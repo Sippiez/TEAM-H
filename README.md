@@ -57,9 +57,35 @@ copying the file alone does not load it.
   evidence in [docs/research/](docs/research/).
 - Follow [AGENTS.md](AGENTS.md) when working with coding assistants.
 
+### Opening a pull request on GitHub
+
+1. Start a new `feature/short-description` branch from the latest default branch.
+   Commit your focused changes and push the branch to GitHub. If this is the
+   branch's first push, use `git push -u origin <your-branch-name>`, replacing
+   the placeholder with your actual branch name.
+2. Open [the repository](https://github.com/Sippiez/TEAM-H) on GitHub, then select
+   **Pull requests > New pull request** (or **Compare & pull request** if shown).
+3. Set **base** to the branch that should receive the changes, normally the
+   default branch, and **compare** to your work branch.
+4. Review the diff, select **Create pull request**, and give it a descriptive
+   title. Fill in the template's summary, changes, verification, and other
+   sections. Use "Not applicable" where appropriate; do not claim checks you
+   did not run.
+5. Request a teammate's review, address feedback, and merge once required reviews
+   and checks are satisfied. Use a draft PR if the work is not ready for review.
+
+GitHub automatically pre-fills new PR descriptions from
+[.github/pull_request_template.md](.github/pull_request_template.md) once that
+file is merged into the repository's default branch. For the initial setup PR,
+or a PR that is already open, copy the template into the description manually.
+Adding the template does not update existing PR descriptions or enforce its
+checklist; required reviews and checks are configured separately in GitHub.
+
 ## Repository layout
 
 - [AGENTS.md](AGENTS.md): guidance for coding assistants.
+- [.github/pull_request_template.md](.github/pull_request_template.md): shared
+  pull request description and checklist.
 - [.gitignore](.gitignore): generic local-file and secret exclusions.
 - [.env.example](.env.example): safe environment configuration template.
 - [docs/decisions/](docs/decisions/): decision records.
