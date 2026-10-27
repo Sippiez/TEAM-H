@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "skills": {
+    "code-review": {
+      "source": "../../../.copilot/session-state/08928b04-dbae-408c-aec2-4a50569caade/files/mattpocock-skills-upstream",
+      "sourceType": "local",
+      "computedHash": "57cfd4ceb011f05e58a1a4f4cad3b2e03419d371f8990f4bcb32ff0d435a039f"
+    },
+    "codebase-design": {
+      "source": "../../../.copilot/session-state/08928b04-dbae-408c-aec2-4a50569caade/files/mattpocock-skills-upstream",
+      "sourceType": "local",
+      "computedHash": "b2888e4f4e8c0af3bfd557575a64b905c44e6248c3101d72077816882b3a92b9"
+    },
+    "diagnosing-bugs": {
+      "source": "../../../.copilot/session-state/08928b04-dbae-408c-aec2-4a50569caade/files/mattpocock-skills-upstream",
+      "sourceType": "local",
+      "computedHash": "ede7254edbd22fcab97a0941511f7d440d8f9a249348fea97c50987ad5501674"
+    },
+    "grill-me": {
+      "source": "../../../.copilot/session-state/08928b04-dbae-408c-aec2-4a50569caade/files/mattpocock-skills-upstream",
+      "sourceType": "local",
+      "computedHash": "9cdbb4b8f7a3aeaef82e6230c9e823500d4a8a1214c726cf342cf9829d34fc7d"
+    },
+    "grilling": {
+      "source": "../../../.copilot/session-state/08928b04-dbae-408c-aec2-4a50569caade/files/mattpocock-skills-upstream",
+      "sourceType": "local",
+      "computedHash": "ef1641a2047b71b60f1942cd35efb47d3afc9d584dff5a0b01f8c7db923aaa08"
+    },
+    "prototype": {
+      "source": "../../../.copilot/session-state/08928b04-dbae-408c-aec2-4a50569caade/files/mattpocock-skills-upstream",
+      "sourceType": "local",
+      "computedHash": "d3fc74689bd993e39c44bfae510d014eecffbeec2922764b065377fd1327c0f6"
+    },
+    "setup-matt-pocock-skills": {
+      "source": "../../../.copilot/session-state/08928b04-dbae-408c-aec2-4a50569caade/files/mattpocock-skills-upstream",
+      "sourceType": "local",
+      "computedHash": "50d6c45174f56a4323b24978f36fcc9169fae0b3abb026587bf636e468c4954c"
+    },
+    "tdd": {
+      "source": "../../../.copilot/session-state/08928b04-dbae-408c-aec2-4a50569caade/files/mattpocock-skills-upstream",
+      "sourceType": "local",
+      "computedHash": "daf55026f456af104a72fa43247f7bcec89e5127316dc5b1b8d675d6a9d8ce94"
+    },
+    "to-tickets": {
+      "source": "../../../.copilot/session-state/08928b04-dbae-408c-aec2-4a50569caade/files/mattpocock-skills-upstream",
+      "sourceType": "local",
+      "computedHash": "5f871bdc46a9212222214ba399be4965374208af1bd7f48f1271bef72841dd31"
+    }
+  }
+}
