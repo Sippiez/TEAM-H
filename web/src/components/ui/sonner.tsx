@@ -1,46 +1,26 @@
 "use client"
 
-import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
-const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+const icon = "size-5"
 
+// The app is light-only; sonner's "system" theme would paint dark-mode text onto paper toasts.
+const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme="light"
       className="toaster group"
+      offset={{ top: 72 }}
+      mobileOffset={{ top: 64, left: 12, right: 12 }}
       icons={{
-        success: (
-          <CircleCheckIcon className="size-4" />
-        ),
-        info: (
-          <InfoIcon className="size-4" />
-        ),
-        warning: (
-          <TriangleAlertIcon className="size-4" />
-        ),
-        error: (
-          <OctagonXIcon className="size-4" />
-        ),
-        loading: (
-          <Loader2Icon className="size-4 animate-spin" />
-        ),
+        success: <CircleCheckIcon className={icon} strokeWidth={2.25} aria-hidden />,
+        info: <InfoIcon className={icon} strokeWidth={2.25} aria-hidden />,
+        warning: <TriangleAlertIcon className={icon} strokeWidth={2.25} aria-hidden />,
+        error: <OctagonXIcon className={icon} strokeWidth={2.25} aria-hidden />,
+        loading: <Loader2Icon className={`${icon} animate-spin`} strokeWidth={2.25} aria-hidden />,
       }}
-      style={
-        {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
-        } as React.CSSProperties
-      }
-      toastOptions={{
-        classNames: {
-          toast: "cn-toast",
-        },
-      }}
+      toastOptions={{ classNames: { toast: "pr-toast" } }}
       {...props}
     />
   )

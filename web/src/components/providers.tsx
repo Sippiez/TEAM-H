@@ -8,10 +8,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <ThemeProvider attribute="class" forcedTheme="light" disableTransitionOnChange>
       <TooltipProvider delay={300}>
         {children}
-        <Toaster richColors position="top-center" />
+        <Toaster position="top-center" />
       </TooltipProvider>
     </ThemeProvider>
   );

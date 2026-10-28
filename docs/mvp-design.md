@@ -57,6 +57,13 @@ flowchart LR
 
 ## 4. Screen design (shadcn/ui)
 
+> **Superseded for visual design and layout.** The app now follows the Paper
+> Route direction in [DESIGN.md](../DESIGN.md) and
+> [decision 0003](decisions/0003-paper-route-design-direction.md): a fixed
+> three-column workspace (route of fields, form sheet, Field/Ask panel),
+> light only, stacking below 1081px. The content and behaviour below still
+> apply.
+
 ### 4.1 Landing
 
 - Centred `Card` with a drag-and-drop upload zone (`Input type="file"`

@@ -114,8 +114,10 @@ components:
 The reference implementation is
 [design-explorations/06-paper-route.html](design-explorations/06-paper-route.html),
 chosen in [decision 0003](docs/decisions/0003-paper-route-design-direction.md).
-When this file and the prototype disagree, this file wins. Update it when the
-direction changes.
+The production implementation is in [web/](web/): tokens and `.pr-*`
+component classes in `web/src/app/globals.css`, and components in
+`web/src/components/form-helper/`. When this file and the prototype or app
+disagree, this file wins. Update it when the direction changes.
 
 ## Overview
 
@@ -220,7 +222,9 @@ counts and example values.
 
 - **Header:** a 60px desk-coloured bar with the brand, the
   "Independent tool. Not a Government of Canada service." notice, and the
-  language toggle.
+  language toggle (left of New session, showing the other language's name
+  with a matching `lang`). Below 640px, New session is icon-only, so the
+  brand, toggle and button fit on one row.
 - **Landing:** a maximum width of 1360px in a 5fr / 7fr grid with a 40px gap.
   The left column holds the hero and the "Start here" upload card. The right
   column holds the service map and "Try a sample form". The grid collapses to
@@ -228,8 +232,15 @@ counts and example values.
 - **Workspace at 1081px and above:** a height-locked
   `300px | minmax(0, 1fr) | 456px` grid. Each column scrolls independently.
   - Left: the vertical route of fields, grouped by form section.
-  - Centre: a sticky document bar (document tabs, "N of 5 documents", Add PDF,
-    and page stops), then the form sheet, at most 780px wide.
+  - Centre: a sticky document bar, then the form sheet, at most 780px wide.
+    The bar is one card with two rows: document tabs, then "N of 5
+    documents" and Add PDF on the right; below a rule, "Page N of M" and
+    the page stops. Tabs shrink and truncate the file name before the row
+    scrolls. Below a 34rem card width, the count and Add PDF wrap under
+    the tabs.
+  - Zoom and Outline fields live in a small paper toolbar (card border,
+    sheet shadow) that floats at the bottom of the sheet and stays in view
+    while it scrolls. It comes before the sheet in focus order.
   - Right: Field and Ask tabs.
 - **1080px and below:** the columns stack. The route becomes a horizontally
   scrolling line of 136px stations above the document.
@@ -310,6 +321,16 @@ edge.
   - The active tab is paper with an ink border and a 3px highlighter underline.
   - Inactive tabs use the hover wash.
 - **Side tabs:** the selected tab has a 3px ink underline.
+
+### Toasts
+
+- Toasts sit top-centre, just below the header. They are used for problems
+  only (wrong file, file too large, document limit, already open, no fields).
+  A successful open shows no toast.
+- Toasts are paper cards with a rule border, the Card shadow and a 6px radius.
+  Errors and warnings use the Status Wash fill.
+- Each toast has a bold 15.5px ink title, a 15px ink-2 description and a 20px
+  ink icon. Toasts are always light themed.
 
 ### Service map (signature)
 

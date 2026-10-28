@@ -34,7 +34,8 @@ shadcn/ui). See [docs/mvp-design.md](docs/mvp-design.md) and
   version managed by nvm in WSL Ubuntu 24.04).
 - **Install:** `cd web && npm install`
 - **Run locally:** `npm run dev`, then open <http://localhost:3000>. Choose
-  **Try the adult passport application (PPTC 153)** to use the bundled sample.
+  **Open sample** on the sample-forms board to use the bundled adult passport
+  application (PPTC 153).
 - **Checks:** `npm run typecheck`, `npm run lint` and `npm run build`.
 - **Deployment:** TODO.
 
@@ -50,6 +51,13 @@ export NODE_EXTRA_CA_CERTS=/path/to/your-root-ca.pem
 ```
 
 The assistant is a rule-based demo. No AI model or API key is needed yet.
+
+You can keep up to five PDFs open as document tabs. **Add PDF** opens
+another, and each tab has its own close button. The button to the left of
+**New session** switches the interface between English and French, and the
+choice is saved in the browser. Only interface text is translated.
+Explanations, assistant replies and linked resources stay in English. The
+French copy is a draft and needs review by a fluent speaker.
 
 ### Environment configuration
 
