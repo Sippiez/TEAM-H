@@ -31,13 +31,17 @@ the `web/` folder. Implementation notes:
   `scripts/copy-pdf-worker.mjs` copies its worker into `public/` before
   `dev` and `build`.
 - Chat currently uses a rule-based assistant behind `/api/chat` and
-  `/api/explain`. A streaming LLM library (for example the Vercel AI SDK) and
-  the LLM provider remain open and can replace those route handlers.
+  `/api/explain`. This is prototype behavior, not the accepted live-AI outcome.
+  [Decision 0002](0002-government-form-helper-mvp.md) records the agreed MVP and
+  prefers the documented, organization-approved Copilot SDK route, subject to
+  access, data-handling, spending, and feasibility gates. It does not authorize
+  implementation or dependency installation.
 
 ## Consequences
 
 - Frontend and backend share TypeScript types (`FormField`, `Resource`).
 - Python-based scraping or retrieval from the LLM team would run as an offline
-  step producing JSON, or as a separate service if needed.
+  step producing JSON. Decision 0002 selects Next.js for source lookup and AI
+  requests without a separate Python backend.
 - Once accepted, update [README.md](../../README.md) with verified setup and
   validation commands.

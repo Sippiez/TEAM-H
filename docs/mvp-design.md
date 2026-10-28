@@ -5,6 +5,12 @@
 - Default scope: Government of Canada (federal) forms and services
 - Proposed stack: [0001: Web stack and UI kit](decisions/0001-web-stack-and-ui-kit.md)
 
+> Historical design draft: the accepted
+> [MVP scope and delivery gates](decisions/0002-government-form-helper-mvp.md)
+> supersede this document wherever they differ, including multi-document chat,
+> bilingual support, government-only live search, upload limits, and AI approval
+> gates. Features below are proposals, not evidence of implementation or approval.
+
 ## 1. Problem and users
 
 Federal forms (passport, benefits, tax, immigration) use dense, legalistic
