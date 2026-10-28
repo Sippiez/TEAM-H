@@ -24,15 +24,32 @@ placeholders, not application boilerplate.
    [docs/decisions/](docs/decisions/) before adding application scaffolding.
 5. Replace the setup placeholders below with verified commands when tooling exists.
 
-### Setup and validation (to be filled in)
+### Setup and validation
 
-- **Prerequisites and versions:** TODO after stack selection.
-- **Dependency installation:** TODO.
-- **Run locally:** TODO.
-- **Tests, linting, and build:** TODO.
+The MVP lives in [web/](web/) (Next.js 16, TypeScript, Tailwind CSS v4,
+shadcn/ui). See [docs/mvp-design.md](docs/mvp-design.md) and
+[decision 0001](docs/decisions/0001-web-stack-and-ui-kit.md).
+
+- **Prerequisites:** Node.js 20.9 or later and npm (verified with the Node
+  version managed by nvm in WSL Ubuntu 24.04).
+- **Install:** `cd web && npm install`
+- **Run locally:** `npm run dev`, then open <http://localhost:3000>. Choose
+  **Try the adult passport application (PPTC 153)** to use the bundled sample.
+- **Checks:** `npm run typecheck`, `npm run lint` and `npm run build`.
 - **Deployment:** TODO.
 
-There are no application, build, or test commands yet.
+`predev` and `prebuild` copy the pdf.js worker into `web/public/` (it's
+gitignored). There are no automated tests yet.
+
+If you're behind a TLS-inspecting proxy, `next/font` and npm can fail to
+download. Point Node at your organisation's root CA instead of disabling TLS
+verification:
+
+```sh
+export NODE_EXTRA_CA_CERTS=/path/to/your-root-ca.pem
+```
+
+The assistant is a rule-based demo. No AI model or API key is needed yet.
 
 ### Environment configuration
 
@@ -90,4 +107,5 @@ checklist; required reviews and checks are configured separately in GitHub.
 - [.env.example](.env.example): safe environment configuration template.
 - [docs/decisions/](docs/decisions/): decision records.
 - [docs/research/](docs/research/): research notes and sources.
+- [web/](web/): Next.js app for the Form Helper MVP.
 - [.agents/skills/](.agents/skills/): existing reusable agent workflows.
