@@ -1,14 +1,10 @@
 "use client";
 
-import { FileSearchIcon, FileTextIcon, MessageSquareIcon, PanelRightIcon, RotateCcwIcon, ScrollTextIcon } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { InfoIcon, RotateCcwIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { cn } from "cn";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { loadForm, type LoadedForm } from "@/lib/pdf/extract";
 import type { AssistantReply, ChatMessage, FieldExplanation, FormContext, FormField } from "@/lib/types";
@@ -16,9 +12,13 @@ import type { AssistantReply, ChatMessage, FieldExplanation, FormContext, FormFi
 import { ChatPanel } from "./chat-panel";
 import { FieldPanel } from "./field-panel";
 import { FormViewer } from "./form-viewer";
+import { setLang, useI18n } from "./i18n";
 import { Landing } from "./landing";
+import { Route } from "./route";
+import { btnSecondary } from "./styles";
 
 const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_DOCS = 5;
 const SAMPLE = { url: "/forms/pptc153.pdf", name: "pptc153.pdf" };
 
 const NAVIGATOR_SUGGESTIONS = [
@@ -26,6 +26,10 @@ const NAVIGATOR_SUGGESTIONS = [
   "I lost my job. What can I apply for?",
   "Sign in to my CRA account",
 ];
+
+/** Where a selection came from. Clicks on the sheet itself never scroll the sheet. */
+type Origin = "sheet" | "route" | "step" | "ref" | "reply";
+type Tab = "field" | "ask";
 
 function toContext(form: LoadedForm): FormContext {
   return {
@@ -44,73 +48,123 @@ function toContext(form: LoadedForm): FormContext {
   };
 }
 
+interface DocSession {
+  key: string;
+  form: LoadedForm;
+  size: number;
+  page: number;
+  selectedId: string | null;
+  visited: ReadonlySet<string>;
+  explanations: Record<string, FieldExplanation>;
+  explainErrors: ReadonlySet<string>;
+  messages: ChatMessage[];
+  pending: boolean;
+  ctxCleared: boolean;
+  tab: Tab;
+}
+
+type Target = { key: string; form: LoadedForm };
+
 let messageCounter = 0;
 const nextId = () => `m-${++messageCounter}`;
+let docCounter = 0;
 
 export function FormHelperApp() {
-  const isDesktop = useMediaQuery("(min-width: 1024px)");
-  const [form, setForm] = useState<LoadedForm | null>(null);
+  const isDesktop = useMediaQuery("(min-width: 1081px)");
+  const { t } = useI18n();
+  const [docs, setDocs] = useState<DocSession[]>([]);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [visited, setVisited] = useState<ReadonlySet<string>>(() => new Set());
-  const [explanations, setExplanations] = useState<Record<string, FieldExplanation>>({});
-  const [explainErrors, setExplainErrors] = useState<ReadonlySet<string>>(() => new Set());
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [pending, setPending] = useState(false);
-  const [chatSheet, setChatSheet] = useState(false);
-  const [fieldSheet, setFieldSheet] = useState(false);
+  const [scrollKey, setScrollKey] = useState(0);
+  const [navMessages, setNavMessages] = useState<ChatMessage[]>([]);
+  const [navPending, setNavPending] = useState(false);
+  const activeRef = useRef<string | null>(null);
   const requested = useRef(new Set<string>());
+  const sideRef = useRef<HTMLElement>(null);
+  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ field: null, ask: null });
 
-  const selected = useMemo(() => form?.fields.find((f) => f.id === selectedId), [form, selectedId]);
+  useEffect(() => {
+    document.documentElement.lang = t.htmlLang;
+  }, [t.htmlLang]);
 
-  const loadExplanation = useCallback(async (field: FormField, formNumber?: string) => {
-    requested.current.add(field.id);
-    setExplainErrors((s) => {
-      if (!s.has(field.id)) return s;
-      const next = new Set(s);
-      next.delete(field.id);
-      return next;
-    });
-    try {
-      const res = await fetch("/api/explain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          field: { id: field.id, path: field.path, page: field.page, type: field.type, label: field.label, section: field.section, options: field.options },
-          formNumber,
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as FieldExplanation;
-      setExplanations((e) => ({ ...e, [field.id]: data }));
-    } catch {
-      requested.current.delete(field.id);
-      setExplainErrors((s) => new Set(s).add(field.id));
-    }
+  const active = docs.find((d) => d.key === activeKey) ?? null;
+  const form = active?.form ?? null;
+  const selected = active?.form.fields.find((f) => f.id === active.selectedId);
+
+  const activate = (key: string | null) => {
+    activeRef.current = key;
+    setActiveKey(key);
+  };
+
+  const updateDoc = useCallback((key: string, fn: (d: DocSession) => DocSession) => {
+    setDocs((ds) => ds.map((d) => (d.key === key ? fn(d) : d)));
   }, []);
 
-  const selectField = useCallback(
-    (id: string, source: LoadedForm | null, openPanel = true) => {
-      const field = source?.fields.find((f) => f.id === id);
-      if (!field || !source) return;
-      setSelectedId(id);
-      setPage(field.page);
-      setVisited((v) => (v.has(id) ? v : new Set(v).add(id)));
-      if (!requested.current.has(id)) void loadExplanation(field, source.formNumber);
-      if (!isDesktop && openPanel) {
-        setChatSheet(false);
-        setFieldSheet(true);
+  const revealSide = useCallback(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    sideRef.current?.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+  }, []);
+
+  const loadExplanation = useCallback(
+    async (key: string, field: FormField, formNumber?: string) => {
+      requested.current.add(`${key}:${field.id}`);
+      updateDoc(key, (d) => {
+        if (!d.explainErrors.has(field.id)) return d;
+        const next = new Set(d.explainErrors);
+        next.delete(field.id);
+        return { ...d, explainErrors: next };
+      });
+      try {
+        const res = await fetch("/api/explain", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            field: { id: field.id, path: field.path, page: field.page, type: field.type, label: field.label, section: field.section, options: field.options },
+            formNumber,
+          }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as FieldExplanation;
+        updateDoc(key, (d) => ({ ...d, explanations: { ...d.explanations, [field.id]: data } }));
+      } catch {
+        requested.current.delete(`${key}:${field.id}`);
+        updateDoc(key, (d) => ({ ...d, explainErrors: new Set(d.explainErrors).add(field.id) }));
       }
     },
-    [isDesktop, loadExplanation],
+    [updateDoc],
   );
 
+  const selectField = useCallback(
+    (target: Target, id: string, origin: Origin) => {
+      const field = target.form.fields.find((f) => f.id === id);
+      if (!field) return;
+      updateDoc(target.key, (d) => ({
+        ...d,
+        selectedId: id,
+        page: field.page,
+        ctxCleared: false,
+        visited: d.visited.has(id) ? d.visited : new Set(d.visited).add(id),
+        tab: origin === "reply" ? d.tab : "field",
+      }));
+      if (!requested.current.has(`${target.key}:${id}`)) void loadExplanation(target.key, field, target.form.formNumber);
+      if (target.key !== activeRef.current) return;
+      if (isDesktop) {
+        if (origin !== "sheet") setScrollKey((k) => k + 1);
+      } else if (origin === "sheet" || origin === "route") {
+        revealSide();
+      }
+    },
+    [isDesktop, loadExplanation, revealSide, updateDoc],
+  );
+
+  /** Posts to the assistant. A null target is the landing page's service navigator. */
   const sendChat = useCallback(
-    async (text: string | null, opts: { intent?: "overview"; source?: LoadedForm | null; fieldId?: string | null } = {}) => {
-      const source = opts.source !== undefined ? opts.source : form;
-      const fieldId = opts.fieldId !== undefined ? opts.fieldId : selectedId;
-      if (text) setMessages((m) => [...m, { id: nextId(), role: "user", text }]);
+    async (text: string | null, target: Target | null, fieldId: string | null, intent?: "overview") => {
+      const push = (msg: ChatMessage) =>
+        target ? updateDoc(target.key, (d) => ({ ...d, messages: [...d.messages, msg] })) : setNavMessages((m) => [...m, msg]);
+      const setPending = (pending: boolean) =>
+        target ? updateDoc(target.key, (d) => ({ ...d, pending })) : setNavPending(pending);
+      if (text) push({ id: nextId(), role: "user", text });
       setPending(true);
       try {
         const res = await fetch("/api/chat", {
@@ -118,56 +172,67 @@ export function FormHelperApp() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: text ?? undefined,
-            intent: opts.intent,
-            form: source ? toContext(source) : undefined,
+            intent,
+            form: target ? toContext(target.form) : undefined,
             selectedFieldId: fieldId ?? undefined,
           }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const reply = (await res.json()) as AssistantReply;
-        setMessages((m) => [...m, { id: nextId(), role: "assistant", ...reply }]);
-        if (reply.highlightFieldId && source && reply.highlightFieldId !== fieldId) {
-          selectField(reply.highlightFieldId, source, false);
+        push({ id: nextId(), role: "assistant", ...reply });
+        if (reply.highlightFieldId && target && reply.highlightFieldId !== fieldId) {
+          selectField(target, reply.highlightFieldId, "reply");
         }
       } catch {
-        setMessages((m) => [
-          ...m,
-          { id: nextId(), role: "assistant", text: "Sorry, I couldn't reach the assistant. Please try again." },
-        ]);
+        push({ id: nextId(), role: "assistant", text: t.chatError });
       } finally {
         setPending(false);
       }
     },
-    [form, selectedId, selectField],
+    [selectField, updateDoc, t.chatError],
   );
 
   const openPdf = async (data: ArrayBuffer, fileName: string) => {
+    // pdf.js may transfer (detach) the buffer, so measure it first.
+    const size = data.byteLength;
+    const dup = docs.find((d) => d.form.fileName === fileName && d.size === size);
+    if (dup) {
+      activate(dup.key);
+      toast.info(t.alreadyOpen);
+      return;
+    }
+    if (docs.length >= MAX_DOCS) {
+      toast.error(t.docLimitTitle, { description: t.docLimitBody });
+      return;
+    }
     setLoading(true);
     try {
       const loaded = await loadForm(data, fileName);
-      void form?.doc.loadingTask.destroy();
-      requested.current = new Set();
-      setForm(loaded);
-      setPage(1);
-      setSelectedId(null);
-      setVisited(new Set());
-      setExplanations({});
-      setExplainErrors(new Set());
-      if (loaded.fields.length === 0) {
-        toast.warning("No fillable fields found", {
-          description: "This MVP works with fillable PDFs. Scanned or flattened forms aren't supported yet.",
-        });
-      } else {
-        toast.success(`Found ${loaded.fields.length} fields`, {
-          description: loaded.formNumber ? `Detected form ${loaded.formNumber}` : "Click any highlighted box.",
-        });
-      }
-      void sendChat(null, { intent: "overview", source: loaded, fieldId: null });
+      const key = `d-${++docCounter}`;
+      setDocs((ds) => [
+        ...ds,
+        {
+          key,
+          form: loaded,
+          size,
+          page: 1,
+          selectedId: null,
+          visited: new Set(),
+          explanations: {},
+          explainErrors: new Set(),
+          messages: [],
+          pending: false,
+          ctxCleared: false,
+          tab: "field",
+        },
+      ]);
+      activate(key);
+      window.scrollTo({ top: 0 });
+      if (loaded.fields.length === 0) toast.warning(t.noFieldsTitle, { description: t.noFieldsBody });
+      void sendChat(null, { key, form: loaded }, null, "overview");
     } catch (err) {
       console.error(err);
-      toast.error("Couldn't open this PDF", {
-        description: "It may be damaged, password-protected or an XFA-only form.",
-      });
+      toast.error(t.openFailTitle, { description: t.openFailBody });
     } finally {
       setLoading(false);
     }
@@ -175,13 +240,13 @@ export function FormHelperApp() {
 
   const onFile = async (file: File) => {
     if (file.size > MAX_BYTES) {
-      toast.error("File too large", { description: "Please choose a PDF under 10 MB." });
+      toast.error(t.tooLargeTitle, { description: t.tooLargeBody });
       return;
     }
     const data = await file.arrayBuffer();
     const header = new TextDecoder().decode(new Uint8Array(data, 0, Math.min(5, data.byteLength)));
     if (header !== "%PDF-") {
-      toast.error("That isn't a PDF", { description: "Please choose a PDF form." });
+      toast.error(t.notPdfTitle, { description: t.notPdfBody });
       return;
     }
     await openPdf(data, file.name);
@@ -193,187 +258,269 @@ export function FormHelperApp() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await openPdf(await res.arrayBuffer(), SAMPLE.name);
     } catch {
-      toast.error("Couldn't load the sample form");
+      toast.error(t.sampleFail);
     }
+  };
+
+  const forget = (key: string) => {
+    for (const k of requested.current) if (k.startsWith(`${key}:`)) requested.current.delete(k);
+  };
+
+  const closeDoc = (key: string) => {
+    const idx = docs.findIndex((d) => d.key === key);
+    if (idx < 0) return;
+    void docs[idx].form.doc.loadingTask.destroy();
+    forget(key);
+    const rest = docs.filter((d) => d.key !== key);
+    const neighbour = rest[Math.min(idx, rest.length - 1)];
+    setDocs(rest);
+    if (activeKey === key) activate(neighbour?.key ?? null);
+    requestAnimationFrame(() => {
+      const next = neighbour
+        ? document.querySelector<HTMLElement>(`[data-doc-tab="${neighbour.key}"]`)
+        : document.getElementById("hero-title");
+      next?.focus();
+    });
   };
 
   const reset = () => {
-    void form?.doc.loadingTask.destroy();
-    setForm(null);
-    setSelectedId(null);
+    for (const d of docs) void d.form.doc.loadingTask.destroy();
+    requested.current = new Set();
+    setDocs([]);
+    activate(null);
+    window.scrollTo({ top: 0 });
   };
+
+  const target = active ? { key: active.key, form: active.form } : null;
 
   const askAboutField = (field: FormField) => {
-    if (!isDesktop) {
-      setFieldSheet(false);
-      setChatSheet(true);
-    }
-    void sendChat("What should I enter in this field?", { fieldId: field.id });
+    if (!active || !target) return;
+    updateDoc(active.key, (d) => ({ ...d, ctxCleared: false, tab: "ask" }));
+    if (!isDesktop) revealSide();
+    void sendChat("What should I enter in this field?", target, field.id);
   };
 
-  const formSuggestions = selected
+  const setTab = (tab: Tab) => {
+    if (active) updateDoc(active.key, (d) => ({ ...d, tab }));
+  };
+
+  const askingAbout = active?.ctxCleared ? undefined : selected;
+
+  const formSuggestions = askingAbout
     ? ["What should I enter in this field?", "Give me an overview of this form"]
     : form?.formNumber === "PPTC 153"
       ? ["Give me an overview of this form", "Who can be my guarantor?", "Where do I put my date of birth?", "How much does a passport cost?"]
       : ["Give me an overview of this form", "Where do I put my address?"];
 
+  const mapHighlight = useMemo(() => {
+    const last = [...navMessages].reverse().find((m) => m.role === "assistant");
+    return last?.resources?.map((r) => r.id);
+  }, [navMessages]);
+
+  const tab = active?.tab ?? "field";
+
+  const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+    e.preventDefault();
+    const next: Tab = e.key === "Home" ? "field" : e.key === "End" ? "ask" : tab === "field" ? "ask" : "field";
+    setTab(next);
+    tabRefs.current[next]?.focus();
+  };
+
   const header = (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-3 sm:px-4">
-      <button type="button" onClick={reset} className="flex items-center gap-2 rounded-md font-heading font-semibold" aria-label="Form Helper home">
-        <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <FileSearchIcon className="size-4" aria-hidden />
-        </span>
-        <span className="hidden sm:inline">Form Helper</span>
+    <header className="flex min-h-[60px] flex-none flex-wrap items-center gap-x-2 gap-y-1 border-b border-rule bg-desk px-3.5 py-2 sm:gap-x-6 sm:px-7">
+      <button
+        type="button"
+        onClick={reset}
+        className="group inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-[19px] font-extrabold tracking-[-0.01em] whitespace-nowrap max-sm:mr-auto"
+      >
+        <svg width="34" height="20" viewBox="0 0 34 20" aria-hidden="true" focusable="false">
+          <path d="M3 10h28" className="stroke-ink" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="17" cy="10" r="6" className="fill-highlighter stroke-ink" strokeWidth="2.5" />
+        </svg>
+        <span className="underline-offset-[0.2em] group-hover:underline">{t.brand}</span>
+        <span className="sr-only">{t.brandHome}</span>
       </button>
-      <Badge variant="outline" className="hidden md:inline-flex">
-        Unofficial demo
-      </Badge>
-      {form && (
-        <div className="ml-2 flex min-w-0 items-center gap-2">
-          <FileTextIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="truncate text-sm">{form.fileName}</span>
-          {form.formNumber && <Badge variant="secondary">{form.formNumber}</Badge>}
-        </div>
-      )}
-      <div className="ml-auto flex items-center gap-1">
-        <Badge variant="outline" className="hidden text-muted-foreground lg:inline-flex" title="Answers come from curated rules, not an AI model">
-          Rule-based demo · no AI model connected
-        </Badge>
-        {form && (
-          <>
-            <Button variant="ghost" size="sm" onClick={() => sendChat(null, { intent: "overview" })} disabled={pending}>
-              <ScrollTextIcon />
-              <span className="hidden sm:inline">Overview</span>
-            </Button>
-            <Button variant="ghost" size="sm" onClick={reset}>
-              <RotateCcwIcon />
-              <span className="hidden sm:inline">New form</span>
-            </Button>
-          </>
+      <p className="flex items-center gap-2 text-[15px] text-ink-2 max-sm:order-3 max-sm:w-full sm:mr-auto">
+        <InfoIcon className="size-5 flex-none text-ink" strokeWidth={2.25} aria-hidden />
+        {t.notOfficial}
+      </p>
+      <div className="flex items-center gap-2 sm:gap-3">
+        <button
+          type="button"
+          lang={t.otherLang}
+          onClick={() => setLang(t.otherLang)}
+          className={cn(btnSecondary, "min-h-11 px-3 sm:px-3.5")}
+        >
+          {t.otherLangName}
+        </button>
+        {docs.length > 0 && (
+          <button type="button" onClick={reset} className={cn(btnSecondary, "min-h-11 max-sm:min-w-11 max-sm:px-0")}>
+            <RotateCcwIcon className="size-[18px]" strokeWidth={2.25} aria-hidden />
+            <span className="max-sm:sr-only">{t.newSession}</span>
+          </button>
         )}
-        <ThemeToggle />
       </div>
     </header>
   );
 
-  const chat = (
-    <ChatPanel
-      messages={messages}
-      pending={pending}
-      onSend={(t) => void sendChat(t)}
-      onFieldRef={form ? (id) => selectField(id, form) : undefined}
-      selectedField={selected}
-      onClearSelection={() => setSelectedId(null)}
-      suggestions={form ? formSuggestions : NAVIGATOR_SUGGESTIONS}
-      placeholder={form ? "Ask about this form or a field…" : "Ask about a government service…"}
-    />
-  );
-
-  if (!form) {
+  if (!active || !form || !target) {
     return (
       <div className="flex min-h-dvh flex-col">
         {header}
         <main className="flex-1">
-          <Landing loading={loading} onFile={onFile} onSample={onSample} navigator={chat} />
+          <Landing
+            loading={loading}
+            onFile={onFile}
+            onSample={onSample}
+            mapHighlight={mapHighlight}
+            navigator={
+              <ChatPanel
+                id="navigator"
+                className="h-full"
+                messages={navMessages}
+                pending={navPending}
+                onSend={(text) => void sendChat(text, null, null)}
+                suggestions={NAVIGATOR_SUGGESTIONS}
+                placeholder={t.navPlaceholder}
+                inputLabel={t.navInputLabel}
+              />
+            }
+          />
         </main>
-        <Disclaimer />
       </div>
     );
   }
 
-  const fieldPanel = (
-    <FieldPanel
-      fields={form.fields}
-      selected={selected}
-      explanation={selected ? explanations[selected.id] : undefined}
-      explanationError={selected ? explainErrors.has(selected.id) : false}
-      visited={visited}
-      onSelect={(id) => selectField(id, form, false)}
-      onBack={() => setSelectedId(null)}
-      onAsk={askAboutField}
-      onRetry={(f) => void loadExplanation(f, form.formNumber)}
-    />
-  );
-
-  const viewer = (
-    <FormViewer
-      doc={form.doc}
-      page={page}
-      pageCount={form.pageCount}
-      onPageChange={(p) => setPage(Math.min(Math.max(1, p), form.pageCount))}
-      fields={form.fields}
-      selectedId={selectedId}
-      visited={visited}
-      onSelect={(id) => selectField(id, form)}
-    />
-  );
-
   return (
-    <div className="flex h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col desk:h-dvh desk:overflow-hidden">
       {header}
-      {isDesktop ? (
-        <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
-          <ResizablePanel defaultSize="27%" minSize="18%" maxSize="40%">
-            <section aria-label="Chat" className="flex h-full flex-col">
-              <h2 className="sr-only">Chat</h2>
-              {chat}
-            </section>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize="45%" minSize="30%">
-            <section aria-label="Form" className="h-full">
-              {viewer}
-            </section>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize="28%" minSize="20%" maxSize="45%">
-            <aside aria-label="Field details" className="h-full">
-              {fieldPanel}
-            </aside>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      ) : (
-        <>
-          <main className="min-h-0 flex-1">{viewer}</main>
-          <nav className="grid shrink-0 grid-cols-2 gap-2 border-t p-2" aria-label="Panels">
-            <Button variant="outline" onClick={() => setChatSheet(true)}>
-              <MessageSquareIcon />
-              Chat
-            </Button>
-            <Button variant="outline" onClick={() => setFieldSheet(true)}>
-              <PanelRightIcon />
-              {selected ? "Field details" : "All fields"}
-            </Button>
-          </nav>
-          <Sheet open={chatSheet} onOpenChange={setChatSheet}>
-            <SheetContent side="bottom" className="h-[85dvh] gap-0 p-0">
-              <SheetHeader className="border-b">
-                <SheetTitle>Chat</SheetTitle>
-                <SheetDescription>Ask about this form or a government service.</SheetDescription>
-              </SheetHeader>
-              <div className="min-h-0 flex-1">{chat}</div>
-            </SheetContent>
-          </Sheet>
-          <Sheet open={fieldSheet} onOpenChange={setFieldSheet}>
-            <SheetContent side="bottom" className="h-[85dvh] gap-0 p-0">
-              <SheetHeader className="sr-only">
-                <SheetTitle>Field details</SheetTitle>
-                <SheetDescription>Explanation of the selected form field.</SheetDescription>
-              </SheetHeader>
-              <div className="min-h-0 flex-1 pt-8">{fieldPanel}</div>
-            </SheetContent>
-          </Sheet>
-        </>
-      )}
+      <main className="flex min-h-0 flex-1 flex-col desk:grid desk:grid-cols-[300px_minmax(0,1fr)_456px]">
+        <h1 className="sr-only">
+          {t.brand}: {form.formNumber ?? form.fileName}
+        </h1>
+        <Route
+          key={active.key}
+          fields={form.fields}
+          selectedId={active.selectedId}
+          visited={active.visited}
+          onSelect={(id) => selectField(target, id, "route")}
+        />
+        <FormViewer
+          doc={form.doc}
+          page={active.page}
+          pageCount={form.pageCount}
+          onPageChange={(p) => updateDoc(active.key, (d) => ({ ...d, page: Math.min(Math.max(1, p), form.pageCount) }))}
+          fields={form.fields}
+          selectedId={active.selectedId}
+          visited={active.visited}
+          scrollKey={scrollKey}
+          loading={loading}
+          onSelect={(id) => selectField(target, id, "sheet")}
+          onFile={onFile}
+          docs={docs.map((d) => ({ key: d.key, fileName: d.form.fileName, formNumber: d.form.formNumber }))}
+          activeKey={active.key}
+          maxDocs={MAX_DOCS}
+          onSwitch={activate}
+          onClose={closeDoc}
+        />
+        <aside
+          ref={sideRef}
+          aria-label={t.sidePanel}
+          className="flex scroll-mt-2 flex-col border-t border-rule bg-paper desk:min-h-0 desk:border-t-0 desk:border-l"
+        >
+          <div
+            role="tablist"
+            aria-label={t.sideTabs}
+            className="flex flex-none gap-1 border-b border-rule px-3 pt-1 sm:px-5 sm:pt-1.5"
+          >
+            {(["field", "ask"] as const).map((name) => (
+              <button
+                key={name}
+                ref={(el) => {
+                  tabRefs.current[name] = el;
+                }}
+                type="button"
+                role="tab"
+                id={`tab-${name}`}
+                aria-controls={`panel-${name}`}
+                aria-selected={tab === name}
+                tabIndex={tab === name ? 0 : -1}
+                onClick={() => setTab(name)}
+                onKeyDown={onTabKey}
+                className={cn(
+                  "-mb-px inline-flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 border-b-3 px-3 text-base font-bold",
+                  tab === name
+                    ? "border-ink text-ink"
+                    : "border-transparent text-ink-2 hover:bg-desk hover:text-ink",
+                )}
+              >
+                {name === "field" ? (
+                  <svg
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.25}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="size-[18px]"
+                  >
+                    <path d="M12 3v18M12 5h7l2 2.5-2 2.5h-7M12 12H5l-2 2.5L5 17h7" />
+                  </svg>
+                ) : (
+                  <InfoIcon aria-hidden="true" className="size-[18px]" strokeWidth={2.25} />
+                )}
+                {name === "field" ? t.tabField : t.tabAsk}
+              </button>
+            ))}
+          </div>
+          <div
+            role="tabpanel"
+            id="panel-field"
+            aria-labelledby="tab-field"
+            hidden={tab !== "field"}
+            className="relative desk:min-h-0 desk:flex-1 desk:overflow-auto"
+          >
+            <FieldPanel
+              fields={form.fields}
+              pageCount={form.pageCount}
+              selected={selected}
+              explanation={selected ? active.explanations[selected.id] : undefined}
+              explanationError={selected ? active.explainErrors.has(selected.id) : false}
+              onSelect={(id) => selectField(target, id, "step")}
+              onAsk={askAboutField}
+              onRetry={(f) => void loadExplanation(active.key, f, form.formNumber)}
+              onShowOnForm={() => setScrollKey((k) => k + 1)}
+            />
+          </div>
+          <div
+            role="tabpanel"
+            id="panel-ask"
+            aria-labelledby="tab-ask"
+            hidden={tab !== "ask"}
+            className="flex-col data-[shown]:flex max-desk:h-[min(640px,88dvh)] desk:min-h-0 desk:flex-1"
+            data-shown={tab === "ask" ? "" : undefined}
+          >
+            <ChatPanel
+              key={active.key}
+              id="ask"
+              className="min-h-0 flex-1"
+              heading={{ title: t.questionsTitle, sub: t.questionsSub }}
+              messages={active.messages}
+              pending={active.pending}
+              onSend={(text) => void sendChat(text, target, active.ctxCleared ? null : active.selectedId)}
+              onFieldRef={(id) => selectField(target, id, "ref")}
+              askingAbout={askingAbout}
+              onClearAsking={() => updateDoc(active.key, (d) => ({ ...d, ctxCleared: true }))}
+              suggestions={formSuggestions}
+              placeholder={t.formPlaceholder}
+              inputLabel={t.formInputLabel}
+            />
+          </div>
+        </aside>
+      </main>
     </div>
-  );
-}
-
-function Disclaimer() {
-  return (
-    <footer className="border-t px-4 py-4 text-center text-xs text-muted-foreground">
-      Unofficial hackathon prototype, not affiliated with the Government of Canada. Explanations are general
-      information, not legal advice. Always check the official instructions on Canada.ca.
-    </footer>
   );
 }

@@ -1,370 +1,258 @@
 "use client";
 
-import {
-  AlertTriangleIcon,
-  ArrowLeftIcon,
-  BadgeCheckIcon,
-  CheckIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  InfoIcon,
-  ListChecksIcon,
-  MapPinIcon,
-  MessageSquareIcon,
-  PencilLineIcon,
-  SearchIcon,
-} from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, CircleXIcon, InfoIcon, LocateFixedIcon, TriangleAlertIcon } from "lucide-react";
+import { useEffect, useRef, type ReactNode } from "react";
 
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "cn";
 import type { FieldExplanation, FormField } from "@/lib/types";
 
+import { englishOnly, useI18n } from "./i18n";
 import { ResourceList } from "./resource-list";
+import { btnPaper, btnPrimary, btnSecondary } from "./styles";
 
-const TYPE_LABEL: Record<FormField["type"], string> = {
-  text: "Text",
-  checkbox: "Checkbox",
-  radio: "Choose one",
-  choice: "Drop-down",
-  signature: "Signature",
-};
+const icon = "size-[18px] flex-none";
 
 interface FieldPanelProps {
   fields: FormField[];
+  pageCount: number;
   selected?: FormField;
   explanation?: FieldExplanation;
   explanationError?: boolean;
-  visited: ReadonlySet<string>;
   onSelect: (fieldId: string) => void;
-  onBack: () => void;
   onAsk: (field: FormField) => void;
   onRetry: (field: FormField) => void;
+  onShowOnForm: () => void;
 }
 
-export function FieldPanel(props: FieldPanelProps) {
-  return props.selected ? (
-    <FieldDetails {...props} selected={props.selected} />
-  ) : (
-    <FieldBrowser fields={props.fields} visited={props.visited} onSelect={props.onSelect} />
-  );
-}
-
-function FieldBrowser({
+export function FieldPanel({
   fields,
-  visited,
-  onSelect,
-}: Pick<FieldPanelProps, "fields" | "visited" | "onSelect">) {
-  const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<"all" | "todo" | "viewed">("all");
-
-  const groups = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = fields.filter((f) => {
-      if (tab === "viewed" && !visited.has(f.id)) return false;
-      if (tab === "todo" && visited.has(f.id)) return false;
-      return !q || f.label.toLowerCase().includes(q) || f.section.toLowerCase().includes(q);
-    });
-    const map = new Map<string, FormField[]>();
-    for (const f of filtered) map.set(f.section, [...(map.get(f.section) ?? []), f]);
-    return [...map.entries()];
-  }, [fields, visited, query, tab]);
-
-  const progress = fields.length ? Math.round((visited.size / fields.length) * 100) : 0;
-
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="space-y-3 border-b p-3">
-        <div>
-          <h2 className="font-heading text-base font-medium">Form fields</h2>
-          <p className="text-sm text-muted-foreground">
-            Click a highlighted box on the form, or pick a field below.
-          </p>
-        </div>
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Reviewed</span>
-            <span className="tabular-nums">
-              {visited.size}/{fields.length}
-            </span>
-          </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Fields reviewed">
-            <div className="h-full bg-emerald-500 transition-all" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
-        <div className="relative">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search fields…"
-            aria-label="Search fields"
-            className="pl-8"
-          />
-        </div>
-        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-          <TabsList className="w-full">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="todo">Not viewed</TabsTrigger>
-            <TabsTrigger value="viewed">Viewed</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        {groups.length === 0 && (
-          <p className="p-4 text-center text-sm text-muted-foreground">No fields match.</p>
-        )}
-        {groups.map(([section, items]) => (
-          <section key={section} className="mb-3">
-            <h3 className="sticky top-0 z-10 bg-background/95 px-2 py-1 text-xs font-medium tracking-wide text-muted-foreground uppercase backdrop-blur">
-              {section}
-            </h3>
-            <ul>
-              {items.map((f) => (
-                <li key={f.id}>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(f.id)}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-                  >
-                    <span
-                      className={cn(
-                        "flex size-4 shrink-0 items-center justify-center rounded-full border",
-                        visited.has(f.id) && "border-emerald-500 bg-emerald-500 text-white",
-                      )}
-                      aria-hidden
-                    >
-                      {visited.has(f.id) && <CheckIcon className="size-3" />}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{f.label}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">p.{f.page}</span>
-                    {visited.has(f.id) && <span className="sr-only">(viewed)</span>}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FieldDetails({
-  fields,
+  pageCount,
   selected,
   explanation,
   explanationError,
   onSelect,
-  onBack,
   onAsk,
   onRetry,
-}: FieldPanelProps & { selected: FormField }) {
-  const index = fields.findIndex((f) => f.id === selected.id);
-  const prev = fields[index - 1];
-  const next = fields[index + 1];
-  const related = fields.filter((f) => f.section === selected.section && f.id !== selected.id).slice(0, 6);
+  onShowOnForm,
+}: FieldPanelProps) {
+  const { t } = useI18n();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const prevRef = useRef<HTMLButtonElement>(null);
+  const nextRef = useRef<HTMLButtonElement>(null);
+  const stepped = useRef<-1 | 1 | null>(null);
+
+  const index = selected ? fields.findIndex((f) => f.id === selected.id) : -1;
+  const prev = index > 0 ? fields[index - 1] : undefined;
+  const next = index >= 0 ? fields[index + 1] : undefined;
+
+  useEffect(() => {
+    const dir = stepped.current;
+    stepped.current = null;
+    if (!dir) return;
+    const btn = dir === 1 ? nextRef.current : prevRef.current;
+    if (!btn || btn.disabled) headingRef.current?.focus();
+  }, [selected?.id]);
+
+  if (!selected) {
+    return (
+      <div className="flex flex-col items-start gap-4 px-4 py-6 sm:px-6">
+        <h2 className="max-w-[30ch] text-[19px] font-semibold text-ink-2">
+          {t.selectPrompt}
+        </h2>
+        {fields[0] && (
+          <button type="button" className={btnPrimary} onClick={() => onSelect(fields[0].id)}>
+            {t.startFirst}
+            <ArrowRightIcon className={icon} strokeWidth={2.25} aria-hidden />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const step = (dir: -1 | 1, target?: FormField) => {
+    if (!target) return;
+    stepped.current = dir;
+    onSelect(target.id);
+  };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="space-y-2 border-b p-3">
-        <Button variant="ghost" size="xs" onClick={onBack} className="-ml-1.5">
-          <ArrowLeftIcon />
-          All fields
-        </Button>
-        <div className="flex flex-wrap gap-1.5">
-          <Badge variant="secondary">{selected.section}</Badge>
-          <Badge variant="outline">Page {selected.page}</Badge>
-          <Badge variant="outline">{TYPE_LABEL[selected.type]}</Badge>
+    <div>
+      <div className="mx-4 flex flex-col gap-3 border-b border-rule-2 pt-[18px] pb-4 sm:mx-6 sm:pt-[22px] sm:pb-5">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[15px] text-ink-2">
+          <span>{selected.section}</span>
+          <span className="tabular-nums">
+            {t.pageOf(selected.page, pageCount)} · {t.types[selected.type]}
+          </span>
         </div>
-        <h2 className="font-heading text-lg leading-snug font-semibold">{selected.label}</h2>
+        <h2
+          ref={headingRef}
+          id="field-title"
+          tabIndex={-1}
+          className="text-[23px] tracking-[-0.01em] focus:outline-none focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-ink sm:text-[27px]"
+        >
+          <span className="pr-hl">{selected.label}</span>
+        </h2>
         {selected.tooltip && selected.tooltip !== selected.label && (
-          <p className="text-xs text-muted-foreground">
-            Label in the PDF: <q>{selected.tooltip}</q>
+          <p className="text-[15px] text-ink-2">
+            {t.pdfLabel} <q>{selected.tooltip}</q>
           </p>
         )}
+        <div className="mt-1 grid gap-2 sm:grid-cols-[auto_1fr]">
+          <button
+            ref={prevRef}
+            type="button"
+            disabled={!prev}
+            aria-label={prev ? t.prevFieldAria(prev.label) : undefined}
+            onClick={() => step(-1, prev)}
+            className={cn(btnSecondary, "justify-start px-3.5 py-2 text-[15.5px] leading-tight")}
+          >
+            <ArrowLeftIcon className={icon} strokeWidth={2.25} aria-hidden />
+            {t.previous}
+          </button>
+          <button
+            ref={nextRef}
+            type="button"
+            disabled={!next}
+            onClick={() => step(1, next)}
+            className={cn(btnPrimary, "justify-between px-3.5 py-2 text-left text-[15.5px] leading-tight")}
+          >
+            {next ? (
+              <span>
+                <span className="font-semibold text-ink-2">{t.nextLabel}</span> {next.label}
+              </span>
+            ) : (
+              <span>{t.lastField}</span>
+            )}
+            <ArrowRightIcon className={icon} strokeWidth={2.25} aria-hidden />
+          </button>
+        </div>
+        <button type="button" onClick={onShowOnForm} className={cn(btnSecondary, "min-h-11 self-start desk:hidden")}>
+          <LocateFixedIcon className={icon} strokeWidth={2.25} aria-hidden />
+          {t.showOnForm}
+        </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="flex flex-col gap-6 px-4 pt-4 pb-8 sm:px-6 sm:pt-[18px] desk:pb-24" aria-live="polite" aria-busy={!explanation && !explanationError}>
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          {explanation &&
+            (explanation.grounded ? (
+              <p className="inline-flex items-center gap-2 text-[15.5px] text-ink-2">
+                <CheckIcon className={cn(icon, "text-ink")} strokeWidth={2.5} aria-hidden />
+                {t.grounded}
+              </p>
+            ) : (
+              <p className="inline-flex items-center gap-2 text-[15.5px] italic">
+                <TriangleAlertIcon className={icon} strokeWidth={2.25} aria-hidden />
+                {t.general}
+              </p>
+            ))}
+          <button type="button" onClick={() => onAsk(selected)} className={cn(btnPaper, "ml-auto min-h-10 px-3 text-[15px]")}>
+            <InfoIcon className={icon} strokeWidth={2.25} aria-hidden />
+            {t.askField}
+          </button>
+        </div>
+
         {explanationError ? (
-          <Alert variant="destructive">
-            <AlertTriangleIcon />
-            <AlertDescription>
-              Couldn&apos;t load an explanation.{" "}
-              <button type="button" className="underline" onClick={() => onRetry(selected)}>
-                Try again
-              </button>
-            </AlertDescription>
-          </Alert>
+          <div className="flex flex-wrap items-center gap-3 rounded-sm bg-status-wash px-3.5 py-2.5" role="alert">
+            <p className="font-bold">{t.explainError}</p>
+            <button type="button" className={cn(btnPaper, "min-h-10 px-3 text-[15px]")} onClick={() => onRetry(selected)}>
+              {t.tryAgain}
+            </button>
+          </div>
         ) : !explanation ? (
-          <div className="space-y-3" aria-label="Loading explanation">
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-4 w-1/2" />
-            <Skeleton className="h-12 w-full" />
+          <div className="flex flex-col gap-3">
+            <span className="sr-only">{t.loadingExplanation}</span>
+            {["w-1/3", "w-full", "w-5/6", "w-1/3", "w-full"].map((w, i) => (
+              <div key={i} aria-hidden="true" className={cn("h-4 animate-pulse rounded-sm bg-rule-2 motion-reduce:animate-none", w)} />
+            ))}
           </div>
         ) : (
-          <ExplanationBody key={selected.id} field={selected} e={explanation} />
+          <Explanation field={selected} e={explanation} />
         )}
-
-        {related.length > 0 && (
-          <div className="mt-4">
-            <div className="mb-1.5 text-xs font-medium text-muted-foreground">Other fields in this section</div>
-            <div className="flex flex-wrap gap-1.5">
-              {related.map((f) => (
-                <Button key={f.id} variant="outline" size="xs" onClick={() => onSelect(f.id)} className="max-w-full">
-                  <span className="truncate">{f.label}</span>
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center gap-1.5 border-t p-2">
-        <Button variant="ghost" size="sm" disabled={!prev} onClick={() => prev && onSelect(prev.id)} aria-label="Previous field">
-          <ChevronLeftIcon />
-          Prev
-        </Button>
-        <Button className="flex-1" size="sm" onClick={() => onAsk(selected)}>
-          <MessageSquareIcon />
-          Ask about this field
-        </Button>
-        <Button variant="ghost" size="sm" disabled={!next} onClick={() => next && onSelect(next.id)} aria-label="Next field">
-          Next
-          <ChevronRightIcon />
-        </Button>
       </div>
     </div>
   );
 }
 
-function ExplanationBody({ field, e }: { field: FormField; e: FieldExplanation }) {
-  const items = ["meaning", "enter", "find", "points", "mistakes", "sources"];
+function Block({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="space-y-3">
-      {e.grounded ? (
-        <div className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400">
-          <BadgeCheckIcon className="size-3.5" aria-hidden />
-          Based on official Canada.ca guidance
-        </div>
-      ) : (
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <InfoIcon className="size-3.5" aria-hidden />
-          General guidance. Check the form&apos;s instructions.
-        </div>
+    <section>
+      <h3 className="mb-1.5 text-[17px]">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function Explanation({ field, e }: { field: FormField; e: FieldExplanation }) {
+  const { lang, t } = useI18n();
+  const en = englishOnly(lang);
+  const options = field.options && field.options.length > 0 && field.options.length <= 12 ? field.options : null;
+  return (
+    <>
+      {t.englishContent && <p className="text-[15.5px] text-ink-2 italic">{t.englishContent}</p>}
+      <Block title={t.meaning}>
+        <p lang={en} className="max-w-[62ch]">
+          {e.meaning}
+        </p>
+      </Block>
+      <Block title={t.enter}>
+        <p lang={en} className="max-w-[62ch]">
+          {e.whatToEnter}
+        </p>
+      </Block>
+      {e.formatExample && (
+        <Block title={t.example}>
+          <p className="inline-block rounded-sm border border-rule bg-paper px-2.5 py-0.5 text-[19px] font-bold tabular-nums">
+            {e.formatExample}
+          </p>
+        </Block>
       )}
-      <Accordion multiple defaultValue={items}>
-        <AccordionItem value="meaning">
-          <AccordionTrigger>
-            <span className="flex items-center gap-2">
-              <InfoIcon className="size-4 text-sky-600" aria-hidden />
-              What it means
-            </span>
-          </AccordionTrigger>
-          <AccordionContent>
-            <p>{e.meaning}</p>
-          </AccordionContent>
-        </AccordionItem>
-        <AccordionItem value="enter">
-          <AccordionTrigger>
-            <span className="flex items-center gap-2">
-              <PencilLineIcon className="size-4 text-violet-600" aria-hidden />
-              What to enter
-            </span>
-          </AccordionTrigger>
-          <AccordionContent className="space-y-2">
-            <p>{e.whatToEnter}</p>
-            {e.formatExample && (
-              <div className="rounded-md border bg-muted/50 px-2.5 py-1.5">
-                <div className="text-xs text-muted-foreground">Example</div>
-                <code className="font-mono text-sm">{e.formatExample}</code>
-              </div>
-            )}
-            {field.options && field.options.length > 0 && field.options.length <= 12 && (
-              <div>
-                <div className="text-xs text-muted-foreground">Options</div>
-                <ul className="mt-1 flex flex-wrap gap-1">
-                  {field.options.map((o) => (
-                    <li key={o}>
-                      <Badge variant="outline">{o}</Badge>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </AccordionContent>
-        </AccordionItem>
-        {e.whereToFind && (
-          <AccordionItem value="find">
-            <AccordionTrigger>
-              <span className="flex items-center gap-2">
-                <MapPinIcon className="size-4 text-orange-600" aria-hidden />
-                Where to find it
-              </span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <p>{e.whereToFind}</p>
-            </AccordionContent>
-          </AccordionItem>
-        )}
-        {e.keyPoints && (
-          <AccordionItem value="points">
-            <AccordionTrigger>
-              <span className="flex items-center gap-2">
-                <ListChecksIcon className="size-4 text-emerald-600" aria-hidden />
-                {e.keyPoints.title}
-              </span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <ul className="space-y-1">
-                {e.keyPoints.items.map((item) => (
-                  <li key={item} className="flex gap-2">
-                    <CheckIcon className="mt-0.5 size-3.5 shrink-0 text-emerald-600" aria-hidden />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </AccordionContent>
-          </AccordionItem>
-        )}
-        {e.commonMistakes.length > 0 && (
-          <AccordionItem value="mistakes">
-            <AccordionTrigger>
-              <span className="flex items-center gap-2">
-                <AlertTriangleIcon className="size-4 text-amber-600" aria-hidden />
-                Common mistakes
-              </span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <ul className="ml-4 list-disc space-y-1 marker:text-muted-foreground">
-                {e.commonMistakes.map((m) => (
-                  <li key={m}>{m}</li>
-                ))}
-              </ul>
-            </AccordionContent>
-          </AccordionItem>
-        )}
-        {e.sources.length > 0 && (
-          <AccordionItem value="sources">
-            <AccordionTrigger>
-              <span className="flex items-center gap-2">
-                <BadgeCheckIcon className="size-4 text-sky-600" aria-hidden />
-                Official sources
-              </span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <ResourceList resources={e.sources} compact />
-            </AccordionContent>
-          </AccordionItem>
-        )}
-      </Accordion>
-    </div>
+      {options && (
+        <Block title={t.options}>
+          <ul className="flex flex-wrap gap-1.5">
+            {options.map((o) => (
+              <li key={o} className="rounded-sm border border-rule px-2.5 py-0.5 font-semibold">
+                {o}
+              </li>
+            ))}
+          </ul>
+        </Block>
+      )}
+      {e.whereToFind && (
+        <Block title={t.whereToFind}>
+          <p lang={en} className="max-w-[62ch]">{e.whereToFind}</p>
+        </Block>
+      )}
+      {e.keyPoints && (
+        <section lang={en} className="rounded-md border border-rule px-4 py-3">
+          <h3 className="mb-1.5 text-[17px]">{e.keyPoints.title}</h3>
+          <ul className="flex flex-col gap-1.5">
+            {e.keyPoints.items.map((item) => (
+              <li key={item} className="flex items-start gap-2.5">
+                <CheckIcon className={cn(icon, "mt-[0.2em]")} strokeWidth={2.5} aria-hidden />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {e.commonMistakes.length > 0 && (
+        <Block title={t.mistakes}>
+          <ul lang={en} className="flex flex-col gap-1.5">
+            {e.commonMistakes.map((m) => (
+              <li key={m} className="flex items-start gap-2.5">
+                <CircleXIcon className={cn(icon, "mt-[0.2em]")} strokeWidth={2.25} aria-hidden />
+                <span>{m}</span>
+              </li>
+            ))}
+          </ul>
+        </Block>
+      )}
+      {e.sources.length > 0 && (
+        <Block title={t.sources}>
+          <ResourceList resources={e.sources} compact />
+        </Block>
+      )}
+    </>
   );
 }

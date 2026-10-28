@@ -1,59 +1,47 @@
-import { CheckCircle2Icon, FileTextIcon } from "lucide-react";
-
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { FormOverview } from "@/lib/types";
 
+import { englishOnly, useI18n } from "./i18n";
 import { ResourceList } from "./resource-list";
 
 export function OverviewCard({ overview }: { overview: FormOverview }) {
+  const { lang, t } = useI18n();
+  const en = englishOnly(lang);
   return (
-    <Card size="sm" className="w-full">
-      <CardHeader>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <FileTextIcon className="size-4 text-muted-foreground" aria-hidden />
-          {overview.formNumber && <Badge variant="secondary">{overview.formNumber}</Badge>}
-          {overview.department && <Badge variant="outline">{overview.department}</Badge>}
-        </div>
-        <CardTitle>{overview.title}</CardTitle>
-        <CardDescription>
-          {overview.pageCount} pages · {overview.fieldCount} fillable fields
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <p>{overview.summary}</p>
+    <div className="flex flex-col gap-2">
+      <h3 className="text-[19px]">{t.overviewTitle(overview.title)}</h3>
+      <p className="text-[15px] text-ink-2 tabular-nums">
+        {[overview.formNumber, overview.department].filter(Boolean).join(" · ")}
+        {(overview.formNumber || overview.department) && " · "}
+        {t.pagesFields(overview.pageCount, overview.fieldCount)}
+      </p>
+      <p lang={en}>{overview.summary}</p>
+      <dl className="flex flex-col gap-2.5">
         {overview.whoFiles && (
-          <p>
-            <span className="font-medium">Who uses it: </span>
-            {overview.whoFiles}
-          </p>
+          <div>
+            <dt className="font-extrabold">{t.whoUses}</dt>
+            <dd lang={en}>{overview.whoFiles}</dd>
+          </div>
         )}
         {overview.youNeed.length > 0 && (
           <div>
-            <div className="mb-1 font-medium">{overview.curated ? "You'll need" : "Sections found"}</div>
-            <ul className="space-y-1">
-              {overview.youNeed.map((item) => (
-                <li key={item} className="flex gap-2">
-                  <CheckCircle2Icon className="mt-0.5 size-3.5 shrink-0 text-emerald-600" aria-hidden />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
+            <dt className="font-extrabold">{overview.curated ? t.youNeed : t.sectionsFound}</dt>
+            <dd lang={en}>
+              <ul className="list-disc pl-[1.3em]">
+                {overview.youNeed.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </dd>
           </div>
         )}
         {overview.howToSubmit && (
-          <p>
-            <span className="font-medium">How to submit: </span>
-            {overview.howToSubmit}
-          </p>
-        )}
-        {overview.resources.length > 0 && (
           <div>
-            <div className="mb-1 font-medium">Official resources</div>
-            <ResourceList resources={overview.resources} compact />
+            <dt className="font-extrabold">{t.howToSubmit}</dt>
+            <dd lang={en}>{overview.howToSubmit}</dd>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </dl>
+      {overview.resources.length > 0 && <ResourceList resources={overview.resources} compact className="mt-1" />}
+    </div>
   );
 }

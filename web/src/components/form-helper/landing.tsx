@@ -1,54 +1,47 @@
 "use client";
 
-import { FileUpIcon, Loader2Icon, LockIcon, MousePointerClickIcon, PanelRightIcon, SparklesIcon } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { ArrowRightIcon, CheckIcon, CpuIcon, FileUpIcon, InfoIcon, LoaderCircleIcon, LockIcon } from "lucide-react";
+import { useState, type ReactNode } from "react";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "cn";
+
+import { useI18n } from "./i18n";
+import { ServiceMap } from "./service-map";
+import { btnPrimary } from "./styles";
 
 interface LandingProps {
   loading: boolean;
   onFile: (file: File) => void;
   onSample: () => void;
   navigator: ReactNode;
+  mapHighlight?: readonly string[];
 }
 
-const STEPS = [
-  { icon: FileUpIcon, title: "Upload a form", text: "Use a fillable PDF from a Government of Canada department." },
-  { icon: MousePointerClickIcon, title: "Click any field", text: "Fillable boxes are highlighted right on the page." },
-  { icon: PanelRightIcon, title: "Get a plain-language explanation", text: "See what it means, what to enter and where to find it, with official sources." },
-];
+const noticeIcon = "mt-0.5 size-5 flex-none text-ink";
 
-export function Landing({ loading, onFile, onSample, navigator }: LandingProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+export function Landing({ loading, onFile, onSample, navigator, mapHighlight }: LandingProps) {
   const [dragging, setDragging] = useState(false);
+  const { t } = useI18n();
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-12">
-      <div className="mb-8 max-w-2xl">
-        <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-          Understand government forms, one field at a time.
-        </h1>
-        <p className="mt-3 text-muted-foreground">
-          Upload a Government of Canada form and click any field for a plain-language explanation. Or ask the
-          service navigator to find the right Canada.ca page.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-[1360px] px-4 pt-6 pb-28 sm:px-7 sm:pt-10 sm:pb-30">
+      <div className="grid items-start gap-8 wide:grid-cols-[5fr_7fr] wide:gap-10">
+        <div className="flex min-w-0 flex-col gap-8">
+          <section aria-labelledby="hero-title" className="pt-1">
+            <h1 id="hero-title" tabIndex={-1} className="focus:outline-none text-[clamp(2.15rem,3vw,2.9rem)] leading-[1.08] tracking-[-0.02em]">
+              {t.heroTitle}
+            </h1>
+            <p className="mt-4 max-w-[42ch] text-[17px] text-ink-2 sm:text-[19px]">
+              {t.heroSub}
+            </p>
+          </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Get help with a form</CardTitle>
-              <CardDescription>Fillable PDF, up to 10 MB.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => inputRef.current?.click()}
+          <section aria-labelledby="start-title" className="flex flex-col bg-paper shadow-sheet">
+            <h2 id="start-title" className="px-4 pt-4 text-[19px] sm:px-6 sm:pt-[18px]">
+              {t.startHere}
+            </h2>
+            <div className="flex flex-col gap-3.5 px-4 pt-3 pb-[18px] sm:px-6 sm:pt-3.5 sm:pb-6">
+              <label
                 onDragOver={(e) => {
                   e.preventDefault();
                   setDragging(true);
@@ -58,73 +51,113 @@ export function Landing({ loading, onFile, onSample, navigator }: LandingProps) 
                   e.preventDefault();
                   setDragging(false);
                   const file = e.dataTransfer.files[0];
-                  if (file) onFile(file);
+                  if (file && !loading) onFile(file);
                 }}
                 className={cn(
-                  "flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors hover:border-primary/50 hover:bg-accent/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-60",
-                  dragging && "border-primary bg-accent",
+                  "group relative grid cursor-pointer grid-cols-[auto_1fr] items-center gap-x-4 gap-y-0.5 rounded-sm border-[1.5px] border-dashed border-quiet-stroke bg-paper p-[22px] hover:border-ink has-focus-visible:outline-3 has-focus-visible:outline-offset-3 has-focus-visible:outline-ink",
+                  dragging && "border-ink bg-status-wash",
+                  loading && "cursor-progress",
                 )}
               >
+                <input
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  disabled={loading}
+                  className="absolute size-px opacity-0"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) onFile(file);
+                    e.target.value = "";
+                  }}
+                />
                 {loading ? (
-                  <Loader2Icon className="size-8 animate-spin text-muted-foreground" aria-hidden />
+                  <LoaderCircleIcon className="row-span-2 size-8 animate-spin motion-reduce:animate-none" strokeWidth={2} aria-hidden />
                 ) : (
-                  <FileUpIcon className="size-8 text-muted-foreground" aria-hidden />
+                  <FileUpIcon className="row-span-2 size-8" strokeWidth={2} aria-hidden />
                 )}
-                <span className="font-medium">{loading ? "Reading your form…" : "Drop a PDF here or click to browse"}</span>
-                <span className="text-sm text-muted-foreground">Forms from IRCC, CRA, Service Canada and others</span>
-              </button>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="application/pdf,.pdf"
-                className="sr-only"
-                tabIndex={-1}
-                aria-hidden
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) onFile(file);
-                  e.target.value = "";
-                }}
-              />
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm text-muted-foreground">No form handy?</span>
-                <Button variant="outline" onClick={onSample} disabled={loading}>
-                  <SparklesIcon />
-                  Try the adult passport application (PPTC 153)
-                </Button>
-              </div>
-              <Alert>
-                <LockIcon />
-                <AlertTitle>Your form stays on your device</AlertTitle>
-                <AlertDescription>
-                  The PDF is read in your browser and isn&apos;t uploaded or stored. Only field labels are sent to
-                  the assistant, never anything you&apos;ve typed into the form.
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
-
-          <ol className="grid gap-3 sm:grid-cols-3">
-            {STEPS.map((s, i) => (
-              <li key={s.title} className="rounded-xl border bg-card p-3">
-                <s.icon className="mb-2 size-5 text-muted-foreground" aria-hidden />
-                <div className="text-sm font-medium">
-                  {i + 1}. {s.title}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">{s.text}</p>
-              </li>
-            ))}
-          </ol>
+                <strong className="text-[19px] leading-tight font-extrabold">
+                  {loading ? t.reading : t.dropHint}
+                </strong>
+                <span className="text-ink-2">{t.sourcesHint}</span>
+              </label>
+              <ul className="flex flex-wrap gap-x-[18px] gap-y-0.5 text-[15.5px] text-ink-2 tabular-nums">
+                {t.limits.map((l) => (
+                  <li key={l}>{l}</li>
+                ))}
+              </ul>
+              <p role="status" className={cn("empty:hidden", loading && "rounded-sm bg-status-wash px-3 py-2.5 font-bold")}>
+                {loading ? t.reading : ""}
+              </p>
+              <p className="flex items-start gap-2 text-[15.5px] font-bold">
+                <CheckIcon className="mt-0.5 size-5 flex-none" strokeWidth={2.5} aria-hidden />
+                {t.supported}
+              </p>
+              <p className="relative mt-0.5 flex items-start gap-2.5 pt-4 text-[15.5px] text-ink-2 before:absolute before:top-0 before:left-0 before:w-18 before:border-t-[1.5px] before:border-ink">
+                <LockIcon className={noticeIcon} strokeWidth={2.25} aria-hidden />
+                <span>
+                  <b className="font-bold text-ink">{t.privacyLead}</b> {t.privacyRest}
+                </span>
+              </p>
+              <p className="flex items-start gap-2.5 text-[15.5px] text-ink-2">
+                <CpuIcon className={noticeIcon} strokeWidth={2.25} aria-hidden />
+                {t.rulesNotAi}
+              </p>
+            </div>
+          </section>
         </div>
 
-        <Card className="flex h-[560px] flex-col gap-0 overflow-hidden py-0">
-          <CardHeader className="border-b py-4">
-            <CardTitle>Service navigator</CardTitle>
-            <CardDescription>Find the right Government of Canada service or page.</CardDescription>
-          </CardHeader>
-          <div className="min-h-0 flex-1">{navigator}</div>
-        </Card>
+        <div className="flex min-w-0 flex-col gap-8 wide:flex-col-reverse wide:justify-end">
+          <section aria-labelledby="board-title" className="bg-paper px-4 pt-[18px] pb-1.5 shadow-card sm:px-6 sm:pt-[22px] sm:pb-2">
+            <h2 id="board-title" className="pb-3 text-[19px]">
+              {t.sampleTitle}
+            </h2>
+            <ul>
+              <li className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 border-t border-rule-2 py-3.5 [grid-template-areas:'code_lang'_'title_title'_'open_open'] sm:grid-cols-[6.5rem_1fr_auto_auto] sm:[grid-template-areas:'code_title_lang_open']">
+                <span className="text-[17px] font-extrabold tabular-nums [grid-area:code]">PPTC 153</span>
+                <span className="text-[19px] leading-[1.3] font-semibold [grid-area:title]">{t.sampleName}</span>
+                <abbr
+                  title={t.sampleLangTitle}
+                  className="justify-self-end rounded-sm border-[1.5px] border-ink px-[7px] text-[15px] font-bold no-underline [grid-area:lang]"
+                >
+                  EN
+                </abbr>
+                <button
+                  type="button"
+                  onClick={onSample}
+                  disabled={loading}
+                  aria-label={t.openSampleAria}
+                  className={cn(btnPrimary, "min-h-11 [grid-area:open]")}
+                >
+                  {t.openSample}
+                  <ArrowRightIcon className="size-[18px]" strokeWidth={2.25} aria-hidden />
+                </button>
+              </li>
+            </ul>
+          </section>
+
+          <ServiceMap highlight={mapHighlight} />
+        </div>
       </div>
+
+      <section
+        aria-labelledby="finder-title"
+        className="mt-16 grid items-start gap-8 border-t border-rule pt-10 sm:mt-24 wide:grid-cols-[5fr_7fr] wide:gap-10"
+      >
+        <div className="flex flex-col gap-2.5">
+          <h2 id="finder-title" className="text-[23px] tracking-[-0.01em] sm:text-[27px]">
+            {t.finderTitle}
+          </h2>
+          <p className="max-w-[46ch] text-ink-2">{t.finderSub}</p>
+        </div>
+        <div className="flex h-[min(620px,85dvh)] min-h-[440px] flex-col bg-paper shadow-card">{navigator}</div>
+      </section>
+
+      <footer className="mt-14">
+        <p className="flex max-w-[80ch] items-start gap-2.5 text-[15.5px] text-ink-2">
+          <InfoIcon className={noticeIcon} strokeWidth={2.25} aria-hidden />
+          {t.footer}
+        </p>
+      </footer>
     </div>
   );
 }

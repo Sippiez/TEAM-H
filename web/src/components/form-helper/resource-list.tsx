@@ -1,35 +1,38 @@
-import { ExternalLinkIcon } from "lucide-react";
-
 import { cn } from "cn";
 import { isAllowedGovUrl } from "@/lib/text";
 import type { Resource } from "@/lib/types";
 
-export function ResourceList({ resources, compact }: { resources: Resource[]; compact?: boolean }) {
+import { englishOnly, useI18n } from "./i18n";
+
+/** Official sources as pencil-blue links. Only allow-listed government URLs render. */
+export function ResourceList({
+  resources,
+  compact,
+  className,
+}: {
+  resources: Resource[];
+  compact?: boolean;
+  className?: string;
+}) {
+  const { lang, t } = useI18n();
   const safe = resources.filter((r) => isAllowedGovUrl(r.url));
   if (safe.length === 0) return null;
   return (
-    <ul className="space-y-1.5">
+    <ul className={cn("flex flex-col", className)}>
       {safe.map((r) => (
-        <li key={r.id}>
-          <a
-            href={r.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              "group flex gap-2 rounded-lg border bg-card p-2.5 text-left transition-colors hover:border-primary/40 hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
-              compact && "p-2",
-            )}
-          >
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1 text-sm font-medium group-hover:underline">
-                <span className="truncate">{r.title}</span>
-              </div>
-              <div className="text-xs text-muted-foreground">{r.department}</div>
-              {!compact && <p className="mt-1 text-xs text-muted-foreground">{r.description}</p>}
-            </div>
-            <ExternalLinkIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-            <span className="sr-only">(opens canada.ca in a new tab)</span>
+        <li key={r.id} className="relative flex flex-col gap-0.5 border-t border-rule-2 py-2 first:border-t-0 first:pt-0.5">
+          <a href={r.url} target="_blank" rel="noopener noreferrer" className="font-semibold">
+            <span lang={englishOnly(lang)}>{r.title}</span>
+            <span className="sr-only">{t.opensNewTab}</span>
           </a>
+          <span lang={englishOnly(lang)} className="text-[15px] text-ink-2">
+            {r.department}
+          </span>
+          {!compact && r.description && (
+            <span lang={englishOnly(lang)} className="text-[15px] text-ink-2">
+              {r.description}
+            </span>
+          )}
         </li>
       ))}
     </ul>

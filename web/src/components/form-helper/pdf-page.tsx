@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "cn";
 import type { PDFDocumentProxy, PDFPageProxy } from "@/lib/pdf/pdfjs";
 import type { FormField } from "@/lib/types";
+
+import { useI18n } from "./i18n";
 
 interface PdfPageProps {
   doc: PDFDocumentProxy;
@@ -15,6 +16,8 @@ interface PdfPageProps {
   selectedId: string | null;
   visited: ReadonlySet<string>;
   showFields: boolean;
+  /** Bump to scroll the selected field into view. */
+  scrollKey: number;
   onSelect: (fieldId: string) => void;
 }
 
@@ -26,8 +29,10 @@ export function PdfPage({
   selectedId,
   visited,
   showFields,
+  scrollKey,
   onSelect,
 }: PdfPageProps) {
+  const { t } = useI18n();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [width, setWidth] = useState(0);
@@ -98,23 +103,28 @@ export function PdfPage({
   }, [fields, viewport]);
 
   useEffect(() => {
-    if (!selectedId || !viewport) return;
-    const el = wrapperRef.current?.querySelector<HTMLElement>(`[data-field-id="${selectedId}"]`);
-    el?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-  }, [selectedId, viewport]);
+    if (!scrollKey || !selectedId || !viewport) return;
+    const el = wrapperRef.current?.querySelector<HTMLElement>(`[data-field-id="${CSS.escape(selectedId)}"]`);
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center", inline: "nearest" });
+    // Only an explicit request scrolls; re-renders for the same request must not.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollKey, viewport]);
 
   return (
     <div ref={wrapperRef} className="w-full">
-      {!viewport && <Skeleton className="mx-auto aspect-[612/792] w-full max-w-3xl" />}
+      {!viewport && (
+        <div className="mx-auto aspect-[612/792] w-full animate-pulse bg-paper shadow-sheet motion-reduce:animate-none" />
+      )}
       <div
-        className={cn("relative mx-auto bg-white shadow-sm ring-1 ring-black/10", !viewport && "hidden")}
+        className={cn("relative mx-auto bg-paper shadow-sheet", !viewport && "hidden")}
         style={viewport ? { width: viewport.width, height: viewport.height } : undefined}
       >
         <canvas
           ref={canvasRef}
           className="block"
           style={viewport ? { width: viewport.width, height: viewport.height } : undefined}
-          aria-label={`Page ${pageNumber} of the form`}
+          aria-label={t.pdfPage(pageNumber)}
           role="img"
         />
         {boxes.map(({ key, field, index, left, top, width: w, height: h }) => {
@@ -128,20 +138,17 @@ export function PdfPage({
               type="button"
               data-field-id={index === 0 ? field.id : undefined}
               title={label}
-              aria-label={`Explain field: ${label}`}
+              aria-label={t.explainFieldAria(label, seen)}
               aria-pressed={selected}
               tabIndex={index === 0 ? 0 : -1}
               aria-hidden={index === 0 ? undefined : true}
               onClick={() => onSelect(field.id)}
               className={cn(
-                "absolute cursor-pointer rounded-[3px] border transition-colors focus-visible:ring-3 focus-visible:ring-ring/60 focus-visible:outline-none",
-                showFields
-                  ? seen
-                    ? "border-emerald-600/50 bg-emerald-400/10 hover:bg-emerald-400/25"
-                    : "border-sky-600/50 bg-sky-400/10 hover:bg-sky-400/25"
-                  : "border-transparent hover:border-sky-600/50 hover:bg-sky-400/15",
-                selected &&
-                  "z-10 border-amber-500 bg-amber-300/35 ring-2 ring-amber-500/70 hover:bg-amber-300/45",
+                "pr-ff",
+                showFields && "is-marked",
+                showFields && seen && "is-visited",
+                (w < 30 || h < 14) && "is-small",
+                selected && "is-selected",
               )}
               style={{ left, top, width: Math.max(w, 8), height: Math.max(h, 8) }}
             />

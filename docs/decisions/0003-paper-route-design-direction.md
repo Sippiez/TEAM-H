@@ -1,7 +1,7 @@
 # 0003: Paper Route design direction
 
 - Date: 2026-10-28
-- Status: Accepted (visual direction only; porting into `web/` not yet authorized)
+- Status: Accepted; implemented in `web/`
 - Owner: TODO
 
 ## Context
@@ -59,5 +59,14 @@ The reference prototype is
   for low-vision users.
 - The prototype's French copy is a draft and needs review by a fluent speaker.
   Its form facsimile is illustrative, and its chat replies are canned.
-- Porting into `web/` (Tailwind and shadcn/ui tokens) needs a separate
-  request. The other prototypes remain for reference only.
+- The direction is ported into `web/` (Tailwind v4 tokens and `.pr-*`
+  classes in `globals.css`; components in `components/form-helper/`). The
+  port keeps the app's real behaviour and copy, and it is light-only. The
+  prototype's AI and privacy copy and canned replies were not carried over.
+  The other prototypes remain for reference only.
+- The prototype's EN/FR tabs became document tabs. Each open PDF gets a tab
+  you can close, with up to five open at once. A header button to the left
+  of New session switches the interface language. Only interface text is
+  translated. Assistant content stays in English and is marked
+  `lang="en"`. The French strings in `components/form-helper/i18n.ts` are a
+  draft that needs review by a fluent speaker.

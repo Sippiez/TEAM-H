@@ -3,7 +3,7 @@ import { Fragment, type ReactNode } from "react";
 function inline(text: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
     part.startsWith("**") && part.endsWith("**") ? (
-      <strong key={i} className="font-semibold">
+      <strong key={i} className="font-bold">
         {part.slice(2, -2)}
       </strong>
     ) : (
@@ -19,7 +19,7 @@ export function RichText({ text }: { text: string }) {
   const flush = () => {
     if (bullets.length) {
       blocks.push(
-        <ul key={`ul-${blocks.length}`} className="ml-4 list-disc space-y-0.5 marker:text-muted-foreground">
+        <ul key={`ul-${blocks.length}`} className="list-disc space-y-1 pl-[1.3em] marker:text-ink">
           {bullets.map((b, i) => (
             <li key={i}>{inline(b)}</li>
           ))}
@@ -37,5 +37,5 @@ export function RichText({ text }: { text: string }) {
     }
   }
   flush();
-  return <div className="space-y-2 leading-relaxed">{blocks}</div>;
+  return <div className="space-y-2">{blocks}</div>;
 }
