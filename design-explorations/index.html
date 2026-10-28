@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form Helper · six design directions</title>
+<style>
+  :root {
+    --bg: #eceef0;
+    --ink: #16181b;
+    --ink-2: #4a4f57;
+    --rule: #c9cdd2;
+    --card: #fff;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; line-height: 1.5; }
+  a { color: inherit; }
+  header.top {
+    padding: 56px clamp(20px, 5vw, 72px) 32px;
+    max-width: 1500px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 40px;
+    align-items: end;
+  }
+  h1 { font-size: clamp(2rem, 4vw, 3.4rem); line-height: 1.05; letter-spacing: -0.03em; margin: 0; text-wrap: balance; }
+  .lede { font-size: 1.08rem; color: var(--ink-2); max-width: 62ch; margin: 0; }
+  .lede + .lede { margin-top: 10px; }
+  main { max-width: 1500px; margin: 0 auto; padding: 0 clamp(20px, 5vw, 72px) 80px; }
+
+  .dir {
+    display: grid;
+    grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+    gap: 36px;
+    padding: 40px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .dir h2 { margin: 0 0 4px; font-size: 1.75rem; letter-spacing: -0.02em; line-height: 1.15; }
+  .dir .n { font-variant-numeric: tabular-nums; color: var(--ink-2); font-weight: 500; margin-right: 6px; }
+  .thesis { font-size: 1.05rem; margin: 10px 0 18px; }
+  dl { margin: 0; display: grid; grid-template-columns: 92px 1fr; gap: 8px 14px; font-size: 0.95rem; }
+  dt { color: var(--ink-2); font-weight: 600; }
+  dd { margin: 0; }
+  .swatches { display: flex; gap: 6px; margin-top: 2px; }
+  .swatches span { width: 22px; height: 22px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15); }
+  .open { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+  .open a {
+    text-decoration: none; font-weight: 600; font-size: 0.95rem;
+    padding: 10px 16px; border-radius: 8px; background: var(--ink); color: #fff;
+  }
+  .open a + a { background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 1px var(--rule); }
+  .open a:hover { opacity: 0.88; }
+  .open a:focus-visible { outline: 3px solid #2b6cb0; outline-offset: 2px; }
+
+  .shots { display: grid; grid-template-columns: 1.55fr 1fr 0.42fr; gap: 16px; align-items: start; }
+  figure { margin: 0; }
+  figcaption { font-size: 0.85rem; color: var(--ink-2); margin-top: 6px; }
+  .frame {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 8px 24px -8px rgb(0 0 0 / 0.18);
+  }
+  .frame iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .frame a { position: absolute; inset: 0; z-index: 1; }
+  .frame a:focus-visible { outline: 3px solid #2b6cb0; outline-offset: -3px; border-radius: 8px; }
+
+  section.compare { border-top: 1px solid var(--rule); padding-top: 40px; }
+  section.compare h2 { margin: 0 0 6px; font-size: 1.6rem; letter-spacing: -0.02em; }
+  section.compare p { color: var(--ink-2); margin: 0 0 18px; max-width: 70ch; }
+  table { border-collapse: collapse; width: 100%; background: var(--card); border-radius: 8px; overflow: hidden; font-size: 0.95rem; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid #e3e6e9; vertical-align: top; }
+  thead th { background: #f6f7f8; font-weight: 600; }
+  tbody th { font-weight: 600; white-space: nowrap; }
+  .note { margin-top: 28px; font-size: 0.95rem; color: var(--ink-2); max-width: 80ch; }
+
+  @media (max-width: 1100px) {
+    header.top { grid-template-columns: 1fr; }
+    .dir { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .shots { grid-template-columns: 1fr 0.45fr; }
+    .shots figure:first-child { grid-column: 1 / -1; }
+    .table-wrap { overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Form Helper: six design directions</h1>
+  <div>
+    <p class="lede">Each prototype uses the same content, the same adult passport form and the same behaviour. Only the design world changes. Open each one and try the landing page, select fields, ask a question, and switch to French.</p>
+    <p class="lede">Pick one direction to take forward. Strong parts of other directions can be borrowed after that.</p>
+  </div>
+</header>
+
+<main id="directions"></main>
+
+<main>
+  <section class="compare" aria-labelledby="cmp">
+    <h2 id="cmp">Side by side</h2>
+    <p>This is an initial read to guide discussion, not a score. Test with the people you're designing for before you decide.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th scope="col">Direction</th><th scope="col">Best at</th><th scope="col">Main risk</th><th scope="col">Phone fit</th><th scope="col">Build effort in web/</th></tr>
+        </thead>
+        <tbody id="cmp-rows"></tbody>
+      </table>
+    </div>
+    <p class="note">All six stay light and avoid the Canada.ca look, as decision 0002 requires. The French copy in these prototypes is a draft translation and needs review by a fluent speaker. The form pages are an illustrative facsimile, not the real PDF. Chat replies are canned prototype responses.</p>
+  </section>
+</main>
+
+<script>
+  const DIRS = [
+    {
+      file: "01-marginalia.html", n: "1", name: "Marginalia",
+      thesis: "The form is the interface. Explanations are margin notes pencilled beside each field, joined by a leader line.",
+      world: "An annotated study copy: cool white desk, crisp paper, graphite ink, highlighter yellow.",
+      type: "Atkinson Hyperlegible Next (designed for low-vision readers)",
+      swatches: ["#f4f6f8", "#ffffff", "#22262b", "#ffe94d", "#2457a6"],
+      best: "Keeping people oriented on the real form. Very literal and easy to grasp.",
+      risk: "Notes compete for space on small screens and dense pages.",
+      phone: "Good, with a bottom sheet for notes", effort: "Medium (leader-line positioning)",
+    },
+    {
+      file: "02-transit.html", n: "2", name: "Transit",
+      thesis: "A form is a journey with stations. Wayfinding signage shows where you are, what's next and where to go.",
+      world: "Transit signage and network maps: dark sign panels, four line colours, thick route lines.",
+      type: "Overpass (derived from Highway Gothic)",
+      swatches: ["#ffffff", "#14171a", "#00843d", "#0062b8", "#f2a900", "#7a3e9d"],
+      best: "Progress and orientation. The service map makes the landing memorable.",
+      risk: "The metaphor can feel playful for serious forms. It needs restraint as forms grow.",
+      phone: "Good, with a horizontal route", effort: "Medium",
+    },
+    {
+      file: "03-facts-panel.html", n: "3", name: "Facts Panel",
+      thesis: "Every field gets a ruled \u201cField Facts / Fiche du champ\u201d label with English and French side by side.",
+      world: "Regulatory labels and spec sheets: black rules, white ground, one signal orange.",
+      type: "Archivo and Archivo condensed",
+      swatches: ["#ffffff", "#000000", "#e8590c", "#b54708"],
+      best: "Showing bilingual content and density. It feels trustworthy and official without copying Canada.ca.",
+      risk: "It's dense, which may intimidate low-literacy users. The bilingual view doubles the reading.",
+      phone: "Fair, using segmented tabs", effort: "Low to medium",
+    },
+    {
+      file: "04-one-field.html", n: "4", name: "One Field at a Time",
+      thesis: "Show one field at a time, huge and calm, like a patient interviewer. The form shrinks to a map.",
+      world: "A calm, saturated teal rail with a light reading area and one coral call to action.",
+      type: "Bricolage Grotesque and Figtree",
+      swatches: ["#0b5c63", "#d6f1ef", "#f7fbfa", "#0d2224", "#e4572e"],
+      best: "Reducing anxiety and helping low-literacy readers. It's the easiest of the directions to read.",
+      risk: "The real form is less visible, so it's harder to match explanations to boxes on paper.",
+      phone: "Excellent, as it's naturally single-column", effort: "Low",
+    },
+    {
+      file: "05-thread.html", n: "5", name: "Thread",
+      thesis: "The conversation is the spine. The form is an attachment, and field explanations arrive as message cards.",
+      world: "A friendly messaging app: lilac ground, indigo bubbles, lime highlights.",
+      type: "Lexend (designed for reading proficiency)",
+      swatches: ["#efeaf8", "#ffffff", "#2a1f6b", "#c6f432"],
+      best: "A familiar mental model. It makes the AI help feel central and approachable.",
+      risk: "It can feel like \u201cjust a chatbot\u201d. Field-by-field browsing is secondary.",
+      phone: "Excellent, as chat is native to phones", effort: "Medium",
+    },
+    {
+      file: "06-paper-route.html", n: "6", name: "Paper Route",
+      thesis: "Transit's wayfinding layout, drawn in pencil on Marginalia's paper. It combines directions 1 and 2.",
+      world: "Marginalia's materials (desk, paper, graphite, highlighter) on Transit's route, stations and service map.",
+      type: "Atkinson Hyperlegible Next",
+      swatches: ["#f3f5f7", "#ffffff", "#22262b", "#ffe94d", "#2556a6"],
+      best: "Orientation (\u201cyou are here\u201d, next field, page stops) with calm, low-noise visuals.",
+      risk: "Three columns get dense at medium widths. The dash-pattern legend on the map is subtle.",
+      phone: "Good, with a horizontal route", effort: "Medium",
+    },
+  ];
+
+  const W = 1440, H = 900, MW = 390, MH = 844;
+  const el = (h) => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstChild; };
+  const frame = (src, w, h, label) => `
+    <div class="frame" data-w="${w}" data-h="${h}" style="aspect-ratio:${w}/${h}">
+      <iframe src="${src}" width="${w}" height="${h}" loading="lazy" tabindex="-1" title="${label}"></iframe>
+      <a href="${src}" aria-label="Open ${label}"></a>
+    </div>`;
+
+  const host = document.getElementById("directions");
+  DIRS.forEach((d) => {
+    host.appendChild(el(`
+      <article class="dir" aria-labelledby="h-${d.n}">
+        <div>
+          <h2 id="h-${d.n}"><span class="n">${d.n}</span>${d.name}</h2>
+          <p class="thesis">${d.thesis}</p>
+          <dl>
+            <dt>World</dt><dd>${d.world}</dd>
+            <dt>Type</dt><dd>${d.type}</dd>
+            <dt>Colour</dt><dd><span class="swatches">${d.swatches.map((c) => `<span style="background:${c}" title="${c}"></span>`).join("")}</span></dd>
+            <dt>Strength</dt><dd>${d.best}</dd>
+            <dt>Risk</dt><dd>${d.risk}</dd>
+          </dl>
+          <div class="open">
+            <a href="${d.file}#workspace">Open workspace</a>
+            <a href="${d.file}#landing">Open landing</a>
+          </div>
+        </div>
+        <div class="shots">
+          <figure>${frame(`${d.file}#workspace`, W, H, `${d.name} workspace`)}<figcaption>Workspace, desktop</figcaption></figure>
+          <figure>${frame(`${d.file}#landing`, W, H, `${d.name} landing`)}<figcaption>Landing, desktop</figcaption></figure>
+          <figure>${frame(`${d.file}#workspace`, MW, MH, `${d.name} workspace on a phone`)}<figcaption>Phone</figcaption></figure>
+        </div>
+      </article>`));
+  });
+
+  document.getElementById("cmp-rows").innerHTML = DIRS.map((d) =>
+    `<tr><th scope="row">${d.n} · ${d.name}</th><td>${d.best}</td><td>${d.risk}</td><td>${d.phone}</td><td>${d.effort}</td></tr>`).join("");
+
+  const fit = () => document.querySelectorAll(".frame").forEach((f) => {
+    const s = f.clientWidth / Number(f.dataset.w);
+    f.querySelector("iframe").style.transform = `scale(${s})`;
+  });
+  new ResizeObserver(fit).observe(document.body);
+  fit();
+</script>
+</body>
+</html>

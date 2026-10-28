@@ -1,0 +1,1093 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<!--
+DIRECTION CONTRACT · 05 Thread
+THESIS: People already know how to ask a friend for help in a messaging app. The conversation is the spine; the form is an attachment you open, and field explanations arrive as message cards you can keep.
+OWN-WORLD: A friendly messenger: soft lilac ground, white bubbles with asymmetric tails, deep indigo user bubbles, and lime only as the field highlight behind dark ink.
+STORY: Open a new chat, attach a blank PDF or a sample, tap a box on the form, and a pinned field card lands in the thread. Ask follow-ups about that field.
+FIRST VIEWPORT: Landing: a big greeting, three attachment bubbles and a "what do you need to do?" field beside a mini chat. Workspace: the thread dominates; the document drawer sits open on the right.
+FORM: The facsimile stays a plain document in the drawer; lime marks the selected field.
+-->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form Helper · 05 Thread</title>
+<link rel="stylesheet" href="shared/form-sheet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --lilac: #efeaf8;
+  --lilac-2: #e5ddf5;
+  --lilac-soft: #f5f2fc;
+  --line: #d3c8ec;
+  --line-soft: #e8e2f6;
+  --line-strong: #9d8fcf;
+  --ink: #1d1550;
+  --ink-2: #463d78;
+  --indigo: #2a1f6b;
+  --indigo-2: #3a2c8c;
+  --on-indigo-2: #ddd6ff;
+  --lime: #c6f432;
+  --lime-hover: #b6e620;
+  --lime-soft: #ecfbbf;
+  --lime-ink: #1d1550;
+  --link: #3a2bb0;
+  --focus: #5b3ff0;
+  --rose: #8a1c3c;
+  --rose-bg: #f8e4ea;
+  --shadow: 3px 6px 18px -6px rgb(42 31 107 / 0.28), 1px 2px 4px rgb(42 31 107 / 0.06);
+  --shadow-sm: 2px 3px 10px -4px rgb(42 31 107 / 0.22), 0 1px 2px rgb(42 31 107 / 0.05);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --font: "Lexend", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--lilac); color: var(--ink); font-family: var(--font); font-size: 17px; line-height: 1.55; }
+[hidden] { display: none !important; }
+h1, h2, h3, h4 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--link); }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.i { width: 20px; height: 20px; flex: none; display: block; }
+[data-icon] { display: inline-flex; flex: none; }
+.skip { position: absolute; left: 12px; top: -80px; z-index: 100; background: var(--indigo); color: #fff; padding: 10px 16px; border-radius: 12px; }
+.skip:focus { top: 12px; }
+
+/* ---------- App bar ---------- */
+.appbar { position: relative; z-index: 10; display: flex; align-items: center; gap: 16px; min-height: 64px; padding: 10px 24px; background: var(--lilac); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: -0.01em; white-space: nowrap; }
+.mark { width: 34px; height: 34px; display: block; }
+.convo-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; padding-left: 16px; border-left: 1px solid var(--line); font-size: 16px; font-weight: 500; line-height: 1.3; }
+.convo-title .ct-num { font-weight: 700; white-space: nowrap; }
+.convo-title .ct-title { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notice { margin-left: auto; display: flex; align-items: center; gap: 8px; max-width: 44ch; font-size: 14.5px; line-height: 1.35; color: var(--ink-2); }
+.notice .i { color: var(--indigo); }
+.lang { display: inline-flex; flex: none; padding: 3px; background: #fff; border-radius: 999px; box-shadow: var(--shadow-sm); }
+.lang button { min-width: 46px; min-height: 38px; border: 0; border-radius: 999px; background: transparent; font-weight: 600; font-size: 15px; }
+.lang button:hover { background: var(--lilac-soft); }
+.lang button[aria-pressed="true"] { background: var(--indigo); color: #fff; }
+
+/* ---------- Shared bubbles ---------- */
+.thread, .pv-thread { list-style: none; margin: 0; padding: 0; }
+.msg { display: flex; align-items: flex-end; gap: 10px; margin-top: 16px; }
+.msg.from-user { justify-content: flex-end; }
+.from-user + .from-bot, .from-bot + .from-user, .msg-day + .msg, .msg + .msg-day, .msg-system + .msg { margin-top: 26px; }
+.avatar { flex: none; width: 34px; height: 34px; }
+.bubble { position: relative; min-width: 0; max-width: min(88%, 62ch); padding: 14px 18px; background: #fff; color: var(--ink); border-radius: 22px 22px 22px 6px; box-shadow: var(--shadow); }
+.bubble::after { content: ""; position: absolute; bottom: 0; left: -7px; width: 14px; height: 14px; background: inherit; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+.from-user .bubble { background: var(--indigo); color: #fff; border-radius: 22px 22px 6px 22px; }
+.from-user .bubble::after { left: auto; right: -7px; clip-path: polygon(0 0, 100% 100%, 0 100%); }
+.bubble > * + * { margin-top: 10px; }
+.bubble > .sr-only + * { margin-top: 0; }
+.msg-card .bubble, .msg-field .bubble { flex: 1; max-width: 100%; padding: 20px 22px; }
+.quote { display: flex; align-items: center; gap: 6px; font-size: 14.5px; color: var(--on-indigo-2); background: rgb(255 255 255 / 0.1); border-radius: 12px; padding: 4px 10px; }
+.quote .i { width: 16px; height: 16px; }
+.msg.is-new { animation: rise 260ms var(--ease) both; }
+@keyframes rise { from { transform: translateY(8px); } to { transform: none; } }
+
+.msg-day, .msg-system { justify-content: center; }
+.msg-day span { font-size: 14px; font-weight: 500; color: var(--ink-2); background: var(--lilac-2); border-radius: 999px; padding: 3px 12px; }
+.msg-system p { max-width: 60ch; text-align: center; font-size: 15px; color: var(--ink); background: var(--lilac-2); border-radius: 16px; padding: 8px 16px; }
+
+.ticks, .crosses { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 7px; }
+.ticks li, .crosses li { display: flex; gap: 10px; align-items: flex-start; }
+.tk { flex: none; width: 22px; height: 22px; margin-top: 2px; border-radius: 50%; display: grid; place-items: center; background: var(--lilac-2); color: var(--indigo); }
+.tk .i { width: 14px; height: 14px; stroke-width: 2.4; }
+.crosses .tk { background: var(--rose-bg); color: var(--rose); }
+.tag { font-size: 14px; color: var(--ink-2); }
+
+.refs { display: flex; flex-wrap: wrap; gap: 8px; }
+.ref { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px 6px 10px; border: 1px solid rgb(29 21 80 / 0.16); border-radius: 999px; background: var(--lime); color: var(--lime-ink); font-size: 15px; font-weight: 500; text-align: left; line-height: 1.3; }
+.ref:hover { background: var(--lime-hover); }
+.ref small { font-size: 14px; font-weight: 400; white-space: nowrap; }
+.ref .i { width: 18px; height: 18px; }
+
+.srcs h4, .src-h { font-size: 15px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
+.srcs ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.srcs li { display: flex; flex-direction: column; max-width: 100%; padding: 8px 12px 9px; background: var(--lilac-soft); border-radius: 14px; }
+.src-chip { display: inline-flex; align-items: flex-start; gap: 6px; color: var(--link); font-weight: 500; font-size: 15.5px; line-height: 1.35; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.src-chip:hover { text-decoration-thickness: 2px; }
+.src-chip .i { width: 16px; height: 16px; margin-top: 2px; }
+.src-meta { margin-top: 3px; padding-left: 22px; font-size: 14px; line-height: 1.4; color: var(--ink-2); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border: 1px solid transparent; border-radius: 999px; background: none; font-size: 16px; font-weight: 500; line-height: 1.2; text-align: center; }
+.btn-primary { background: var(--indigo); color: #fff; }
+.btn-primary:hover { background: var(--indigo-2); }
+.btn-ghost { background: var(--lilac-soft); border-color: var(--line); }
+.btn-ghost:hover { background: var(--lilac-2); }
+.btn-ghost[aria-pressed="true"] { background: var(--lime); border-color: rgb(29 21 80 / 0.16); }
+.btn-step { background: #fff; border-color: var(--line); padding: 0 12px; }
+.btn-step:hover:not(:disabled) { border-color: var(--indigo); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.icon-btn { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--lilac-soft); }
+.icon-btn:hover { background: var(--lilac-2); }
+/* ---------- Overview card ---------- */
+.ov-title { font-size: 22px; line-height: 1.25; font-weight: 600; letter-spacing: -0.01em; }
+.bubble > .ov-meta { margin-top: 4px; font-size: 15px; color: var(--ink-2); }
+.ov-dl { margin: 16px 0 0; display: grid; gap: 0; }
+.ov-dl > div { padding: 12px 0 0; margin-top: 12px; border-top: 1px solid var(--line-soft); }
+.ov-dl dt { font-weight: 600; font-size: 16px; }
+.ov-dl dd { margin: 2px 0 0; }
+.bubble > .srcs { margin-top: 16px; }
+
+/* ---------- Attachment card ---------- */
+.bubble.attach { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; border: 0; padding: 12px 14px 12px 12px; text-align: left; font-size: 16px; line-height: 1.3; }
+button.bubble.attach:hover { background: var(--indigo-2); }
+.attach-icon { flex: none; width: 46px; height: 54px; display: grid; place-items: center; background: #fff; color: var(--indigo); border-radius: 6px 14px 6px 6px; }
+.attach-icon .i { width: 24px; height: 24px; }
+.attach-text { flex: 1 1 170px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.attach-text strong { font-size: 17px; }
+.attach-text small { font-size: 14px; color: var(--on-indigo-2); }
+.attach-cta { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px 8px 14px; background: var(--lime); color: var(--lime-ink); border-radius: 999px; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.attach-cta .i { width: 18px; height: 18px; }
+
+/* ---------- Field card ---------- */
+.fc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.fc-title { font-size: 23px; line-height: 1.25; font-weight: 600; letter-spacing: -0.01em; }
+.fc-title:focus { outline: none; }
+.fc-title:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; border-radius: 4px; }
+.fc-meta { margin-top: 4px; font-size: 15px; color: var(--ink-2); }
+.fc-tools { display: flex; align-items: center; gap: 6px; flex: none; }
+.pin-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; background: var(--lime); color: var(--lime-ink); border-radius: 999px; font-size: 14px; font-weight: 600; }
+.pin-pill .i { width: 16px; height: 16px; }
+.bubble > .fc-flags { margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.flag-guarantor { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--lime); color: var(--lime-ink); border-radius: 12px; font-size: 15.5px; font-weight: 600; }
+.grounded { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: var(--ink-2); }
+.grounded .i { color: var(--indigo); }
+.grounded.is-general { padding: 6px 12px; background: var(--lilac-soft); border-radius: 12px; color: var(--ink); }
+.bubble > .fc-sec { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+.fc-sec h4 { font-size: 15px; font-weight: 600; color: var(--ink-2); margin-bottom: 4px; }
+.specimen { display: inline-block; padding: 2px 4px 3px; font-size: 19px; font-weight: 500; letter-spacing: 0.03em; color: var(--indigo); border-bottom: 2px dashed var(--line-strong); }
+.opts { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.opts li { padding: 4px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 15.5px; }
+.bubble > .fc-actions { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line-soft); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.fc-step { margin-left: auto; display: flex; gap: 6px; }
+.msg-kept .bubble { max-width: min(88%, 560px); }
+.kept-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.kept-head .tag { display: inline-flex; align-items: center; gap: 6px; }
+.kept-head .i { color: var(--indigo); width: 18px; height: 18px; }
+.kept-title { font-size: 18px; font-weight: 600; line-height: 1.3; }
+.specimen.sm { font-size: 16px; }
+.thinking { display: flex; align-items: center; gap: 10px; color: var(--ink-2); }
+.bubble.thinking > * + * { margin-top: 0; }
+.dots { display: inline-flex; gap: 4px; }
+.dots b { width: 7px; height: 7px; border-radius: 50%; background: var(--indigo); }
+.dots b:nth-child(2) { opacity: 0.6; }
+.dots b:nth-child(3) { opacity: 0.3; }
+
+/* ---------- Workspace layout ---------- */
+body[data-view="workspace"] { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+body[data-view="workspace"] main { flex: 1; min-height: 0; display: flex; }
+main:focus { outline: none; }
+.workspace { flex: 1; min-height: 0; display: flex; width: 100%; }
+.chat { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.thread-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.thread-inner { max-width: 760px; margin: 0 auto; padding: 0 20px 28px; }
+
+.pinbar { position: sticky; top: 0; z-index: 4; margin: 0 -8px; padding: 12px 8px 12px; background: linear-gradient(var(--lilac) 78%, rgb(239 234 248 / 0)); }
+.pin-card { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 8px; background: #fff; border-radius: 18px; box-shadow: var(--shadow-sm); }
+.pin-ic { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: var(--lime); color: var(--lime-ink); }
+.pin-ic.is-empty { background: var(--lilac-2); color: var(--indigo); }
+.pin-ic .i { width: 18px; height: 18px; }
+.pin-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; font-size: 15.5px; }
+.pin-text strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin-text small { font-size: 14px; color: var(--ink-2); }
+.pin-btn { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--lilac-soft); font-size: 15px; font-weight: 500; }
+.pin-btn:hover { background: var(--lilac-2); }
+.pin-btn .i { width: 18px; height: 18px; }
+
+.composer-wrap { flex: none; padding: 10px 20px 62px; background: var(--lilac); border-top: 1px solid var(--line); }
+.composer { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+.suggest { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-s { min-height: 40px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px 999px 999px 8px; background: #fff; font-size: 15px; font-weight: 500; line-height: 1.3; box-shadow: 1px 2px 0 rgb(42 31 107 / 0.06); }
+.chip-s:hover { border-color: var(--indigo); }
+.ctx { display: flex; }
+.ctx-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-width: 0; padding: 4px 4px 4px 12px; background: var(--lime); color: var(--lime-ink); border-radius: 999px; font-size: 15px; font-weight: 500; }
+.ctx-chip .i { width: 16px; height: 16px; }
+.ctx-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ctx-clear { flex: none; min-height: 34px; padding: 0 12px; border: 0; border-radius: 999px; background: rgb(29 21 80 / 0.1); font-size: 14.5px; font-weight: 600; }
+.ctx-clear:hover { background: rgb(29 21 80 / 0.18); }
+.inputrow { display: flex; align-items: center; gap: 8px; padding: 5px 5px 5px 18px; background: #fff; border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow-sm); }
+.inputrow:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+.inputrow input { flex: 1; min-width: 0; min-height: 44px; border: 0; background: transparent; font-size: 17px; outline: none; }
+.inputrow input::placeholder { color: #5a5285; opacity: 1; }
+.inputrow > [data-icon] { color: var(--ink-2); }
+.send { flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px 0 14px; border: 0; border-radius: 999px; background: var(--indigo); color: #fff; font-weight: 600; }
+.send:hover { background: var(--indigo-2); }
+.disclose { display: grid; gap: 3px; padding: 0 4px; font-size: 14px; line-height: 1.45; color: var(--ink-2); }
+.disclose p { display: flex; gap: 8px; align-items: flex-start; }
+.disclose .i { width: 16px; height: 16px; margin-top: 2px; color: var(--indigo); }
+
+/* ---------- Drawer ---------- */
+.drawer { display: none; flex: none; width: 46%; max-width: 720px; overflow-y: auto; overscroll-behavior: contain; background: var(--lilac-2); border-left: 1px solid var(--line); }
+.drawer.is-open { display: block; }
+.drawer-inner { display: flex; flex-direction: column; gap: 12px; padding: 14px 24px 76px; }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.drawer-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 16px; font-weight: 600; }
+.drawer-title .count { font-size: 15px; font-weight: 400; color: var(--ink-2); }
+.drawer-close { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 15px; font-weight: 500; }
+.drawer-close:hover { border-color: var(--indigo); }
+.doc-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.doc-chip { display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 14px 8px 10px; border: 1px solid var(--line); border-radius: 16px 16px 16px 6px; background: #fff; text-align: left; line-height: 1.25; box-shadow: var(--shadow-sm); }
+.doc-chip strong { display: block; font-size: 15px; }
+.doc-chip small { display: block; font-size: 14px; color: var(--ink-2); }
+.doc-chip:hover { border-color: var(--indigo); }
+.doc-chip[aria-pressed="true"] { background: var(--indigo); border-color: var(--indigo); color: #fff; }
+.doc-chip[aria-pressed="true"] small { color: var(--on-indigo-2); }
+.add-pdf { cursor: pointer; border-style: dashed; border-color: var(--line-strong); background: transparent; box-shadow: none; font-size: 15px; font-weight: 500; }
+.add-pdf:focus-within { outline: 3px solid var(--focus); outline-offset: 3px; }
+.drawer-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.pages { display: flex; align-items: center; gap: 4px; overflow-x: auto; padding: 3px; max-width: 100%; }
+.pages-lbl { font-size: 15px; color: var(--ink-2); margin-right: 4px; }
+.pages button { position: relative; flex: none; min-width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent; font-size: 15px; font-weight: 500; }
+.pages button:hover { background: #fff; }
+.pages button[aria-current="page"] { background: var(--indigo); color: #fff; }
+.pages button.has-fields::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--lime); box-shadow: inset 0 0 0 1px rgb(29 21 80 / 0.4); }
+.fields-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px 0 14px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 15px; font-weight: 500; }
+.fields-toggle:hover { border-color: var(--indigo); }
+.fields-toggle .chev { transition: transform 160ms var(--ease); }
+.fields-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.fieldlist { padding: 6px 8px 8px; background: #fff; border-radius: 18px; box-shadow: var(--shadow-sm); }
+.fl-sec h3 { padding: 10px 10px 4px; font-size: 14.5px; font-weight: 600; color: var(--ink-2); }
+.fl-sec ul { list-style: none; margin: 0; padding: 0; }
+.fl-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 10px; border: 0; border-radius: 12px; background: none; text-align: left; font-size: 15.5px; line-height: 1.3; }
+.fl-item:hover { background: var(--lilac-soft); }
+.fl-item[aria-current="true"] { background: var(--lime); }
+.fl-tick { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border: 1.5px solid var(--line-strong); border-radius: 50%; }
+.fl-tick.is-visited { background: var(--indigo); border-color: var(--indigo); color: #fff; }
+.fl-tick .i { width: 13px; height: 13px; stroke-width: 2.6; }
+.fl-label { flex: 1; min-width: 0; }
+.fl-label b { font-weight: 600; }
+.fl-page { font-size: 14px; color: var(--ink-2); white-space: nowrap; }
+.sheet-wrap { border-radius: 4px; overflow: hidden; box-shadow: 4px 10px 28px -8px rgb(42 31 107 / 0.35), 1px 2px 4px rgb(42 31 107 / 0.08); }
+.sheet-wrap .form-sheet { font-size: 12px; --ff-ring: #2a1f6b; --ff-tint: rgb(198 244 50 / 0.6); --ff-hover: rgb(42 31 107 / 0.07); --ff-visited-mark: #2a1f6b; --ff-radius: 2px; }
+.sheet-wrap .ff:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.sheet-wrap .ff.is-selected { background: var(--ff-tint); box-shadow: inset 0 0 0 2px var(--ff-ring); }
+/* ---------- Landing ---------- */
+.landing { max-width: 1240px; margin: 0 auto; padding: 20px 28px 110px; }
+.sys-strip { display: flex; align-items: flex-start; gap: 12px; max-width: 980px; margin: 0 auto 36px; padding: 12px 18px; background: var(--lilac-2); border-radius: 16px; font-size: 15px; line-height: 1.5; color: var(--ink); }
+.sys-strip .i { margin-top: 2px; color: var(--indigo); }
+.sys-strip p + p { margin-top: 4px; }
+.sys-strip strong { font-weight: 600; }
+.land-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: 56px; align-items: start; }
+.hero h1 { font-size: clamp(2.4rem, 1.2rem + 3.3vw, 4rem); line-height: 1.05; font-weight: 600; letter-spacing: -0.03em; max-width: 16ch; }
+.hero-sub { margin-top: 18px; max-width: 52ch; font-size: 19px; color: var(--ink-2); }
+.starter { margin-top: 36px; }
+.starter h2, .finder h2 { font-size: 17px; font-weight: 600; margin-bottom: 12px; }
+.starter-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.sb { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 172px; padding: 18px 18px 20px; border: 0; border-radius: 22px 22px 22px 6px; background: #fff; color: var(--ink); text-align: left; line-height: 1.35; box-shadow: var(--shadow); transition: transform 200ms var(--ease), box-shadow 200ms var(--ease); }
+.sb:hover { transform: translateY(-2px); box-shadow: 4px 10px 24px -8px rgb(42 31 107 / 0.35), 1px 2px 4px rgb(42 31 107 / 0.06); }
+.sb-ic { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: var(--lilac-2); color: var(--indigo); margin-bottom: 6px; }
+.sb strong { font-size: 18px; font-weight: 600; }
+.sb small { font-size: 14.5px; color: var(--ink-2); }
+.sb-drop { cursor: pointer; border: 2px dashed var(--line-strong); box-shadow: none; background: rgb(255 255 255 / 0.7); }
+.sb-drop:focus-within { outline: 3px solid var(--focus); outline-offset: 3px; }
+.sb-drop.is-over { background: var(--lime-soft); border-color: var(--indigo); }
+.sb-sample { background: var(--indigo); color: #fff; border-radius: 22px 22px 6px 22px; }
+.sb-sample:hover { background: var(--indigo-2); }
+.sb-sample .sb-ic { background: rgb(255 255 255 / 0.12); color: #fff; }
+.sb-sample small { color: var(--on-indigo-2); }
+.sb-code { display: inline-block; margin-top: auto; padding: 2px 10px; border-radius: 999px; background: var(--lime); color: var(--lime-ink); font-size: 14px; font-weight: 600; }
+.starter-foot { margin-top: 14px; font-size: 15px; color: var(--ink-2); }
+.upload-status:not(:empty) { margin-top: 10px; padding: 10px 14px; background: var(--lime-soft); border-radius: 14px; font-size: 15.5px; color: var(--ink); }
+.finder { margin-top: 44px; max-width: 720px; }
+.finder-hint { margin: -6px 0 12px; font-size: 15.5px; color: var(--ink-2); }
+.search { display: flex; align-items: center; gap: 10px; padding: 4px 6px 4px 16px; background: #fff; border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow-sm); }
+.search:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+.search input { flex: 1; min-width: 0; min-height: 46px; border: 0; background: transparent; font-size: 17px; outline: none; }
+.search input::placeholder { color: #5a5285; opacity: 1; }
+.svc-list { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.svc { display: flex; align-items: flex-start; gap: 12px; max-width: 100%; padding: 12px 16px; background: #fff; color: var(--ink); text-decoration: none; border-radius: 20px 20px 20px 6px; box-shadow: var(--shadow-sm); line-height: 1.35; }
+.svc:hover { box-shadow: var(--shadow); }
+.svc:hover .svc-name { text-decoration: underline; text-underline-offset: 3px; }
+.svc .i { margin-top: 2px; color: var(--link); }
+.svc-name { display: block; font-weight: 500; color: var(--link); }
+.svc-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-size: 14px; color: var(--ink-2); }
+.dept { padding: 1px 8px; border-radius: 8px; background: var(--lilac-2); color: var(--ink); }
+.svc-empty { padding: 12px 16px; background: var(--lilac-2); border-radius: 16px; font-size: 15.5px; }
+
+.preview { position: sticky; top: 24px; margin: 8px 0 0; }
+.pv-window { padding: 0 18px 18px; background: var(--lilac-soft); border: 1px solid var(--line); border-radius: 28px; box-shadow: 6px 16px 40px -16px rgb(42 31 107 / 0.35); overflow: hidden; }
+.pv-top { display: flex; align-items: center; gap: 10px; margin: 0 -18px; padding: 12px 18px; background: #fff; border-bottom: 1px solid var(--line-soft); font-size: 15px; font-weight: 600; }
+.pv-top .avatar { width: 28px; height: 28px; }
+.pv-top small { display: block; font-weight: 400; font-size: 14px; color: var(--ink-2); }
+.pv-thread .msg { margin-top: 14px; }
+.pv-thread .bubble { font-size: 15px; padding: 12px 15px; }
+.pv-thread .msg-field .bubble { padding: 16px 16px; }
+.pv-thread .fc-title { font-size: 19px; }
+.pv-thread .fc-sec h4, .pv-thread .pv-h { font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.pv-thread .bubble > .fc-sec { margin-top: 12px; padding-top: 10px; }
+.pv-thread .specimen { font-size: 16px; }
+.pv-thread .attach-icon { width: 36px; height: 42px; }
+.pv-composer { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 8px 8px 8px 16px; background: #fff; border: 1px solid var(--line); border-radius: 22px; font-size: 15px; color: #5a5285; }
+.pv-composer span:first-child { flex: 1; }
+.pv-send { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--indigo); color: #fff; }
+.pv-send .i { width: 18px; height: 18px; }
+.preview figcaption { margin-top: 12px; text-align: center; font-size: 14px; color: var(--ink-2); }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1180px) {
+  .starter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sb-drop { grid-column: 1 / -1; min-height: 0; }
+}
+@media (max-width: 1023px) {
+  .appbar { flex-wrap: wrap; gap: 8px 12px; padding: 10px 16px; }
+  .notice { order: 3; flex: 1 1 100%; max-width: none; margin-left: 0; font-size: 14px; }
+  .lang { margin-left: auto; }
+  .convo-title { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; padding: 0; border: 0; }
+  .land-grid { grid-template-columns: minmax(0, 1fr); }
+  .preview { display: none; }
+  .landing { padding: 16px 18px 110px; }
+  .thread-inner { padding: 0 14px 24px; }
+  .msg-card .avatar, .msg-field .avatar { display: none; }
+  .bubble { max-width: 92%; }
+  .msg-card .bubble, .msg-field .bubble { padding: 18px 16px; }
+  .fc-step { margin-left: 0; width: 100%; }
+  .fc-step .btn { flex: 1; }
+  .pin-btn { min-width: 44px; min-height: 44px; padding: 0; justify-content: center; border-radius: 50%; }
+  .pin-btn .lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .composer-wrap { padding: 10px 14px 64px; }
+  .suggest { flex-wrap: nowrap; overflow-x: auto; margin: 0 -14px; padding: 2px 14px 4px; scrollbar-width: none; }
+  .chip-s { flex: none; min-height: 44px; }
+  .send { padding: 0 14px; }
+  .send .lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .drawer { position: fixed; inset: 0; z-index: 60; width: auto; max-width: none; border-left: 0; }
+  .drawer-inner { padding: 12px 14px 80px; }
+  .drawer-close { min-height: 44px; }
+  .pages button { min-width: 44px; height: 44px; }
+  .fields-toggle, .doc-chip { min-height: 44px; }
+  .sheet-wrap .form-sheet { aspect-ratio: auto; min-height: 125vw; }
+  .sheet-wrap .ff { min-height: 44px; }
+  .ctx-clear, .ref, .icon-btn { min-height: 44px; }
+  .icon-btn { width: 44px; height: 44px; }
+}
+@media (max-width: 699px) {
+  .starter-grid { grid-template-columns: minmax(0, 1fr); }
+  .sb { min-height: 0; }
+  .hero-sub { font-size: 17.5px; }
+  .fc-title { font-size: 21px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg.is-new { animation: none; }
+  .sb, .fields-toggle .chev { transition: none; }
+  .sb:hover { transform: none; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main" data-i18n="skip">Skip to content</a>
+<header class="appbar" id="appbar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 36 36" aria-hidden="true" focusable="false"><path fill="#2a1f6b" d="M8 4h20a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H15l-7 6v-6a6 6 0 0 1-6-6V10a6 6 0 0 1 6-6z"/><rect x="9" y="11" width="18" height="3.5" rx="1.75" fill="#c6f432"/><rect x="9" y="17.5" width="12" height="3.5" rx="1.75" fill="#fff"/></svg>
+    <span data-i18n="brand">Form Helper</span>
+  </div>
+  <h1 class="convo-title" id="convoTitle" data-view-panel="workspace"></h1>
+  <p class="notice"><span data-icon="info"></span><span data-i18n="notOfficial"></span></p>
+  <div class="lang" role="group" data-i18n-aria="langGroup">
+    <button type="button" data-lang="en" lang="en"><span aria-hidden="true">EN</span><span class="sr-only">English</span></button>
+    <button type="button" data-lang="fr" lang="fr"><span aria-hidden="true">FR</span><span class="sr-only">Français</span></button>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+  <!-- ============ LANDING ============ -->
+  <div class="landing" data-view-panel="landing">
+    <div class="sys-strip" role="note">
+      <span data-icon="lock"></span>
+      <div>
+        <p><strong data-i18n="privacy"></strong> <span data-i18n="aiDisclosure"></span></p>
+        <p data-i18n="notOfficialLong"></p>
+      </div>
+    </div>
+    <div class="land-grid">
+      <div>
+        <div class="hero">
+          <h1 data-i18n="heroTitle"></h1>
+          <p class="hero-sub" data-i18n="heroSub"></p>
+        </div>
+        <section class="starter" aria-labelledby="startTitle">
+          <h2 id="startTitle" data-i18n="startTitle"></h2>
+          <div class="starter-grid">
+            <label class="sb sb-drop" id="drop">
+              <input type="file" class="sr-only" id="pdfInput" accept="application/pdf,.pdf" multiple aria-describedby="dropHint dropLimits">
+              <span class="sb-ic" data-icon="upload"></span>
+              <strong data-i18n="uploadTitle"></strong>
+              <small id="dropHint" data-i18n="uploadHint"></small>
+              <small id="dropLimits" data-i18n="limits"></small>
+            </label>
+            <button type="button" class="sb sb-sample" data-sample="pptc153" lang="en">
+              <span class="sb-ic" data-icon="doc"></span>
+              <strong data-i18n="tryEn"></strong>
+              <small data-i18n="sampleEn"></small>
+              <span class="sb-code">PPTC 153</span>
+            </button>
+            <button type="button" class="sb sb-sample" data-sample="pptc154" lang="fr">
+              <span class="sb-ic" data-icon="doc"></span>
+              <strong data-i18n="tryFr"></strong>
+              <small data-i18n="sampleFr"></small>
+              <span class="sb-code">PPTC 154</span>
+            </button>
+          </div>
+          <p class="starter-foot" data-i18n="supported"></p>
+          <p class="upload-status" id="uploadStatus" role="status"></p>
+        </section>
+        <section class="finder" aria-labelledby="svcTitle">
+          <h2 id="svcTitle"><label for="svc" data-i18n="serviceTitle"></label></h2>
+          <p class="finder-hint" id="svcHint" data-i18n="serviceSub"></p>
+          <div class="search">
+            <span data-icon="search"></span>
+            <input id="svc" type="search" autocomplete="off" data-i18n-ph="servicePh" aria-describedby="svcHint" aria-controls="svcList">
+          </div>
+          <p class="sr-only" id="svcCount" role="status"></p>
+          <ul class="svc-list" id="svcList"></ul>
+        </section>
+      </div>
+      <figure class="preview" aria-labelledby="pvCap">
+        <div class="pv-window" id="preview" aria-hidden="true"></div>
+        <figcaption id="pvCap" data-i18n="previewLabel"></figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <!-- ============ WORKSPACE ============ -->
+  <div class="workspace" data-view-panel="workspace">
+    <section class="chat" id="chat" aria-labelledby="threadTitle">
+      <h2 class="sr-only" id="threadTitle" data-i18n="threadLabel"></h2>
+      <div class="thread-scroll" id="scroller">
+        <div class="thread-inner">
+          <div class="pinbar" id="pinbar"></div>
+          <ol class="thread" id="thread"></ol>
+        </div>
+      </div>
+      <div class="composer-wrap">
+        <form class="composer" id="composer" novalidate>
+          <div class="suggest" id="suggest" role="group" data-i18n-aria="suggestionsLabel"></div>
+          <div class="ctx" id="ctx" hidden>
+            <span class="ctx-chip"><span data-icon="target"></span><span class="ctx-text" id="ctxText"></span><button type="button" class="ctx-clear" id="ctxClear" data-i18n="clear"></button></span>
+          </div>
+          <div class="inputrow">
+            <label for="ask" class="sr-only" data-i18n="chatTitle"></label>
+            <span data-icon="chat"></span>
+            <input id="ask" type="text" autocomplete="off" data-i18n-ph="chatPh">
+            <button type="submit" class="send"><span data-icon="send"></span><span class="lbl" data-i18n="send"></span></button>
+          </div>
+          <div class="disclose">
+            <p><span data-icon="lock"></span><span data-i18n="privacy"></span></p>
+            <p><span data-icon="info"></span><span data-i18n="aiDisclosure"></span></p>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <aside class="drawer" id="drawer" aria-labelledby="drawerTitle">
+      <div class="drawer-inner">
+        <div class="drawer-head">
+          <h2 class="drawer-title" id="drawerTitle"><span data-i18n="attachments"></span><span class="count" id="docCount"></span></h2>
+          <button type="button" class="drawer-close" id="drawerClose" aria-controls="drawer"></button>
+        </div>
+        <div class="doc-chips" id="docChips"></div>
+        <div class="drawer-tools">
+          <nav class="pages" id="pages"></nav>
+          <button type="button" class="fields-toggle" id="fieldsToggle" aria-controls="fieldList" aria-expanded="false"></button>
+        </div>
+        <div class="fieldlist" id="fieldList" hidden></div>
+        <div class="sheet-wrap" id="sheet"></div>
+      </div>
+    </aside>
+  </div>
+</main>
+<div id="live" class="sr-only" aria-live="polite"></div>
+
+<script src="shared/data.js"></script>
+<script src="shared/proto.js"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const esc = FH.esc;
+  const t = FH.t;
+
+  /* ---------- Design-specific copy (EN/FR) ---------- */
+  Object.assign(FH.data.i18n.en, {
+    skip: "Skip to content",
+    langGroup: "Language",
+    startTitle: "Start a chat with a form",
+    uploadProto: "Prototype: uploaded files aren't processed here. Try a sample form to see how it works.",
+    noServices: "No match yet. Try words like passport, pension, benefit or tax.",
+    svcCount: "{n} services shown",
+    newTab: "(opens in a new tab)",
+    previewLabel: "How a field explanation arrives in the conversation",
+    previewAsk: "What number goes here?",
+    tryEn: "Try the English sample",
+    tryFr: "Essayer l'exemple français",
+    openDoc: "Open",
+    hideDoc: "Hide document",
+    closeDoc: "Close document",
+    showDoc: "Show document",
+    pagesN: "{n} pages · blank form",
+    pinned: "Pinned",
+    showCard: "Show card",
+    keep: "Keep in chat",
+    kept: "Kept in chat",
+    reopen: "Open again",
+    closeCard: "Close field card",
+    pagesLabel: "Form pages",
+    pageN: "Page {n}",
+    hasFields: "has explained fields",
+    you: "You",
+    attachments: "Attachments",
+    today: "Today",
+    suggestionsLabel: "Suggested questions",
+    threadLabel: "Conversation",
+    fieldsCount: "{v} of {n} viewed",
+  });
+  Object.assign(FH.data.i18n.fr, {
+    skip: "Passer au contenu",
+    langGroup: "Langue",
+    startTitle: "Commencer une conversation avec un formulaire",
+    uploadProto: "Prototype : les fichiers ne sont pas traités ici. Essayez un formulaire exemple pour voir comment ça fonctionne.",
+    noServices: "Aucun résultat pour l'instant. Essayez des mots comme passeport, pension, prestation ou impôt.",
+    svcCount: "{n} services affichés",
+    newTab: "(s'ouvre dans un nouvel onglet)",
+    previewLabel: "Comment l'explication d'un champ arrive dans la conversation",
+    previewAsk: "Quel numéro va ici?",
+    tryEn: "Try the English sample",
+    tryFr: "Essayer l'exemple français",
+    openDoc: "Ouvrir",
+    hideDoc: "Masquer le document",
+    closeDoc: "Fermer le document",
+    showDoc: "Afficher le document",
+    pagesN: "{n} pages · formulaire vierge",
+    pinned: "Épinglée",
+    showCard: "Voir la fiche",
+    keep: "Garder dans la conversation",
+    kept: "Gardée dans la conversation",
+    reopen: "Rouvrir",
+    closeCard: "Fermer la fiche du champ",
+    pagesLabel: "Pages du formulaire",
+    pageN: "Page {n}",
+    hasFields: "contient des champs expliqués",
+    you: "Vous",
+    attachments: "Pièces jointes",
+    today: "Aujourd'hui",
+    suggestionsLabel: "Questions suggérées",
+    threadLabel: "Conversation",
+    fieldsCount: "{v} sur {n} consultés",
+  });
+  const colon = () => (FH.lang === "fr" ? " : " : ": ");
+
+  /* ---------- Icons ---------- */
+  const P = {
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+    lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    doc: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
+    pin: '<path d="M12 17v4M8 3h8l-1 6 3 3v2H6v-2l3-3z"/>',
+    send: '<path d="M4 12 20 4l-6 16-3-7z"/><path d="m11 13 9-9"/>',
+    x: '<path d="M6 6l12 12M18 6 6 18"/>',
+    chevL: '<path d="m15 6-6 6 6 6"/>',
+    chevR: '<path d="m9 6 6 6-6 6"/>',
+    chevD: '<path d="m6 9 6 6 6-6"/>',
+    check: '<path d="m5 12.5 4.5 4.5L19 7"/>',
+    ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+    upload: '<path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
+    list: '<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',
+    chat: '<path d="M5 5h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-8l-5 4v-4H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/>',
+    bookmark: '<path d="M7 3h10v18l-5-4-5 4z"/>',
+    alert: '<path d="M12 4 21 20H3z"/><path d="M12 10v4M12 17h.01"/>',
+    target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>',
+    search: '<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    panel: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/>',
+    cursor: '<path d="m6 4 12 6-5 2-2 5z"/>',
+  };
+  const icon = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${P[n] || ""}</svg>`;
+  const MARK = '<svg class="avatar" viewBox="0 0 36 36" aria-hidden="true" focusable="false"><path fill="#2a1f6b" d="M8 4h20a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H15l-7 6v-6a6 6 0 0 1-6-6V10a6 6 0 0 1 6-6z"/><rect x="9" y="11" width="18" height="3.5" rx="1.75" fill="#c6f432"/><rect x="9" y="17.5" width="12" height="3.5" rx="1.75" fill="#fff"/></svg>';
+  const tk = (n) => `<span class="tk">${icon(n)}</span>`;
+
+  /* ---------- Elements & state ---------- */
+  const thread = $("#thread"), scroller = $("#scroller"), pinbar = $("#pinbar");
+  const drawer = $("#drawer"), drawerClose = $("#drawerClose"), chat = $("#chat"), appbar = $("#appbar");
+  const docChips = $("#docChips"), pagesNav = $("#pages"), fieldsToggle = $("#fieldsToggle"), fieldList = $("#fieldList");
+  const ask = $("#ask"), ctxBox = $("#ctx"), ctxText = $("#ctxText"), suggest = $("#suggest"), liveRegion = $("#live");
+  const svcInput = $("#svc"), svcList = $("#svcList"), svcCount = $("#svcCount"), preview = $("#preview");
+  const mqDesk = matchMedia("(min-width: 1024px)");
+  const S = { msgs: [], uid: 0, live: null, ctx: null, drawerOpen: false, listOpen: false, uploadMsg: false, refocus: null, opener: null };
+
+  /* ---------- Shared fragments ---------- */
+  const bot = (cls, inner) => `<li class="msg from-bot ${cls}">${MARK}${inner}</li>`;
+  const tickList = (items, mark = "check", cls = "ticks") => `<ul class="${cls}">${items.map((x) => `<li>${tk(mark)}<span>${esc(x)}</span></li>`).join("")}</ul>`;
+  function srcsHTML(sources, heading) {
+    if (!sources || !sources.length) return "";
+    const h = heading ? `<h4>${esc(t("sources"))}</h4>` : `<p class="src-h">${esc(t("sources"))}</p>`;
+    return `<div class="srcs">${h}<ul>${sources.map((s) => `<li><a class="src-chip" href="${esc(s.url)}" target="_blank" rel="noopener">${icon("ext")}<span>${esc(s.title)}<span class="sr-only"> ${esc(t("newTab"))}</span></span></a><span class="src-meta">${esc(s.checked)}${s.note ? ` · ${esc(s.note)}` : ""}</span></li>`).join("")}</ul></div>`;
+  }
+  function refChip(id) {
+    const f = FH.field(id);
+    if (!f) return "";
+    return `<button type="button" class="ref" data-select="${id}">${icon("target")}<span>${esc(f.label)} <small>· ${esc(t("page"))} ${f.page}</small></span></button>`;
+  }
+  function replyBubble(r) {
+    return bot("", `<div class="bubble">
+      <p>${esc(r.text)}</p>
+      ${r.list ? tickList(r.list) : ""}
+      ${r.refs && r.refs.length ? `<div class="refs">${r.refs.map(refChip).join("")}</div>` : ""}
+      ${srcsHTML(r.sources, false)}
+    </div>`);
+  }
+  function userBubble(text, ctx) {
+    const f = ctx && FH.field(ctx);
+    return `<li class="msg from-user"><div class="bubble"><span class="sr-only">${esc(t("you"))}${colon()}</span>${f ? `<span class="quote">${icon("target")}<span>${esc(t("askingAbout"))}${colon()}${esc(f.label)}</span></span>` : ""}<p>${esc(text)}</p></div></li>`;
+  }
+  function overviewBubble(o) {
+    return bot("msg-card", `<div class="bubble">
+      <h3 class="ov-title">${esc(o.title)}</h3>
+      <p class="ov-meta">${esc(o.department)} · ${esc(t("overviewTitle"))}</p>
+      <p>${esc(o.summary)}</p>
+      <dl class="ov-dl">
+        <div><dt>${esc(t("who"))}</dt><dd>${esc(o.who)}</dd></div>
+        <div><dt>${esc(t("need"))}</dt><dd>${tickList(o.need)}</dd></div>
+        <div><dt>${esc(t("submit"))}</dt><dd>${esc(o.submit)}</dd></div>
+      </dl>
+      ${srcsHTML(o.sources, true)}
+    </div>`);
+  }
+  function fieldBubble(m) {
+    const f = FH.field(m.fid);
+    if (!f) return "";
+    const last = FH.data.fields.length - 1;
+    const sec = (key, body) => `<div class="fc-sec"><h4>${esc(t(key))}</h4>${body}</div>`;
+    return `<li class="msg from-bot msg-field">${MARK}<article class="bubble fieldcard" aria-labelledby="fc-title">
+      <div class="fc-head">
+        <div>
+          <h3 class="fc-title" id="fc-title" tabindex="-1">${esc(f.label)}</h3>
+          <p class="fc-meta">${esc(f.sectionLabel)} · ${esc(t("page"))} ${f.page} ${esc(t("of"))} ${FH.doc().pages}</p>
+        </div>
+        <div class="fc-tools">
+          <span class="pin-pill">${icon("pin")}${esc(t("pinned"))}</span>
+          <button type="button" class="icon-btn" data-act="close-card" aria-label="${esc(t("closeCard"))}">${icon("x")}</button>
+        </div>
+      </div>
+      <div class="fc-flags">
+        ${f.bold ? `<span class="flag-guarantor">${icon("alert")}${esc(t("required"))}</span>` : ""}
+        ${f.grounded ? `<span class="grounded">${icon("check")}${esc(t("grounded"))}</span>` : `<span class="grounded is-general">${icon("info")}${esc(t("general"))}</span>`}
+      </div>
+      ${f.meaning ? sec("meaning", `<p>${esc(f.meaning)}</p>`) : ""}
+      ${f.enter ? sec("enter", `<p>${esc(f.enter)}</p>`) : ""}
+      ${f.example ? sec("example", `<p><span class="specimen">${esc(f.example)}</span></p>`) : ""}
+      ${f.find ? sec("find", `<p>${esc(f.find)}</p>`) : ""}
+      ${f.options && f.options.length ? sec("options", `<ul class="opts">${f.options.map((o) => `<li>${esc(o)}</li>`).join("")}</ul>`) : ""}
+      ${f.points ? `<div class="fc-sec"><h4>${esc(f.points.title)}</h4>${tickList(f.points.items)}</div>` : ""}
+      ${f.mistakes.length ? sec("mistakes", tickList(f.mistakes, "x", "crosses")) : ""}
+      ${f.sources.length ? `<div class="fc-sec">${srcsHTML(f.sources, true)}</div>` : ""}
+      <div class="fc-actions">
+        <button type="button" class="btn btn-primary" data-act="ask">${icon("chat")}${esc(t("askField"))}</button>
+        <button type="button" class="btn btn-ghost" data-act="keep" aria-pressed="${!!m.kept}">${icon(m.kept ? "check" : "bookmark")}${esc(t("keep"))}</button>
+        <div class="fc-step">
+          <button type="button" class="btn btn-step" data-act="prev"${f.index === 0 ? " disabled" : ""}>${icon("chevL")}${esc(t("prev"))}</button>
+          <button type="button" class="btn btn-step" data-act="next"${f.index === last ? " disabled" : ""}>${esc(t("next"))}${icon("chevR")}</button>
+        </div>
+      </div>
+    </article></li>`;
+  }
+  function keptBubble(m) {
+    const f = FH.field(m.fid);
+    if (!f) return "";
+    return bot("msg-kept", `<div class="bubble">
+      <p class="kept-title">${esc(f.label)}</p>
+      <p class="tag">${esc(f.sectionLabel)} · ${esc(t("page"))} ${f.page}</p>
+      ${f.enter ? `<p>${esc(f.enter)}</p>` : ""}
+      ${f.example ? `<p><span class="specimen sm">${esc(f.example)}</span></p>` : ""}
+      <div class="kept-head"><button type="button" class="btn btn-ghost" data-select="${f.id}">${icon("pin")}${esc(t("reopen"))}</button><span class="tag">${icon("bookmark")}${esc(t("kept"))}</span></div>
+    </div>`);
+  }
+  function attachBubble() {
+    const d = FH.doc();
+    const open = S.drawerOpen;
+    return `<li class="msg from-user msg-attach"><button type="button" class="bubble attach" data-act="drawer" aria-controls="drawer" aria-expanded="${open}">
+      <span class="attach-icon">${icon("doc")}</span>
+      <span class="attach-text"><strong>${esc(d.number)} · ${esc(d.title[FH.lang])}</strong><small>${esc(t("pagesN", { n: d.pages }))}</small></span>
+      <span class="attach-cta">${icon(open ? "panel" : "chevR")}${esc(open ? (mqDesk.matches ? t("hideDoc") : t("closeDoc")) : t("openDoc"))}</span>
+    </button></li>`;
+  }
+  const queryOf = (m) => (m.key ? t(m.key) : m.q) + (m.ctx && FH.field(m.ctx) ? " " + FH.field(m.ctx).label : "");
+
+  function msgHTML(m) {
+    switch (m.kind) {
+      case "attach": return attachBubble();
+      case "day": return `<li class="msg msg-day"><span>${esc(t("today"))}</span></li>`;
+      case "seed": {
+        const s = FH.seedChat()[m.idx];
+        if (s.kind === "overview") return overviewBubble(s.overview);
+        if (s.role === "user") return userBubble(s.text);
+        return replyBubble(s);
+      }
+      case "user": return userBubble(m.key ? t(m.key) : m.q, m.ctx);
+      case "thinking": return bot("", `<div class="bubble thinking" role="status"><span class="dots" aria-hidden="true"><b></b><b></b><b></b></span><span>${esc(t("thinking"))}</span></div>`);
+      case "reply": return replyBubble(FH.reply(queryOf(m)));
+      case "field": return fieldBubble(m);
+      case "kept": return keptBubble(m);
+      case "system": return `<li class="msg msg-system"><p>${esc(t(m.key))}</p></li>`;
+    }
+    return "";
+  }
+  /* ---------- Thread operations ---------- */
+  function toNode(m) {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = msgHTML(m).trim();
+    const li = tpl.content.firstElementChild;
+    if (li) li.dataset.uid = m.uid;
+    return li;
+  }
+  function add(m, animate = S.ready) {
+    m.uid = ++S.uid;
+    S.msgs.push(m);
+    const li = toNode(m);
+    if (li) { if (animate) li.classList.add("is-new"); thread.appendChild(li); }
+    return m;
+  }
+  function replaceMsg(m) {
+    const old = thread.querySelector(`[data-uid="${m.uid}"]`);
+    const li = toNode(m);
+    if (old && li) old.replaceWith(li);
+    return li;
+  }
+  function removeMsg(m) {
+    S.msgs = S.msgs.filter((x) => x !== m);
+    const old = thread.querySelector(`[data-uid="${m.uid}"]`);
+    if (old) old.remove();
+  }
+  function renderThread() {
+    thread.innerHTML = "";
+    S.msgs.forEach((m) => { const li = toNode(m); if (li) thread.appendChild(li); });
+  }
+  const scrollBottom = () => { scroller.scrollTop = scroller.scrollHeight; };
+  function scrollToCard() {
+    const li = thread.querySelector(".msg-field");
+    if (!li || !scroller.offsetParent) return;
+    const top = li.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - pinbar.offsetHeight - 12;
+    scroller.scrollTop = Math.max(0, top);
+  }
+  function doRefocus() {
+    const sel = S.refocus;
+    S.refocus = null;
+    if (!sel) return;
+    let el = $(sel);
+    if (!el || el.disabled || !el.offsetParent) el = $("#fc-title");
+    if (el) el.focus({ preventScroll: true });
+  }
+  function keepFocus(container, fn) {
+    const a = document.activeElement;
+    let key = null;
+    if (a && a !== document.body && container.contains(a)) {
+      const d = a.dataset || {};
+      key = d.doc ? `[data-doc="${d.doc}"]` : d.page ? `[data-page="${d.page}"]` : d.select ? `[data-select="${d.select}"]` : a.id ? `#${a.id}` : null;
+    }
+    fn();
+    if (key) { const el = container.querySelector(key); if (el) el.focus({ preventScroll: true }); }
+  }
+  function updateAttach() {
+    const m = S.msgs.find((x) => x.kind === "attach");
+    if (!m) return;
+    const a = document.activeElement;
+    const had = a && a.closest && a.closest(".msg-attach");
+    const li = replaceMsg(m);
+    if (had && li) li.querySelector("button").focus({ preventScroll: true });
+  }
+
+  function setCtx(id) {
+    S.ctx = id && FH.field(id) ? id : null;
+    ctxBox.hidden = !S.ctx;
+    ctxText.textContent = S.ctx ? `${t("askingAbout")}${colon()}${FH.field(S.ctx).label}` : "";
+  }
+  function send(q, key) {
+    const ctx = S.ctx;
+    add({ kind: "user", q, key, ctx });
+    setCtx(null);
+    const th = add({ kind: "thinking" });
+    scrollBottom();
+    setTimeout(() => {
+      const r = { kind: "reply", q, key, ctx, uid: th.uid };
+      const i = S.msgs.indexOf(th);
+      if (i < 0) { add(r); } else { S.msgs[i] = r; const li = replaceMsg(r); if (li) li.classList.add("is-new"); }
+      liveRegion.textContent = FH.reply(queryOf(r)).text;
+      scrollBottom();
+    }, 600);
+  }
+
+  /* ---------- Pin bar ---------- */
+  function renderPin() {
+    const f = S.live && FH.field(S.live.fid);
+    const docBtn = S.drawerOpen ? "" : `<button type="button" class="pin-btn" id="pinDoc" data-act="drawer" aria-controls="drawer" aria-expanded="false">${icon("doc")}<span class="lbl">${esc(t("showDoc"))}</span></button>`;
+    pinbar.innerHTML = `<div class="pin-card">${f
+      ? `<span class="pin-ic">${icon("pin")}</span><span class="pin-text"><strong>${esc(f.label)}</strong><small>${esc(t("pinned"))} · ${esc(f.sectionLabel)} · ${esc(t("page"))} ${f.page}</small></span><button type="button" class="pin-btn" data-act="jump">${icon("chevD")}<span class="lbl">${esc(t("showCard"))}</span></button>`
+      : `<span class="pin-ic is-empty">${icon("cursor")}</span><span class="pin-text"><span>${esc(t("selectPrompt"))}</span></span>`}${docBtn}</div>`;
+  }
+
+  /* ---------- Drawer ---------- */
+  function setDrawer(open, opts = {}) {
+    const focus = opts.focus !== false;
+    const was = S.drawerOpen;
+    S.drawerOpen = open;
+    const modal = open && !mqDesk.matches;
+    drawer.classList.toggle("is-open", open);
+    if (modal) { drawer.setAttribute("role", "dialog"); drawer.setAttribute("aria-modal", "true"); }
+    else { drawer.removeAttribute("role"); drawer.removeAttribute("aria-modal"); }
+    chat.toggleAttribute("inert", modal);
+    appbar.toggleAttribute("inert", modal);
+    const a = document.activeElement;
+    const focusWasInDrawer = a && drawer.contains(a);
+    if (open && !was && a && a !== document.body && !focusWasInDrawer) {
+      S.opener = a.closest(".msg-attach") ? ".msg-attach button" : a.id ? `#${a.id}` : null;
+    }
+    renderDrawerHead();
+    renderPin();
+    updateAttach();
+    if (!focus || was === open) return;
+    const now = document.activeElement;
+    if (open) {
+      if (modal || !now || now === document.body) drawerClose.focus({ preventScroll: true });
+    } else if (focusWasInDrawer || !now || now === document.body) {
+      const o = S.opener && $(S.opener);
+      const back = o && o.offsetParent ? o : ($("#pinDoc") || ask);
+      back.focus({ preventScroll: true });
+    }
+  }
+  function renderDrawerHead() {
+    const desk = mqDesk.matches;
+    drawerClose.innerHTML = `${icon(desk ? "panel" : "x")}<span>${esc(t(desk ? "hideDoc" : "closeDoc"))}</span>`;
+    drawerClose.setAttribute("aria-expanded", String(S.drawerOpen));
+    $("#docCount").textContent = t("docsCount", { n: FH.data.docs.length });
+  }
+  function renderDocs() {
+    keepFocus(docChips, () => {
+      docChips.innerHTML = FH.data.docs.map((d) => `<button type="button" class="doc-chip" data-doc="${d.id}" aria-pressed="${d.id === FH.state.docId}">${icon("doc")}<span><strong>${esc(d.number)}</strong><small>${esc(d.short[FH.lang])}</small></span></button>`).join("")
+        + `<label class="doc-chip add-pdf">${icon("plus")}<span>${esc(t("addPdf"))}</span><input type="file" class="sr-only" id="addPdf" accept="application/pdf,.pdf"></label>`;
+    });
+  }
+  function renderPages() {
+    const withFields = new Set(FH.data.fields.map((f) => f.page));
+    pagesNav.setAttribute("aria-label", t("pagesLabel"));
+    keepFocus(pagesNav, () => {
+      pagesNav.innerHTML = `<span class="pages-lbl" aria-hidden="true">${esc(t("page"))}</span>` + Array.from({ length: FH.doc().pages }, (_, i) => i + 1).map((p) => {
+        const has = withFields.has(p);
+        const label = t("pageN", { n: p }) + (has ? `, ${t("hasFields")}` : "");
+        return `<button type="button" data-page="${p}" class="${has ? "has-fields" : ""}"${p === FH.state.page ? ' aria-current="page"' : ""} aria-label="${esc(label)}">${p}</button>`;
+      }).join("");
+    });
+  }
+  function renderFieldList() {
+    const n = FH.data.fields.length, v = FH.state.visited.size;
+    fieldsToggle.innerHTML = `${icon("list")}<span>${esc(t("fieldsTitle"))} · ${esc(t("fieldsCount", { v, n }))}</span>${icon("chevD", "chev")}`;
+    fieldsToggle.setAttribute("aria-expanded", String(S.listOpen));
+    fieldList.hidden = !S.listOpen;
+    keepFocus(fieldList, () => {
+      fieldList.innerHTML = FH.sectionsInOrder().map((s, si) => `<div class="fl-sec"><h3 id="fl-sec-${si}">${esc(s.label)}</h3><ul aria-labelledby="fl-sec-${si}">${s.fields.map((f) => {
+        const seen = FH.state.visited.has(f.id);
+        return `<li><button type="button" class="fl-item" data-select="${f.id}"${FH.state.selectedId === f.id ? ' aria-current="true"' : ""}><span class="fl-tick${seen ? " is-visited" : ""}" aria-hidden="true">${seen ? icon("check") : ""}</span><span class="fl-label">${esc(f.label)}${seen ? `<span class="sr-only"> (${esc(t("viewed"))})</span>` : ""}</span><span class="fl-page">${esc(t("page"))} ${f.page}</span></button></li>`;
+      }).join("")}</ul></div>`).join("");
+    });
+  }
+  function renderTitle() {
+    const d = FH.doc();
+    $("#convoTitle").innerHTML = `<span class="ct-num">${esc(d.number)}</span><span class="ct-title">${esc(d.title[FH.lang])}</span>`;
+  }
+  function renderSuggest() {
+    suggest.innerHTML = ["suggestion1", "suggestion2", "suggestion3"].map((k) => `<button type="button" class="chip-s" data-key="${k}">${esc(t(k))}</button>`).join("");
+  }
+  /* ---------- Landing ---------- */
+  const norm = (s) => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  function renderServices() {
+    const toks = norm(svcInput.value.trim()).split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+    let list = FH.data.services.filter((s) => FH.data.resources[s.id]).map((s, i) => {
+      const hay = norm([s.en, s.fr, s.dept, FH.data.resources[s.id].en, FH.data.resources[s.id].fr].join(" "));
+      return { s, i, score: toks.reduce((n, w) => n + (hay.includes(w) ? 1 : 0), 0) };
+    });
+    if (toks.length) list = list.filter((x) => x.score > 0).sort((a, b) => b.score - a.score || a.i - b.i);
+    svcList.innerHTML = list.length
+      ? list.map(({ s }) => {
+          const r = FH.resource(s.id);
+          return `<li><a class="svc" href="${esc(r.url)}" target="_blank" rel="noopener">${icon("ext")}<span><span class="svc-name">${esc(s[FH.lang])}<span class="sr-only"> ${esc(t("newTab"))}</span></span><span class="svc-meta"><span class="dept">${esc(s.dept)}</span>${r.note ? `<span>${esc(r.note)}</span>` : ""}</span></span></a></li>`;
+        }).join("")
+      : `<li class="svc-empty">${esc(t("noServices"))}</li>`;
+    svcCount.textContent = t("svcCount", { n: list.length });
+  }
+  function renderPreview() {
+    const f = FH.field("g-number");
+    const d = FH.data.docs.find((x) => x.lang === FH.lang) || FH.data.docs[0];
+    preview.innerHTML = `
+      <div class="pv-top">${MARK}<span>${esc(t("brand"))}<small>${esc(d.number)} · ${esc(d.short[FH.lang])}</small></span></div>
+      <ol class="pv-thread">
+        <li class="msg from-user"><div class="bubble attach"><span class="attach-icon">${icon("doc")}</span><span class="attach-text"><strong>${esc(d.number)}</strong><small>${esc(t("pagesN", { n: d.pages }))}</small></span></div></li>
+        <li class="msg from-user"><div class="bubble"><span class="quote">${icon("target")}<span>${esc(t("askingAbout"))}${colon()}${esc(f.label)}</span></span><p>${esc(t("previewAsk"))}</p></div></li>
+        <li class="msg from-bot msg-field">${MARK}<div class="bubble">
+          <div class="fc-head"><div><p class="fc-title">${esc(f.label)}</p><p class="fc-meta">${esc(f.sectionLabel)} · ${esc(t("page"))} ${f.page}</p></div><span class="pin-pill">${icon("pin")}${esc(t("pinned"))}</span></div>
+          ${f.bold ? `<div class="fc-flags"><span class="flag-guarantor">${icon("alert")}${esc(t("required"))}</span></div>` : ""}
+          <div class="fc-sec"><p class="pv-h">${esc(t("enter"))}</p><p>${esc(f.enter)}</p></div>
+          <div class="fc-sec"><p class="pv-h">${esc(t("example"))}</p><p><span class="specimen">${esc(f.example)}</span></p></div>
+        </div></li>
+      </ol>
+      <div class="pv-composer"><span>${esc(t("chatPh"))}</span><span class="pv-send">${icon("send")}</span></div>`;
+  }
+  const renderUploadStatus = () => { $("#uploadStatus").textContent = S.uploadMsg ? t("uploadProto") : ""; };
+  const renderLang = () => $$("[data-lang]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === FH.lang)));
+
+  /* ---------- Events ---------- */
+  $$("[data-lang]").forEach((b) => b.addEventListener("click", () => FH.setLang(b.dataset.lang)));
+  svcInput.addEventListener("input", renderServices);
+  $$("[data-sample]").forEach((b) => b.addEventListener("click", () => {
+    FH.setDoc(b.dataset.sample);
+    FH.showView("workspace");
+    $("#main").focus({ preventScroll: true });
+  }));
+  const drop = $("#drop");
+  const showUpload = () => { S.uploadMsg = true; renderUploadStatus(); };
+  $("#pdfInput").addEventListener("change", (e) => { if (e.target.files.length) showUpload(); e.target.value = ""; });
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("is-over"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, () => drop.classList.remove("is-over")));
+  drop.addEventListener("drop", (e) => { e.preventDefault(); showUpload(); });
+
+  thread.addEventListener("click", (e) => {
+    const sel = e.target.closest("[data-select]");
+    if (sel) { S.refocus = "#fc-title"; FH.select(sel.dataset.select); return; }
+    const a = e.target.closest("[data-act]");
+    if (!a) return;
+    if (a.dataset.act === "drawer") { setDrawer(!S.drawerOpen); return; }
+    if (!S.live) return;
+    switch (a.dataset.act) {
+      case "close-card": FH.select(null); ask.focus(); break;
+      case "ask": setCtx(S.live.fid); ask.focus(); break;
+      case "keep": {
+        S.live.kept = !S.live.kept;
+        if (!S.live.kept) S.msgs.filter((m) => m.kind === "kept" && m.fid === S.live.fid).forEach(removeMsg);
+        const li = replaceMsg(S.live);
+        if (li) li.querySelector('[data-act="keep"]').focus({ preventScroll: true });
+        break;
+      }
+      case "prev": S.refocus = '.msg-field [data-act="prev"]'; FH.step(-1); break;
+      case "next": S.refocus = '.msg-field [data-act="next"]'; FH.step(1); break;
+    }
+  });
+  pinbar.addEventListener("click", (e) => {
+    const a = e.target.closest("[data-act]");
+    if (!a) return;
+    if (a.dataset.act === "drawer") setDrawer(true);
+    if (a.dataset.act === "jump") { scrollToCard(); const h = $("#fc-title"); if (h) h.focus({ preventScroll: true }); }
+  });
+  drawerClose.addEventListener("click", () => setDrawer(false));
+  docChips.addEventListener("click", (e) => { const b = e.target.closest("[data-doc]"); if (b && b.dataset.doc !== FH.state.docId) FH.setDoc(b.dataset.doc); });
+  docChips.addEventListener("change", (e) => {
+    if (e.target.id !== "addPdf") return;
+    if (e.target.files.length) { add({ kind: "system", key: "uploadProto" }); if (mqDesk.matches) scrollBottom(); }
+    e.target.value = "";
+  });
+  pagesNav.addEventListener("click", (e) => { const b = e.target.closest("[data-page]"); if (b) FH.setPage(Number(b.dataset.page)); });
+  fieldsToggle.addEventListener("click", () => { S.listOpen = !S.listOpen; renderFieldList(); });
+  fieldList.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-select]");
+    if (!b) return;
+    S.refocus = mqDesk.matches ? `#fieldList [data-select="${b.dataset.select}"]` : "#fc-title";
+    FH.select(b.dataset.select);
+  });
+  fieldList.addEventListener("keydown", (e) => {
+    const items = $$(".fl-item", fieldList);
+    const i = items.indexOf(document.activeElement);
+    if (i < 0) return;
+    const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: items.length - 1 }[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    items[Math.max(0, Math.min(items.length - 1, to))].focus();
+  });
+  $("#sheet").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-field]");
+    if (b) S.refocus = mqDesk.matches ? `#sheet [data-field="${b.dataset.field}"]` : "#fc-title";
+  }, true);
+  suggest.addEventListener("click", (e) => { const b = e.target.closest("[data-key]"); if (b) send(null, b.dataset.key); });
+  $("#composer").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = ask.value.trim();
+    if (!v) { ask.focus(); return; }
+    ask.value = "";
+    send(v, null);
+  });
+  $("#ctxClear").addEventListener("click", () => { setCtx(null); ask.focus(); });
+  document.addEventListener("keydown", (e) => {
+    if (!S.drawerOpen || mqDesk.matches) return;
+    if (e.key === "Escape") { e.preventDefault(); setDrawer(false); return; }
+    if (e.key !== "Tab") return;
+    const f = $$('button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])', drawer).filter((el) => el.offsetParent || el.type === "file");
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && (document.activeElement === first || !drawer.contains(document.activeElement))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (document.activeElement === last || !drawer.contains(document.activeElement))) { e.preventDefault(); first.focus(); }
+  });
+  mqDesk.addEventListener("change", () => setDrawer(mqDesk.matches, { focus: false }));
+
+  /* ---------- FH state listeners ---------- */
+  function onSelect(f) {
+    const prev = S.live;
+    let keepFlag = false;
+    if (prev) {
+      const leaving = !f || prev.fid !== f.id;
+      const hasKept = S.msgs.some((m) => m.kind === "kept" && m.fid === prev.fid);
+      if (!leaving) keepFlag = prev.kept;
+      if (prev.kept && leaving && !hasKept) {
+        const k = { kind: "kept", fid: prev.fid, uid: prev.uid };
+        S.msgs[S.msgs.indexOf(prev)] = k;
+        replaceMsg(k);
+      } else {
+        removeMsg(prev);
+      }
+      S.live = null;
+    }
+    if (f) {
+      S.live = add({ kind: "field", fid: f.id, kept: keepFlag || S.msgs.some((m) => m.kind === "kept" && m.fid === f.id) });
+    }
+    renderPin();
+    renderFieldList();
+    if (f && S.drawerOpen && !mqDesk.matches) setDrawer(false, { focus: false });
+    if (f) requestAnimationFrame(() => { scrollToCard(); doRefocus(); });
+    else S.refocus = null;
+  }
+
+  function onLang() {
+    renderLang();
+    renderServices();
+    renderPreview();
+    renderUploadStatus();
+    renderTitle();
+    renderDocs();
+    renderPages();
+    renderFieldList();
+    renderDrawerHead();
+    renderPin();
+    renderSuggest();
+    setCtx(S.ctx);
+    const top = scroller.scrollTop;
+    renderThread();
+    scroller.scrollTop = top;
+  }
+
+  /* ---------- Init ---------- */
+  $$("[data-icon]").forEach((el) => { el.innerHTML = icon(el.dataset.icon); el.setAttribute("aria-hidden", "true"); });
+  FH.mountSheet($("#sheet"), {});
+  FH.on("select", onSelect);
+  FH.on("page", renderPages);
+  FH.on("doc", () => { renderTitle(); renderDocs(); renderPages(); });
+  FH.on("lang", onLang);
+
+  add({ kind: "attach" }, false);
+  add({ kind: "day" }, false);
+  [0, 1, 2].forEach((idx) => add({ kind: "seed", idx }, false));
+  FH.applyI18n(document);
+  onLang();
+  setDrawer(mqDesk.matches, { focus: false });
+  FH.select("g-number");
+  S.ready = true;
+  FH.mountSwitcher((v) => { if (v === "workspace") requestAnimationFrame(scrollToCard); });
+})();
+</script>
+</body>
+</html>

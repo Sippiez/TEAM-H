@@ -9,6 +9,8 @@ Keep records brief and link to supporting [research](../research/).
 - [0001: Web stack and UI kit](0001-web-stack-and-ui-kit.md) - Accepted.
 - [0002: Government Form Helper MVP scope and delivery gates](0002-government-form-helper-mvp.md) -
   Accepted design baseline; implementation and provider approvals remain gated.
+- [0003: Paper Route design direction](0003-paper-route-design-direction.md) -
+  Accepted visual direction; porting into `web/` not yet authorized.
 
 ## Template
 

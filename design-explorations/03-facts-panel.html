@@ -1,0 +1,1232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+DIRECTION CONTRACT · 03 Facts Panel
+THESIS: Canadians already trust the bilingual Nutrition Facts table. Every form field gets its own "Field Facts / Fiche du champ" label, English and French side by side, so bilingualism becomes the feature.
+OWN-WORLD: Regulatory labels and ruled spec sheets. White paper, true-black 8/4/1px rules, condensed Archivo, one signal orange for the selected field and guarantor flags.
+STORY: Read the label wall, open a sample, pick a field, read its facts in both languages, then ask in the ruled Questions band.
+FIRST VIEWPORT: Landing: black masthead, poster headline between heavy rules, black "Read before you start" strip, Form Facts label beside the upload panel. Workspace: field index | facsimile | Field Facts label, Questions band beneath.
+FORM: The facsimile stays a plain government document on a grey desk, ringed in orange where selected.
+-->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form Helper · Field Facts</title>
+<link rel="stylesheet" href="shared/form-sheet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #000;
+    --paper: #fff;
+    --orange: #e8590c;
+    --orange-ink: #b54708;
+    --desk: #ebebeb;
+    --sub: #2b2b2b;
+    --hover: #f0f0f0;
+    --index-w: 280px;
+    --facts-w: 540px;
+    --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --font: "Archivo", "Arial Narrow", Arial, sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-stretch: 100%;
+  }
+  h1, h2, h3, h4 { text-wrap: balance; margin: 0; }
+  p { margin: 0; }
+  ul { margin: 0; padding: 0; }
+  a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover { text-decoration-thickness: 3px; }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+  .sr {
+    position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .cond { font-stretch: 62%; font-weight: 900; letter-spacing: -0.01em; }
+
+  /* ---------- Rules ---------- */
+  .bar8 { height: 8px; background: var(--ink); transform-origin: left center; }
+  .bar4 { height: 4px; background: var(--ink); transform-origin: left center; }
+  .hair { height: 1px; background: var(--ink); }
+
+  /* ---------- Buttons ---------- */
+  .btn-solid, .btn-line {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 44px; padding: 8px 16px;
+    font-weight: 700; line-height: 1.2; text-align: left;
+    border: 2px solid var(--ink); border-radius: 0;
+    transition: background-color 120ms ease-out, color 120ms ease-out;
+  }
+  .btn-solid { background: var(--ink); color: var(--paper); }
+  .btn-solid:hover { background: var(--paper); color: var(--ink); }
+  .btn-line { background: var(--paper); color: var(--ink); }
+  .btn-line:hover { background: var(--ink); color: var(--paper); }
+  .btn-solid:disabled, .btn-line:disabled { opacity: 0.45; cursor: not-allowed; background: var(--paper); color: var(--ink); }
+  .btn-solid svg, .btn-line svg { width: 16px; height: 16px; flex: none; }
+
+  /* ---------- Masthead ---------- */
+  .skip { position: absolute; left: 8px; top: -60px; z-index: 50; background: var(--paper); color: var(--ink); padding: 10px 14px; font-weight: 700; border: 2px solid var(--ink); }
+  .skip:focus { top: 8px; }
+  .mast {
+    background: var(--ink); color: var(--paper);
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 28px;
+    padding: 8px 24px; min-height: 56px;
+  }
+  .brand { font-size: 1.75rem; line-height: 1; white-space: nowrap; }
+  .mast-note { font-size: 0.9375rem; font-weight: 500; line-height: 1.3; border-left: 1px solid #fff; padding-left: 16px; max-width: 70ch; }
+  .lang { display: flex; border: 2px solid var(--paper); }
+  .lang button {
+    min-width: 52px; min-height: 40px; padding: 0 12px; border: 0;
+    background: var(--ink); color: var(--paper); font-weight: 800; font-stretch: 80%; letter-spacing: 0.04em;
+  }
+  .lang button + button { border-left: 2px solid var(--paper); }
+  .lang button[aria-pressed="true"] { background: var(--paper); color: var(--ink); }
+  .lang button:not([aria-pressed="true"]):hover { text-decoration: underline; text-underline-offset: 4px; }
+
+  /* ---------- Landing ---------- */
+  .landing { max-width: 1440px; margin: 0 auto; padding: 28px 32px 112px; }
+  .hero-h {
+    font-size: clamp(2.75rem, 7.4vw, 6rem); line-height: 0.92; padding: 14px 0 18px;
+    font-stretch: 62%; font-weight: 900; letter-spacing: -0.02em;
+  }
+  .hero-foot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 16px 48px; padding: 16px 0 32px; align-items: start; }
+  .hero-sub { font-size: 1.3125rem; line-height: 1.45; max-width: 60ch; font-weight: 450; }
+  .hero-ver { border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); padding: 8px 0; font-size: 0.9375rem; font-weight: 600; display: flex; gap: 10px; }
+  .hero-ver::before { content: ""; width: 12px; height: 12px; background: var(--ink); flex: none; margin-top: 5px; }
+
+  .readfirst {
+    background: var(--ink); color: var(--paper);
+    display: grid; grid-template-columns: minmax(0, 260px) repeat(3, minmax(0, 1fr)); gap: 0;
+    margin-bottom: 40px;
+  }
+  .readfirst h2 { padding: 20px 24px; font-size: 2rem; line-height: 0.98; }
+  .readfirst h2 .alt { display: block; font-size: 1.125rem; font-weight: 700; margin-top: 8px; line-height: 1.15; }
+  .rf-item { padding: 20px 24px; border-left: 1px solid var(--paper); }
+  .rf-item h3 { font-size: 1rem; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; margin-bottom: 6px; }
+  .rf-item p { font-size: 1rem; line-height: 1.45; }
+
+  .land-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 4px; background: var(--ink); border: 4px solid var(--ink); }
+  .land-grid > * { background: var(--paper); }
+  .land-cell { padding: 24px 28px 28px; }
+
+  /* Shared facts-label anatomy */
+  .label { border: 2px solid var(--ink); padding: 8px 12px 12px; background: var(--paper); }
+  .lbl-title { display: flex; flex-direction: column; padding-bottom: 6px; }
+  .lbl-title > span:first-child { font-size: 3rem; line-height: 0.9; font-stretch: 62%; font-weight: 900; letter-spacing: -0.01em; }
+  .lbl-title > span:last-child { font-size: 1.75rem; line-height: 1; font-stretch: 62%; font-weight: 800; margin-top: 2px; }
+  .fx-big { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0 6px; }
+  .fx-big h3 { font-size: 1.125rem; font-weight: 800; }
+  .fx-big .alt { font-weight: 400; }
+  .fx-num { font-stretch: 62%; font-weight: 900; font-size: 2.5rem; line-height: 1; }
+  .fx-num small { font-size: 1.125rem; font-weight: 700; font-stretch: 80%; margin-left: 2px; }
+
+  .ff-name { font-size: 1.25rem; font-weight: 700; padding-top: 6px; line-height: 1.25; }
+  .ff-dept { font-size: 0.9375rem; padding-bottom: 8px; color: var(--sub); }
+  .ff-row { border-top: 1px solid var(--ink); padding: 8px 0 10px; }
+  .ff-row:first-of-type { border-top: 0; }
+  .ff-row h3 { font-size: 1rem; font-weight: 800; display: flex; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+  .ff-row h3 .n { font-stretch: 62%; font-weight: 900; font-size: 1.375rem; line-height: 1; }
+  .ff-row p, .ff-row li { max-width: 72ch; }
+  .sq-list { list-style: none; display: grid; gap: 4px; }
+  .sq-list li { position: relative; padding-left: 18px; }
+  .sq-list li::before { content: ""; position: absolute; left: 0; top: 0.55em; width: 8px; height: 8px; background: var(--ink); }
+  .ff-foot { font-size: 0.875rem; padding-top: 6px; }
+  .ff-open { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .ff-open .btn-solid { flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 14px; }
+  .ff-open .k { font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+  .ff-open .t { font-size: 1.0625rem; font-weight: 700; }
+
+  /* Sources list (shared helper markup) */
+  .src-list { list-style: none; display: grid; gap: 6px; }
+  .src { display: grid; gap: 1px; }
+  .src a { font-weight: 600; }
+  .src-note, .src-date { font-size: 0.8125rem; color: var(--sub); }
+  .src-note { font-style: italic; }
+
+  .panel-h { font-size: 2.25rem; line-height: 0.95; font-stretch: 62%; font-weight: 900; padding-bottom: 10px; }
+  .drop {
+    display: grid; justify-items: start; gap: 12px; margin: 16px 0 20px; padding: 22px 20px;
+    border: 2px dashed var(--ink); cursor: pointer; background: var(--paper);
+    transition: background-color 120ms ease-out;
+  }
+  .drop:hover, .drop.is-over { background: var(--hover); }
+  .drop:focus-within { outline: 3px solid var(--orange); outline-offset: 2px; }
+  .drop-hint { font-size: 1.125rem; font-weight: 600; }
+  .drop svg { width: 36px; height: 36px; }
+  .up-status { min-height: 1.5em; font-weight: 600; margin-top: 10px; }
+  table { border-collapse: collapse; width: 100%; }
+  .limits caption { caption-side: bottom; text-align: left; font-size: 0.875rem; padding-top: 8px; color: var(--sub); }
+  .limits th, .limits td { text-align: left; padding: 8px 0; border-top: 1px solid var(--ink); vertical-align: baseline; }
+  .limits thead th { border-top: 0; border-bottom: 4px solid var(--ink); font-size: 0.8125rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 800; padding-top: 0; }
+  .limits tbody th { font-weight: 600; width: 40%; }
+  .limits td { font-stretch: 75%; font-weight: 800; font-size: 1.25rem; line-height: 1.2; }
+  .limits tbody tr:last-child > * { border-bottom: 8px solid var(--ink); }
+
+  .directory { margin-top: 56px; }
+  .dir-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 48px; align-items: end; padding-bottom: 14px; border-bottom: 8px solid var(--ink); }
+  .dir-head h2 { font-size: clamp(2rem, 4vw, 3.25rem); line-height: 0.95; font-stretch: 62%; font-weight: 900; }
+  .dir-head p { font-size: 1.125rem; max-width: 60ch; }
+  .dir-form { padding: 16px 0 10px; }
+  .dir-form label { display: block; font-weight: 800; margin-bottom: 6px; }
+  .dir-row { display: flex; gap: 0; }
+  .dir-row input {
+    flex: 1; min-width: 0; min-height: 52px; padding: 10px 14px; font-size: 1.125rem;
+    border: 2px solid var(--ink); border-right: 0; border-radius: 0; background: var(--paper);
+  }
+  .dir-row input::placeholder { color: #555; }
+  .dir-count { font-size: 0.9375rem; font-weight: 600; padding: 4px 0 10px; }
+  .dir th, .dir td { text-align: left; padding: 12px 12px 12px 0; border-bottom: 1px solid var(--ink); vertical-align: top; }
+  .dir thead th { font-size: 0.8125rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 800; border-bottom: 4px solid var(--ink); padding-top: 4px; }
+  .dir td:first-child { font-weight: 700; font-size: 1.0625rem; width: 40%; }
+  .dir td:nth-child(2) { font-stretch: 75%; font-weight: 800; width: 14%; }
+  .dir td small { display: block; font-size: 0.8125rem; color: var(--sub); font-style: italic; }
+  .dir-empty td { font-weight: 600; }
+
+  /* ---------- Workspace ---------- */
+  .ws { display: flex; flex-direction: column; }
+  .doctabs { display: flex; align-items: stretch; gap: 0; border-bottom: 4px solid var(--ink); min-height: 52px; }
+  .doctab-list { display: flex; }
+  .doctab {
+    display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
+    padding: 6px 18px; min-height: 52px; border: 0; border-right: 1px solid var(--ink); background: var(--paper); text-align: left;
+  }
+  .doctab .n { font-stretch: 70%; font-weight: 900; font-size: 1.125rem; line-height: 1.05; }
+  .doctab .s { font-size: 0.8125rem; line-height: 1.2; }
+  .doctab:hover { background: var(--hover); }
+  .doctab[aria-current="true"] { box-shadow: inset 0 6px 0 var(--ink); background: var(--paper); }
+  .doc-tools { margin-left: auto; display: flex; align-items: center; gap: 0; }
+  .doc-tools > * { border-left: 1px solid var(--ink); }
+  .doccount { padding: 0 18px; font-weight: 700; font-stretch: 85%; align-self: stretch; display: flex; align-items: center; white-space: nowrap; }
+  .doc-tools button { min-height: 52px; padding: 0 18px; border: 0; border-left: 1px solid var(--ink); background: var(--paper); font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
+  .doc-tools button:hover { background: var(--ink); color: var(--paper); }
+  .doc-tools svg { width: 16px; height: 16px; }
+  .docstatus { padding: 0 18px; font-size: 0.875rem; font-weight: 600; max-width: 32ch; line-height: 1.25; display: flex; align-items: center; }
+  .docstatus:empty { display: none; }
+
+  .seg { display: none; }
+
+  .ws-grid {
+    display: grid; gap: 4px; background: var(--ink);
+    grid-template-columns: var(--index-w) minmax(0, 1fr) var(--facts-w);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "index sheet facts" "index chat chat";
+  }
+  .pane { background: var(--paper); min-width: 0; min-height: 0; }
+  .pane-index { grid-area: index; display: flex; flex-direction: column; overflow: auto; }
+  .pane-sheet { grid-area: sheet; display: flex; flex-direction: column; background: var(--desk); }
+  .pane-facts { grid-area: facts; display: flex; flex-direction: column; }
+  .pane-chat { grid-area: chat; display: flex; flex-direction: column; }
+
+  /* Index */
+  .idx-head { padding: 14px 16px 10px; }
+  .idx-head h2 { font-size: 1.5rem; line-height: 1; font-stretch: 62%; font-weight: 900; }
+  .idx-count { font-size: 0.875rem; font-weight: 600; margin-top: 4px; }
+  .idx-cols { display: grid; grid-template-columns: 1fr auto; padding: 4px 16px; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; border-bottom: 1px solid var(--ink); }
+  .idx-sec { font-size: 0.9375rem; font-weight: 800; padding: 12px 16px 6px; border-bottom: 1px solid var(--ink); }
+  .idx-list { list-style: none; }
+  .idx-list li + li { border-top: 1px solid #bdbdbd; }
+  .idx-row {
+    display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: start; gap: 10px;
+    width: 100%; min-height: 40px; padding: 9px 16px; border: 0; background: var(--paper); text-align: left; line-height: 1.3; font-size: 0.9375rem;
+  }
+  .idx-row:hover { background: var(--hover); }
+  .idx-mark { width: 12px; height: 12px; border: 2px solid var(--ink); margin-top: 3px; }
+  .idx-row.is-visited .idx-mark { background: var(--ink); }
+  .idx-row.is-selected { box-shadow: inset 0 0 0 3px var(--orange); font-weight: 700; }
+  .idx-row:focus-visible { outline-offset: -3px; }
+  .idx-page { font-weight: 700; font-stretch: 80%; }
+  .idx-flag { display: inline-block; margin-left: 6px; padding: 0 5px; border: 1px solid var(--orange-ink); color: var(--orange-ink); font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 1px; line-height: 1.5; }
+
+  /* Sheet */
+  .sheet-bar { background: var(--paper); border-bottom: 1px solid var(--ink); display: flex; align-items: center; gap: 12px 16px; padding: 6px 12px 6px 16px; flex-wrap: wrap; }
+  .sheet-title { font-size: 0.9375rem; font-weight: 700; line-height: 1.25; flex: 1 1 200px; }
+  .sheet-title b { font-stretch: 70%; font-weight: 900; margin-right: 6px; }
+  .pager { display: flex; align-items: center; border: 1px solid var(--ink); }
+  .pager-label { padding: 0 8px; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+  .pager button {
+    position: relative; min-width: 34px; min-height: 34px; border: 0; border-left: 1px solid var(--ink);
+    background: var(--paper); font-weight: 700; color: #4a4a4a;
+  }
+  .pager button.has { color: var(--ink); font-weight: 900; }
+  .pager button.has::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 4px; height: 4px; margin-left: -2px; background: currentColor; }
+  .pager button:hover { background: var(--hover); }
+  .pager button[aria-current="page"] { background: var(--ink); color: var(--paper); }
+  .sheet-scroll { flex: 1; min-height: 0; overflow: auto; padding: 20px; }
+  #sheet { max-width: 640px; margin: 0 auto; box-shadow: 0 3px 10px rgb(0 0 0 / 0.16); border: 1px solid #000; }
+  .form-sheet {
+    --fs-ink: #111; --fs-rule: #5a5a5a; --fs-bar: #111;
+    --ff-ring: var(--orange); --ff-tint: rgb(232 89 12 / 0.12); --ff-hover: rgb(0 0 0 / 0.05); --ff-visited-mark: #111;
+  }
+  .form-sheet .ff.is-selected { box-shadow: inset 0 0 0 3px var(--ff-ring); }
+  .form-sheet .ff.is-visited::after { border-radius: 0; width: 7px; height: 7px; }
+  .form-sheet .ff:focus-visible { outline: 3px solid var(--orange); outline-offset: 1px; }
+
+  /* Facts label (workspace) */
+  .facts-scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 16px; }
+  .facts { border: 2px solid var(--ink); padding: 8px 12px 12px; font-size: 0.9375rem; line-height: 1.42; }
+  .fx-other { display: none; }
+  .fx-langs { display: grid; grid-template-columns: 1fr 1fr; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 0 2px; border-top: 1px solid var(--ink); }
+  .fx-langs > div + div { border-left: 1px solid var(--ink); padding-left: 10px; }
+  .fx-label { padding: 0 0 8px; }
+  .fx-label .fx-c { font-size: 1.1875rem; font-weight: 700; line-height: 1.22; }
+  .fx-cols { display: grid; grid-template-columns: 1fr 1fr; }
+  .fx-c { min-width: 0; padding-right: 10px; overflow-wrap: anywhere; hyphens: auto; }
+  .fx-c + .fx-c { border-left: 1px solid var(--ink); padding: 0 0 0 10px; }
+  .fx-c-tag { display: none; }
+  .fx-row { border-top: 1px solid var(--ink); padding: 6px 0 8px; }
+  .fx-row.first { border-top: 0; }
+  .fx-h { font-size: 0.9375rem; font-weight: 800; margin-bottom: 3px; line-height: 1.25; }
+  .fx-h .alt { font-weight: 400; }
+  .fx-h .alt::before { content: "/ "; }
+  .fx-c ul { list-style: none; display: grid; gap: 3px; }
+  .fx-c li { position: relative; padding-left: 14px; }
+  .fx-c li::before { content: ""; position: absolute; left: 0; top: 0.55em; width: 6px; height: 6px; background: var(--ink); }
+  .fx-example .fx-c p { font-weight: 700; font-size: 1.0625rem; }
+  .fx-none { color: var(--sub); }
+  .fx-pt { font-weight: 700; margin-bottom: 3px; }
+  .fx-c .src-list { gap: 8px; }
+  .fx-c .src::before { display: none; }
+  .fx-c .src { padding-left: 0; }
+  .fx-flag {
+    display: flex; gap: 10px; align-items: flex-start; margin: 2px 0 8px; padding: 7px 10px;
+    background: var(--orange); color: #000; font-weight: 800; line-height: 1.25;
+  }
+  .fx-flag::before { content: ""; width: 12px; height: 12px; background: #000; flex: none; margin-top: 3px; }
+  .fx-flag .alt { font-weight: 600; display: block; }
+  .fx-foot { font-size: 0.8125rem; padding-top: 6px; display: grid; gap: 2px; }
+  .fx-foot .mk { display: inline-block; width: 9px; height: 9px; border: 1.5px solid var(--ink); margin-right: 6px; vertical-align: 0; }
+  .fx-foot .mk.on { background: var(--ink); }
+  .fx-empty { padding: 18px 0 20px; font-size: 1.125rem; font-weight: 600; display: grid; gap: 6px; }
+  .fx-empty .alt { font-weight: 400; }
+
+  .facts-actions { border-top: 1px solid var(--ink); padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .facts-actions .stepper { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .fpos { font-weight: 800; font-stretch: 80%; min-width: 3.5em; text-align: center; }
+
+  /* Rules draw in when a field is selected (the one authored motion) */
+  @media (prefers-reduced-motion: no-preference) {
+    .facts.draw .bar8 { animation: draw 280ms var(--ease-expo) both; }
+    @keyframes draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  }
+
+  /* Chat band */
+  .chat-head { display: flex; align-items: center; gap: 8px 18px; padding: 6px 12px 6px 16px; border-bottom: 1px solid var(--ink); flex-wrap: wrap; }
+  .chat-title { font-size: 1.625rem; line-height: 1; font-stretch: 62%; font-weight: 900; }
+  .chat-title .alt { font-weight: 700; }
+  .chat-sub { font-size: 0.875rem; font-weight: 600; }
+  .chat-toggle { margin-left: auto; min-height: 36px; padding: 4px 12px; border: 1px solid var(--ink); background: var(--paper); font-weight: 700; font-size: 0.875rem; }
+  .chat-toggle:hover { background: var(--ink); color: var(--paper); }
+  .chat-body { display: grid; grid-template-columns: minmax(0, 1fr) var(--facts-w); gap: 4px; background: var(--ink); height: clamp(190px, 25vh, 250px); }
+  .pane-chat.is-collapsed .chat-body { display: none; }
+  .chat-log { background: var(--paper); overflow: auto; padding: 0 16px 72px; }
+  .msg { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--ink); }
+  .msg-by { font-stretch: 70%; font-weight: 900; font-size: 0.9375rem; line-height: 1.2; }
+  .msg-by small { display: block; font-stretch: 100%; font-weight: 600; font-size: 0.75rem; color: var(--sub); margin-top: 2px; }
+  .msg-body { display: grid; gap: 8px; max-width: 72ch; }
+  .msg-u .msg-body p { font-weight: 600; }
+  .msg-ctx { font-size: 0.8125rem; font-weight: 700; color: var(--orange-ink); }
+  .msg h3 { font-size: 1.0625rem; font-weight: 800; }
+  .ov { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0; margin: 0; border-top: 4px solid var(--ink); }
+  .ov dt, .ov dd { border-bottom: 1px solid var(--ink); padding: 6px 0; margin: 0; }
+  .ov dt { font-weight: 800; padding-right: 14px; }
+  .refs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 10px;
+    border: 1px solid var(--ink); background: var(--paper); font-weight: 600; font-size: 0.875rem; line-height: 1.2; text-align: left;
+  }
+  .chip:hover { background: var(--ink); color: var(--paper); }
+  .chip::before { content: ""; width: 7px; height: 7px; background: currentColor; flex: none; }
+  .thinking { display: flex; align-items: center; gap: 10px; font-weight: 700; padding: 12px 0; }
+  .thinking::before { content: ""; width: 12px; height: 12px; border: 2px solid var(--ink); }
+
+  .composer { background: var(--paper); overflow: auto; padding: 10px 16px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .sugg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ctx { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 10px; border: 2px solid var(--orange); font-size: 0.875rem; }
+  .ctx[hidden] { display: none; }
+  .ctx b { color: var(--orange-ink); font-weight: 800; }
+  .ctx span { flex: 1; min-width: 0; }
+  .ctx button { min-height: 32px; padding: 2px 10px; border: 1px solid var(--ink); background: var(--paper); font-weight: 700; font-size: 0.8125rem; }
+  .ctx button:hover { background: var(--ink); color: var(--paper); }
+  .input-row { display: flex; }
+  .input-row textarea {
+    flex: 1; min-width: 0; resize: none; min-height: 48px; padding: 10px 12px; border: 2px solid var(--ink); border-right: 0;
+    border-radius: 0; line-height: 1.35; background: var(--paper);
+  }
+  .input-row textarea::placeholder { color: #555; }
+  .disc { font-size: 0.8125rem; line-height: 1.4; color: var(--sub); display: grid; gap: 2px; }
+
+  /* ---------- Desktop workspace locks to the viewport ---------- */
+  @media (min-width: 1024px) {
+    body[data-view="workspace"] { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+    body[data-view="workspace"] main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    body[data-view="workspace"] .ws { flex: 1; min-height: 0; }
+    body[data-view="workspace"] .ws-grid { flex: 1; min-height: 0; }
+  }
+  @media (min-width: 1024px) and (max-width: 1279px) {
+    :root { --index-w: 236px; --facts-w: 440px; }
+    .lbl-title > span:first-child { font-size: 2.5rem; }
+  }
+
+  /* ---------- Tablet & phone: tabs ---------- */
+  @media (max-width: 1023px) {
+    .mast { grid-template-columns: minmax(0, 1fr) auto; padding: 10px 16px; }
+    .mast-note { grid-column: 1 / -1; grid-row: 2; border-left: 0; border-top: 1px solid #fff; padding: 8px 0 0; font-size: 0.875rem; }
+    .lang button { min-height: 44px; }
+
+    .landing { padding: 20px 16px 96px; }
+    .hero-foot { grid-template-columns: 1fr; }
+    .readfirst { grid-template-columns: 1fr; }
+    .readfirst h2 { padding: 18px 18px 6px; }
+    .rf-item { border-left: 0; border-top: 1px solid var(--paper); padding: 14px 18px; }
+    .land-grid { grid-template-columns: 1fr; }
+    .land-cell { padding: 18px 16px 22px; }
+    .dir-head { grid-template-columns: 1fr; }
+
+    .doctabs { flex-wrap: wrap; }
+    .doctab-list { flex: 1 1 100%; border-bottom: 1px solid var(--ink); }
+    .doctab { flex: 1; min-height: 52px; padding: 6px 14px; }
+    .doc-tools { margin-left: 0; flex: 1 1 100%; flex-wrap: wrap; }
+    .doc-tools > :first-child { border-left: 0; }
+    .doccount { min-height: 48px; padding: 0 14px; }
+    .doc-tools button { min-height: 48px; padding: 0 14px; }
+    .docstatus { flex: 1 1 100%; padding: 8px 14px; border-left: 0; border-top: 1px solid var(--ink); max-width: none; }
+
+    .seg {
+      display: grid; grid-template-columns: repeat(3, 1fr); position: sticky; top: 0; z-index: 5;
+      background: var(--paper); border-bottom: 4px solid var(--ink);
+    }
+    .seg button { min-height: 52px; border: 0; background: var(--paper); font-weight: 900; font-stretch: 70%; font-size: 1.125rem; }
+    .seg button + button { border-left: 1px solid var(--ink); }
+    .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+    .ws-grid { display: block; background: var(--paper); }
+    .pane { display: none; }
+    .ws-grid[data-tab="form"] .pane-sheet,
+    .ws-grid[data-tab="form"] .pane-index,
+    .ws-grid[data-tab="facts"] .pane-facts,
+    .ws-grid[data-tab="questions"] .pane-chat { display: flex; }
+    .ws-grid[data-tab="form"] .pane-index { border-top: 4px solid var(--ink); padding-bottom: 72px; }
+    .pane-index, .facts-scroll, .sheet-scroll { overflow: visible; }
+    .sheet-scroll { padding: 12px; }
+    .pager button { min-width: 44px; min-height: 44px; flex: 1; }
+    .pager { width: 100%; }
+    .pager-label { display: none; }
+    .idx-row { min-height: 48px; padding: 12px 16px; }
+    .facts-actions { position: sticky; bottom: 0; background: var(--paper); border-top: 4px solid var(--ink); padding-bottom: 64px; }
+    .facts-actions .btn-solid { flex: 1 1 100%; }
+    .facts-actions .stepper { margin-left: 0; width: 100%; justify-content: space-between; }
+    .chat-toggle { display: none; }
+    .chat-body { display: flex; flex-direction: column; height: auto; background: var(--paper); }
+    .chat-log { max-height: 58vh; padding-bottom: 12px; border-bottom: 4px solid var(--ink); }
+    .composer { padding-bottom: 72px; overflow: visible; }
+    .chip { min-height: 44px; }
+    .ctx button { min-height: 44px; }
+    .msg { grid-template-columns: 1fr; gap: 4px; }
+  }
+
+  /* ---------- Phone: one language at a time, the other on request ---------- */
+  @media (max-width: 639px) {
+    .brand { font-size: 1.5rem; }
+    .hero-h { font-size: clamp(2.5rem, 12.5vw, 3.5rem); }
+    .hero-sub { font-size: 1.125rem; }
+    .readfirst h2 { font-size: 1.75rem; }
+    .lbl-title > span:first-child { font-size: 2.5rem; }
+    .ff-open { grid-template-columns: 1fr; }
+    .panel-h { font-size: 2rem; }
+    .doccount { flex: 1; }
+    .facts-scroll { padding: 12px; }
+    .fx-langs { display: none; }
+    .fx-other {
+      display: flex; width: 100%; justify-content: space-between; align-items: center; min-height: 44px;
+      margin: 0 0 6px; padding: 6px 10px; border: 1px solid var(--ink); background: var(--paper); font-weight: 800;
+    }
+    .fx-other::after { content: "+"; font-size: 1.25rem; line-height: 1; }
+    .fx-other[aria-expanded="true"]::after { content: "–"; }
+    .fx-cols { grid-template-columns: 1fr; }
+    .fx-c + .fx-c { border-left: 0; padding: 6px 0 0; margin-top: 6px; border-top: 1px dashed var(--ink); }
+    .facts:not(.show-other) .fx-c[data-l="oth"],
+    .facts:not(.show-other) .fx-h .alt,
+    .facts:not(.show-other) .fx-flag .alt,
+    .facts:not(.show-other) .fx-foot .alt,
+    .facts:not(.show-other) .fx-empty .alt { display: none; }
+    .facts.show-other .fx-c[data-l="oth"] .fx-c-tag { display: inline-block; font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.08em; border: 1px solid var(--ink); padding: 0 4px; margin-bottom: 4px; }
+    .dir thead { display: none; }
+    .dir tr { display: grid; grid-template-columns: 1fr auto; border-bottom: 1px solid var(--ink); padding: 10px 0; }
+    .dir td { border: 0; padding: 2px 0; width: auto !important; }
+    .dir td:nth-child(2) { text-align: right; }
+    .dir td:nth-child(3) { grid-column: 1 / -1; padding-top: 4px; }
+    .dir-row button { padding: 8px 12px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main" data-i18n="skip"></a>
+<header class="mast">
+  <span class="brand cond" data-i18n="brand"></span>
+  <p class="mast-note" data-i18n="notOfficial"></p>
+  <div class="lang" role="group" id="langGroup" data-i18n-aria="language">
+    <button type="button" data-lang="en" lang="en" aria-label="English">EN</button>
+    <button type="button" data-lang="fr" lang="fr" aria-label="Français">FR</button>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+  <!-- ================= LANDING ================= -->
+  <div class="landing" data-view-panel="landing">
+    <section class="hero" aria-labelledby="hero-h">
+      <div class="bar8"></div>
+      <h1 id="hero-h" class="hero-h" data-i18n="heroTitle"></h1>
+      <div class="bar4"></div>
+      <div class="hero-foot">
+        <p class="hero-sub" data-i18n="heroSub"></p>
+        <p class="hero-ver" data-i18n="supported"></p>
+      </div>
+    </section>
+
+    <aside class="readfirst" aria-labelledby="rf-h">
+      <h2 id="rf-h" class="cond"></h2>
+      <div class="rf-item"><h3 data-i18n="privacyH"></h3><p data-i18n="privacy"></p></div>
+      <div class="rf-item"><h3 data-i18n="aiH"></h3><p data-i18n="aiDisclosure"></p></div>
+      <div class="rf-item"><h3 data-i18n="officialH"></h3><p data-i18n="notOfficialLong"></p></div>
+    </aside>
+
+    <div class="land-grid">
+      <div class="land-cell"><section class="label" id="formFacts" aria-labelledby="ff-h"></section></div>
+      <section class="land-cell upload" aria-labelledby="up-h">
+        <h2 id="up-h" class="panel-h" data-i18n="uploadTitle"></h2>
+        <div class="bar8"></div>
+        <label class="drop" id="drop" for="fileIn">
+          <svg viewBox="0 0 36 36" aria-hidden="true" fill="none" stroke="#000" stroke-width="2.5"><path d="M8 3h14l7 7v23H8z"/><path d="M22 3v7h7"/><path d="M18.5 28V16m-5 5 5-5 5 5"/></svg>
+          <span class="drop-hint" data-i18n="uploadHint"></span>
+          <span class="btn-solid" aria-hidden="true" data-i18n="chooseFile"></span>
+          <input type="file" id="fileIn" class="sr" accept="application/pdf,.pdf">
+        </label>
+        <table class="limits">
+          <caption data-i18n="limits"></caption>
+          <thead><tr><th scope="col" data-i18n="limitCol"></th><th scope="col" data-i18n="allowedCol"></th></tr></thead>
+          <tbody>
+            <tr><th scope="row" data-i18n="limDocs"></th><td data-i18n="limDocsV"></td></tr>
+            <tr><th scope="row" data-i18n="limSize"></th><td data-i18n="limSizeV"></td></tr>
+            <tr><th scope="row" data-i18n="limPages"></th><td data-i18n="limPagesV"></td></tr>
+            <tr><th scope="row" data-i18n="limType"></th><td data-i18n="limTypeV"></td></tr>
+          </tbody>
+        </table>
+        <p class="up-status" id="upStatus" role="status"></p>
+      </section>
+    </div>
+
+    <section class="directory" aria-labelledby="dir-h">
+      <div class="dir-head">
+        <h2 id="dir-h" data-i18n="serviceTitle"></h2>
+        <p data-i18n="serviceSub"></p>
+      </div>
+      <form class="dir-form" id="dirForm" role="search">
+        <label for="dirIn" data-i18n="serviceLabel"></label>
+        <div class="dir-row">
+          <input id="dirIn" type="search" autocomplete="off" data-i18n-ph="servicePh">
+          <button type="submit" class="btn-solid" data-i18n="go"></button>
+        </div>
+      </form>
+      <p class="dir-count" id="dirCount" role="status"></p>
+      <table class="dir">
+        <thead><tr><th scope="col" data-i18n="colService"></th><th scope="col" data-i18n="colDept"></th><th scope="col" data-i18n="colLink"></th></tr></thead>
+        <tbody id="dirBody"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- ================= WORKSPACE ================= -->
+  <div class="ws" data-view-panel="workspace">
+    <h1 class="sr" id="wsTitle"></h1>
+    <nav class="doctabs" data-i18n-aria="docsNav">
+      <div class="doctab-list" id="docTabs"></div>
+      <div class="doc-tools">
+        <p class="doccount" id="docCount"></p>
+        <button type="button" id="addPdf"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 2v12M2 8h12"/></svg><span data-i18n="addPdf"></span></button>
+        <input type="file" id="addPdfIn" class="sr" tabindex="-1" aria-hidden="true" accept="application/pdf,.pdf">
+        <button type="button" id="newSession" data-i18n="newSession"></button>
+        <p class="docstatus" id="docStatus" role="status"></p>
+      </div>
+    </nav>
+
+    <div class="seg" role="group" data-i18n-aria="viewsNav" id="seg">
+      <button type="button" data-tab="form" data-i18n="tabForm" aria-controls="wsGrid"></button>
+      <button type="button" data-tab="facts" data-i18n="tabFacts" aria-controls="wsGrid"></button>
+      <button type="button" data-tab="questions" data-i18n="tabQuestions" aria-controls="wsGrid"></button>
+    </div>
+
+    <div class="ws-grid" id="wsGrid" data-tab="facts">
+      <nav class="pane pane-index" aria-labelledby="idx-h">
+        <div class="idx-head">
+          <h2 id="idx-h" data-i18n="fieldsTitle"></h2>
+          <p class="idx-count" id="idxCount"></p>
+        </div>
+        <div class="bar4"></div>
+        <div class="idx-cols" aria-hidden="true"><span data-i18n="fieldCol"></span><span data-i18n="page"></span></div>
+        <div id="index"></div>
+      </nav>
+
+      <section class="pane pane-sheet" aria-labelledby="sheetTitle">
+        <div class="sheet-bar">
+          <h2 class="sheet-title" id="sheetTitle"></h2>
+          <div class="pager" id="pager" role="group"></div>
+        </div>
+        <div class="sheet-scroll" id="sheetScroll"><div id="sheet"></div></div>
+      </section>
+
+      <section class="pane pane-facts" aria-labelledby="facts-h">
+        <div class="facts-scroll" id="factsScroll"><div id="facts"></div></div>
+        <div class="facts-actions">
+          <button type="button" class="btn-solid" id="askField"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 2h12v9H7l-3 3v-3H2z"/></svg><span data-i18n="askField"></span></button>
+          <div class="stepper">
+            <button type="button" class="btn-line" id="prevF"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10 3 5 8l5 5"/></svg><span data-i18n="prev"></span></button>
+            <span class="fpos" id="fpos"></span>
+            <button type="button" class="btn-line" id="nextF"><span data-i18n="next"></span><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m6 3 5 5-5 5"/></svg></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="pane pane-chat" id="chatPane" aria-labelledby="chat-h">
+        <header class="chat-head">
+          <h2 class="chat-title" id="chat-h"><span lang="en">Questions</span> <span class="alt" lang="fr">/ Questions</span></h2>
+          <p class="chat-sub" data-i18n="chatTitle"></p>
+          <button type="button" class="chat-toggle" id="chatToggle" aria-expanded="true" aria-controls="chatBody"></button>
+        </header>
+        <div class="chat-body" id="chatBody">
+          <div class="chat-log" id="chatLog" role="log" aria-live="polite" aria-labelledby="chat-h" tabindex="0"></div>
+          <form class="composer" id="composer">
+            <div class="sugg" id="sugg"></div>
+            <div class="ctx" id="ctx" hidden></div>
+            <label for="chatInput" class="sr" data-i18n="chatTitle"></label>
+            <div class="input-row">
+              <textarea id="chatInput" rows="2" data-i18n-ph="chatPh"></textarea>
+              <button type="submit" class="btn-solid" data-i18n="send"></button>
+            </div>
+            <div class="disc"><p data-i18n="privacy"></p><p data-i18n="aiDisclosure"></p></div>
+          </form>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script src="shared/data.js"></script>
+<script src="shared/proto.js"></script>
+<script>
+(function () {
+  const D = FH.data;
+  const esc = FH.esc;
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+  /* Design-specific strings, merged into the shared dictionary so FH.t() covers them. */
+  Object.assign(D.i18n.en, {
+    skip: "Skip to content",
+    language: "Language",
+    fieldFacts: "Field Facts",
+    formFacts: "Form Facts",
+    readFirst: "Read before you start",
+    privacyH: "Privacy",
+    aiH: "AI processing",
+    officialH: "Not official",
+    chooseFile: "Choose a PDF",
+    limitCol: "Limit",
+    allowedCol: "Allowed",
+    limDocs: "Documents",
+    limDocsV: "5 PDFs",
+    limSize: "Size",
+    limSizeV: "25 MB each",
+    limPages: "Pages",
+    limPagesV: "30 each",
+    limType: "Type",
+    limTypeV: "Blank fillable federal forms",
+    uploadNote: "{name}: this prototype doesn't open uploads. Try a sample form.",
+    notPdf: "That file isn't a PDF. Choose a blank PDF form.",
+    serviceLabel: "What do you need to do?",
+    colService: "Service",
+    colDept: "Department",
+    colLink: "Official page",
+    noMatch: "No matching service. Try passport, job, children or pension.",
+    serviceCount: "{n} services listed",
+    fieldsExplained: "Fields explained",
+    forms: "Forms",
+    department: "Department",
+    docsNav: "Open documents",
+    viewsNav: "Workspace views",
+    tabForm: "Form",
+    tabFacts: "Facts",
+    tabQuestions: "Questions",
+    fieldCol: "Field",
+    hasFields: "has fields to explain",
+    pagesLabel: "Pages of this form",
+    guarantorTag: "Guarantor fills",
+    sectionH: "Section",
+    pointsH: "Guarantor rules",
+    noSources: "No official page is linked for this field.",
+    seeOther: "Voir en français",
+    hideOther: "Masquer le français",
+    fieldPos: "{i} / {n}",
+    visitedOne: "viewed",
+    you: "You",
+    hideChat: "Hide questions",
+    showChat: "Show questions",
+    addNote: "{name}: this prototype doesn't open uploads.",
+    openIn: "Open sample · {l}",
+  });
+  Object.assign(D.i18n.fr, {
+    skip: "Passer au contenu",
+    language: "Langue",
+    fieldFacts: "Fiche du champ",
+    formFacts: "Fiche du formulaire",
+    readFirst: "À lire avant de commencer",
+    privacyH: "Confidentialité",
+    aiH: "Traitement par l'IA",
+    officialH: "Non officiel",
+    chooseFile: "Choisir un PDF",
+    limitCol: "Limite",
+    allowedCol: "Permis",
+    limDocs: "Documents",
+    limDocsV: "5 PDF",
+    limSize: "Taille",
+    limSizeV: "25 Mo chacun",
+    limPages: "Pages",
+    limPagesV: "30 chacun",
+    limType: "Type",
+    limTypeV: "Formulaires fédéraux vierges et remplissables",
+    uploadNote: "{name} : ce prototype n'ouvre pas les fichiers téléversés. Essayez un formulaire exemple.",
+    notPdf: "Ce fichier n'est pas un PDF. Choisissez un formulaire PDF vierge.",
+    serviceLabel: "Que voulez-vous faire?",
+    colService: "Service",
+    colDept: "Ministère",
+    colLink: "Page officielle",
+    noMatch: "Aucun service correspondant. Essayez passeport, emploi, enfants ou pension.",
+    serviceCount: "{n} services affichés",
+    fieldsExplained: "Champs expliqués",
+    forms: "Formulaires",
+    department: "Ministère",
+    docsNav: "Documents ouverts",
+    viewsNav: "Vues de l'espace de travail",
+    tabForm: "Formulaire",
+    tabFacts: "Fiche",
+    tabQuestions: "Questions",
+    fieldCol: "Champ",
+    hasFields: "contient des champs à expliquer",
+    pagesLabel: "Pages de ce formulaire",
+    guarantorTag: "Au répondant",
+    sectionH: "Section",
+    pointsH: "Règles du répondant",
+    noSources: "Aucune page officielle n'est liée à ce champ.",
+    seeOther: "See in English",
+    hideOther: "Hide English",
+    fieldPos: "{i} / {n}",
+    visitedOne: "consulté",
+    you: "Vous",
+    hideChat: "Masquer les questions",
+    showChat: "Afficher les questions",
+    addNote: "{name} : ce prototype n'ouvre pas les fichiers téléversés.",
+    openIn: "Ouvrir l'exemple · {l}",
+  });
+
+  const other = () => (FH.lang === "en" ? "fr" : "en");
+  const T = (lang, key, vars) => {
+    let s = D.i18n[lang][key] ?? D.i18n.en[key] ?? key;
+    if (vars) for (const k in vars) s = s.replace(`{${k}}`, vars[k]);
+    return s;
+  };
+  const colon = () => (FH.lang === "fr" ? " : " : ": ");
+  const tabMode = matchMedia("(max-width: 1023px)");
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  const rawField = (id) => D.fields.find((f) => f.id === id);
+
+  /* ================= Masthead ================= */
+  function renderLang() {
+    $$("#langGroup [data-lang]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === FH.lang)));
+    document.title = `${FH.t("brand")} · ${FH.t("fieldFacts")}`;
+  }
+  $("#langGroup").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-lang]");
+    if (b && b.dataset.lang !== FH.lang) FH.setLang(b.dataset.lang);
+  });
+
+  /* ================= Landing ================= */
+  function renderReadFirst() {
+    $("#rf-h").innerHTML = `<span>${esc(FH.t("readFirst"))}</span><span class="alt" lang="${other()}">${esc(T(other(), "readFirst"))}</span>`;
+  }
+
+  function renderFormFacts() {
+    const o = FH.overview();
+    $("#formFacts").innerHTML = `
+      <h2 class="lbl-title" id="ff-h"><span lang="en">${esc(T("en", "formFacts"))}</span><span lang="fr">${esc(T("fr", "formFacts"))}</span></h2>
+      <div class="hair"></div>
+      <p class="ff-name">${esc(o.title)}</p>
+      <p class="ff-dept">${esc(o.department)} · PPTC 153 (EN) · PPTC 154 (FR)</p>
+      <div class="bar8"></div>
+      <div class="fx-big"><h3>${esc(FH.t("fieldsExplained"))}</h3><p class="fx-num">${D.fields.length}</p></div>
+      <div class="bar4"></div>
+      <div class="ff-row"><h3>${esc(FH.t("who"))}</h3><p>${esc(o.who)}</p></div>
+      <div class="ff-row"><h3>${esc(FH.t("need"))} <span class="n">${o.need.length}</span></h3><ul class="sq-list">${o.need.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></div>
+      <div class="ff-row"><h3>${esc(FH.t("submit"))}</h3><p>${esc(o.submit)}</p></div>
+      <div class="ff-row"><h3>${esc(FH.t("sources"))} <span class="n">${o.sources.length}</span></h3>${FH.sourceList(o.sources, "src")}</div>
+      <div class="bar8"></div>
+      <p class="ff-foot">${esc(FH.t("checked"))}</p>
+      <div class="ff-open">
+        <button type="button" class="btn-solid" data-doc="pptc153"><span class="k">${esc(FH.t("openIn", { l: "EN" }))}</span><span class="t" lang="en">PPTC 153 · ${esc(FH.t("sampleEn"))}</span></button>
+        <button type="button" class="btn-solid" data-doc="pptc154"><span class="k">${esc(FH.t("openIn", { l: "FR" }))}</span><span class="t" lang="fr">PPTC 154 · ${esc(FH.t("sampleFr"))}</span></button>
+      </div>`;
+  }
+  $("#formFacts").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-doc]");
+    if (!b) return;
+    FH.setDoc(b.dataset.doc);
+    FH.showView("workspace");
+  });
+
+  /* Upload (prototype: acknowledges the file, never opens it) */
+  let upMsg = null;
+  function renderUpStatus() {
+    $("#upStatus").textContent = upMsg ? (upMsg.bad ? FH.t("notPdf") : FH.t("uploadNote", { name: upMsg.name })) : "";
+  }
+  function takeFile(file) {
+    if (!file) return;
+    const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    upMsg = { name: file.name, bad: !isPdf };
+    renderUpStatus();
+  }
+  const drop = $("#drop");
+  $("#fileIn").addEventListener("change", (e) => takeFile(e.target.files[0]));
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("is-over"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, () => drop.classList.remove("is-over")));
+  drop.addEventListener("drop", (e) => { e.preventDefault(); takeFile(e.dataTransfer.files[0]); });
+
+  /* Service directory */
+  const DEPT_FR = { ESDC: "EDSC", CRA: "ARC", IRCC: "IRCC" };
+  const STOP = new Set(["the", "and", "for", "my", "with", "need", "want", "get", "how", "what", "can", "pour", "les", "des", "une", "mon", "mes", "que", "faire", "est", "dans", "comment"]);
+  const norm = (s) => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  function renderDirectory() {
+    const q = norm($("#dirIn").value.trim());
+    const words = q.split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP.has(w));
+    const rows = D.services.filter((s) => {
+      if (!q) return true;
+      const r = D.resources[s.id];
+      const hay = norm([s.en, s.fr, s.dept, DEPT_FR[s.dept], r.en, r.fr].join(" "));
+      if (!words.length) return hay.includes(q);
+      return words.some((w) => hay.includes(w) || (w.length > 4 && hay.includes(w.slice(0, -1))));
+    });
+    $("#dirBody").innerHTML = rows.length
+      ? rows.map((s) => {
+          const r = FH.resource(s.id);
+          const dept = FH.lang === "fr" ? DEPT_FR[s.dept] || s.dept : s.dept;
+          return `<tr>
+            <td data-label="${esc(FH.t("colService"))}">${esc(s[FH.lang])}</td>
+            <td><abbr title="${esc(dept)}">${esc(dept)}</abbr></td>
+            <td><a href="${r.url}" target="_blank" rel="noopener">${esc(r.title)}<span aria-hidden="true"> ↗</span></a>${r.note ? `<small>${esc(r.note)}</small>` : ""}</td>
+          </tr>`;
+        }).join("")
+      : `<tr class="dir-empty"><td colspan="3">${esc(FH.t("noMatch"))}</td></tr>`;
+    $("#dirCount").textContent = rows.length ? FH.t("serviceCount", { n: rows.length }) : "";
+  }
+  $("#dirIn").addEventListener("input", renderDirectory);
+  $("#dirForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    renderDirectory();
+    const first = $("#dirBody a");
+    if (first) first.focus();
+  });
+
+  /* ================= Workspace: documents ================= */
+  let docMsg = null;
+  function renderDocs() {
+    const doc = FH.doc();
+    $("#docTabs").innerHTML = D.docs.map((d) => `
+      <button type="button" class="doctab" data-doc="${d.id}" ${d.id === doc.id ? 'aria-current="true"' : ""}>
+        <span class="n">${esc(d.number)}</span><span class="s">${esc(d.short[FH.lang])}</span>
+      </button>`).join("");
+    $("#docCount").textContent = FH.t("docsCount", { n: D.docs.length });
+    $("#docStatus").textContent = docMsg ? FH.t("addNote", { name: docMsg }) : "";
+    $("#wsTitle").textContent = `${doc.number} · ${doc.title[FH.lang]}`;
+    $("#sheetTitle").innerHTML = `<b>${esc(doc.number)}</b>${esc(doc.title[FH.lang])}`;
+  }
+  $("#docTabs").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-doc]");
+    if (b && b.dataset.doc !== FH.state.docId) FH.setDoc(b.dataset.doc);
+  });
+  $("#addPdf").addEventListener("click", () => $("#addPdfIn").click());
+  $("#addPdfIn").addEventListener("change", (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    docMsg = f.name;
+    renderDocs();
+    e.target.value = "";
+  });
+
+  /* ================= Workspace: pager + sheet ================= */
+  const pagesWithFields = new Set(D.fields.map((f) => f.page));
+  function renderPager() {
+    const doc = FH.doc();
+    const pager = $("#pager");
+    pager.setAttribute("aria-label", FH.t("pagesLabel"));
+    pager.innerHTML = `<span class="pager-label" aria-hidden="true">${esc(FH.t("page"))}</span>` +
+      Array.from({ length: doc.pages }, (_, i) => i + 1).map((p) => {
+        const has = pagesWithFields.has(p);
+        const label = `${FH.t("page")} ${p} ${FH.t("of")} ${doc.pages}${has ? `, ${FH.t("hasFields")}` : ""}`;
+        return `<button type="button" data-page="${p}" class="${has ? "has" : ""}" aria-label="${esc(label)}" ${p === FH.state.page ? 'aria-current="page"' : ""}>${p}</button>`;
+      }).join("");
+  }
+  $("#pager").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-page]");
+    if (b) FH.setPage(Number(b.dataset.page));
+  });
+
+  /* Keep keyboard focus on the facsimile field after the shared renderer redraws it. */
+  let refocusField = null;
+  $("#sheet").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-field]");
+    if (!b) return;
+    refocusField = b.dataset.field;
+    if (tabMode.matches) setTab("facts");
+  }, true);
+
+  /* ================= Workspace: index ================= */
+  function renderIndex() {
+    $("#index").innerHTML = FH.sectionsInOrder().map((s) => `
+      <h3 class="idx-sec">${esc(s.label)}</h3>
+      <ul class="idx-list">${s.fields.map((f) => `
+        <li><button type="button" class="idx-row" data-id="${f.id}">
+          <span class="idx-mark" aria-hidden="true"></span>
+          <span class="idx-label">${esc(f.label)}${f.bold ? `<span class="idx-flag">${esc(FH.t("guarantorTag"))}</span>` : ""}<span class="sr idx-vis"></span></span>
+          <span class="idx-page"><span class="sr">${esc(FH.t("page"))} </span>${f.page}</span>
+        </button></li>`).join("")}
+      </ul>`).join("");
+    updateIndex();
+  }
+  function updateIndex() {
+    $$(".idx-row").forEach((b) => {
+      const id = b.dataset.id;
+      const sel = id === FH.state.selectedId;
+      const vis = FH.state.visited.has(id);
+      b.classList.toggle("is-selected", sel);
+      b.classList.toggle("is-visited", vis);
+      if (sel) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current");
+      b.querySelector(".idx-vis").textContent = vis ? `, ${FH.t("visitedOne")}` : "";
+    });
+    $("#idxCount").textContent = `${FH.state.visited.size} / ${D.fields.length} ${FH.t("viewed")}`;
+  }
+  $("#index").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-id]");
+    if (!b) return;
+    FH.select(b.dataset.id);
+    if (tabMode.matches) setTab("facts");
+  });
+
+  /* ================= Workspace: Field Facts label ================= */
+  let showOther = false;
+  function renderFacts(animate) {
+    const L1 = FH.lang, L2 = other();
+    const id = FH.state.selectedId;
+    const title = `<h2 class="lbl-title" id="facts-h"><span lang="en">${esc(T("en", "fieldFacts"))}</span><span lang="fr">${esc(T("fr", "fieldFacts"))}</span></h2>`;
+    const otherBtn = `<button type="button" class="fx-other" id="fxOther" aria-expanded="${showOther}" lang="${L2}">${esc(FH.t(showOther ? "hideOther" : "seeOther"))}</button>`;
+    const langs = `<div class="fx-langs" aria-hidden="true"><div>${L1 === "en" ? "English" : "Français"}</div><div>${L2 === "en" ? "English" : "Français"}</div></div>`;
+    const box = $("#facts");
+
+    if (!id) {
+      box.innerHTML = `<div class="facts ${showOther ? "show-other" : ""}">${title}${otherBtn}<div class="bar8"></div>
+        <div class="fx-empty"><p>${esc(FH.t("selectPrompt"))}</p><p class="alt" lang="${L2}">${esc(T(L2, "selectPrompt"))}</p></div>
+        <div class="bar4"></div></div>`;
+      return;
+    }
+
+    const f = rawField(id);
+    const cell = (lang, html) => `<div class="fx-c" lang="${lang}" data-l="${lang === L1 ? "cur" : "oth"}"><span class="fx-c-tag">${lang.toUpperCase()}</span>${html}</div>`;
+    const cols = (fn) => `<div class="fx-cols">${cell(L1, fn(L1))}${cell(L2, fn(L2))}</div>`;
+    const head = (h1, h2) => `<h3 class="fx-h"><span>${esc(h1)}</span> <span class="alt" lang="${L2}">${esc(h2)}</span></h3>`;
+    const headKey = (key) => head(T(L1, key), T(L2, key));
+    const para = (v) => (v ? `<p>${esc(v)}</p>` : `<p class="fx-none">—</p>`);
+    const list = (arr) => (arr && arr.length ? `<ul>${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="fx-none">—</p>`);
+    let first = true;
+    const row = (cls, h, fn) => { const out = `<section class="fx-row fx-${cls}${first ? " first" : ""}">${h}${cols(fn)}</section>`; first = false; return out; };
+    const has = (k) => f.en[k] || f.fr[k];
+
+    let body = "";
+    if (has("meaning")) body += row("meaning", headKey("meaning"), (l) => para(f[l].meaning));
+    if (has("enter")) body += row("enter", headKey("enter"), (l) => para(f[l].enter));
+    if (has("example")) body += row("example", headKey("example"), (l) => para(f[l].example));
+    if (has("find")) body += row("find", headKey("find"), (l) => para(f[l].find));
+    if (f.options) body += row("options", headKey("options"), (l) => list(f.options[l]));
+    if ((f.en.mistakes || []).length || (f.fr.mistakes || []).length) body += row("mistakes", headKey("mistakes"), (l) => list(f[l].mistakes));
+    if (f.en.points) body += row("points", headKey("pointsH"), (l) => `<p class="fx-pt">${esc(f[l].points.title)}</p>${list(f[l].points.items)}`);
+
+    const sources = (l) => f.sources.length
+      ? `<ul class="src-list">${f.sources.map((sid) => `<li class="src"><a href="${D.resources[sid].url}" target="_blank" rel="noopener">${esc(D.resources[sid][l])}</a>${l === "fr" ? `<small class="src-note">${esc(T("fr", "sourceLang"))}</small>` : ""}<small class="src-date">${esc(T(l, "checked"))}</small></li>`).join("")}</ul>`
+      : `<p class="fx-none">${esc(T(l, "noSources"))}</p>`;
+
+    const gKey = f.grounded ? "grounded" : "general";
+    box.innerHTML = `
+      <div class="facts ${animate ? "draw" : ""} ${showOther ? "show-other" : ""}">
+        ${title}
+        ${otherBtn}
+        ${langs}
+        <div class="fx-label fx-cols">${cell(L1, esc(f[L1].label))}${cell(L2, esc(f[L2].label))}</div>
+        <div class="bar8"></div>
+        <div class="fx-big">${headKey("page")}<p class="fx-num">${f.page}<small>/ ${FH.doc().pages}</small></p></div>
+        <section class="fx-row">${headKey("sectionH")}${cols((l) => para(D.sections[f.section][l]))}</section>
+        ${f.bold ? `<p class="fx-flag"><span><span>${esc(T(L1, "required"))}</span><span class="alt" lang="${L2}">${esc(T(L2, "required"))}</span></span></p>` : ""}
+        <div class="bar4"></div>
+        ${body}
+        <div class="bar4"></div>
+        <section class="fx-row first fx-sources">${headKey("sources")}${cols(sources)}</section>
+        <div class="bar8"></div>
+        <footer class="fx-foot">
+          <p><span class="mk ${f.grounded ? "on" : ""}" aria-hidden="true"></span>${esc(T(L1, gKey))}</p>
+          <p class="alt" lang="${L2}"><span class="mk ${f.grounded ? "on" : ""}" aria-hidden="true"></span>${esc(T(L2, gKey))}</p>
+        </footer>
+      </div>`;
+  }
+  $("#facts").addEventListener("click", (e) => {
+    if (!e.target.closest("#fxOther")) return;
+    showOther = !showOther;
+    renderFacts(false);
+    $("#fxOther").focus();
+  });
+
+  function updateActions() {
+    const ids = D.fields.map((f) => f.id);
+    const i = ids.indexOf(FH.state.selectedId);
+    $("#prevF").disabled = i <= 0;
+    $("#nextF").disabled = i === ids.length - 1;
+    $("#askField").disabled = i < 0;
+    $("#fpos").textContent = i < 0 ? "–" : FH.t("fieldPos", { i: i + 1, n: ids.length });
+  }
+  $("#prevF").addEventListener("click", () => FH.step(-1));
+  $("#nextF").addEventListener("click", () => FH.step(1));
+  $("#askField").addEventListener("click", () => {
+    if (!FH.state.selectedId) return;
+    ctxId = FH.state.selectedId;
+    renderCtx();
+    setChatOpen(true);
+    if (tabMode.matches) setTab("questions");
+    $("#chatInput").focus();
+  });
+
+  function scrollSelectedIntoView() {
+    $("#factsScroll").scrollTop = 0;
+    if (tabMode.matches) return;
+    const behavior = reduceMotion.matches ? "auto" : "smooth";
+    const nudge = (scroller, el) => {
+      if (!el) return;
+      const r = el.getBoundingClientRect(), s = scroller.getBoundingClientRect();
+      if (r.top < s.top + 8 || r.bottom > s.bottom - 8) scroller.scrollTo({ top: scroller.scrollTop + (r.top - s.top) - s.height / 3, behavior });
+    };
+    requestAnimationFrame(() => {
+      nudge($("#sheetScroll"), $("#sheet .ff.is-selected"));
+      nudge($(".pane-index"), $(".idx-row.is-selected"));
+    });
+  }
+
+  /* ================= Workspace: Questions ================= */
+  let msgs = [];
+  let thinking = false;
+  let ctxId = null;
+  const SUGG = ["suggestion1", "suggestion2", "suggestion3"];
+
+  function resetChat() { msgs = [{ seed: true }]; thinking = false; }
+
+  function expand() {
+    const out = [];
+    msgs.forEach((m) => {
+      if (m.seed) out.push(...FH.seedChat());
+      else if (m.role === "user") out.push({ role: "user", text: m.key ? FH.t(m.key) : m.text, ctx: m.ctx });
+      else out.push({ role: "assistant", ...FH.reply(m.key ? FH.t(m.key) : m.q) });
+    });
+    return out;
+  }
+  const by = (who, sub) => `<p class="msg-by">${esc(who)}${sub ? `<small>${esc(sub)}</small>` : ""}</p>`;
+  const refChips = (refs) => refs && refs.length
+    ? `<div class="refs">${refs.map((id) => { const f = FH.field(id); return `<button type="button" class="chip" data-ref="${id}">${esc(f.label)} · ${esc(FH.t("page"))} ${f.page}</button>`; }).join("")}</div>`
+    : "";
+
+  function renderChat(scrollToEnd) {
+    const log = $("#chatLog");
+    log.innerHTML = expand().map((m) => {
+      if (m.kind === "overview") {
+        const o = m.overview;
+        return `<article class="msg msg-a">${by(FH.t("brand"), FH.t("protoReply"))}<div class="msg-body">
+          <h3>${esc(FH.t("overviewTitle"))}: ${esc(o.title)}</h3>
+          <p>${esc(o.summary)}</p>
+          <dl class="ov">
+            <dt>${esc(FH.t("who"))}</dt><dd>${esc(o.who)}</dd>
+            <dt>${esc(FH.t("need"))}</dt><dd><ul class="sq-list">${o.need.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></dd>
+            <dt>${esc(FH.t("submit"))}</dt><dd>${esc(o.submit)}</dd>
+          </dl>
+          ${FH.sourceList(o.sources, "src")}
+        </div></article>`;
+      }
+      if (m.role === "user") {
+        const cf = m.ctx ? FH.field(m.ctx) : null;
+        return `<article class="msg msg-u">${by(FH.t("you"))}<div class="msg-body">${cf ? `<p class="msg-ctx">${esc(FH.t("askingAbout"))}${colon()}${esc(cf.label)}</p>` : ""}<p>${esc(m.text)}</p></div></article>`;
+      }
+      return `<article class="msg msg-a">${by(FH.t("brand"), FH.t("protoReply"))}<div class="msg-body">
+        <p>${esc(m.text)}</p>
+        ${m.list ? `<ul class="sq-list">${m.list.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+        ${refChips(m.refs)}
+        ${m.sources && m.sources.length ? FH.sourceList(m.sources, "src") : ""}
+      </div></article>`;
+    }).join("") + (thinking ? `<p class="thinking" role="status">${esc(FH.t("thinking"))}</p>` : "");
+    if (scrollToEnd) log.scrollTop = log.scrollHeight;
+  }
+
+  function renderSugg() {
+    $("#sugg").innerHTML = SUGG.map((k) => `<button type="button" class="chip" data-sugg="${k}">${esc(FH.t(k))}</button>`).join("");
+  }
+  function renderCtx() {
+    const box = $("#ctx");
+    const f = ctxId ? FH.field(ctxId) : null;
+    box.hidden = !f;
+    box.innerHTML = f ? `<span>${esc(FH.t("askingAbout"))}${colon()}<b>${esc(f.label)}</b></span><button type="button" id="ctxClear">${esc(FH.t("clear"))}</button>` : "";
+  }
+
+  function ask(entry) {
+    const ctx = ctxId;
+    msgs.push({ role: "user", ...entry, ctx });
+    thinking = true;
+    renderChat(true);
+    const q = entry.text ? (ctx ? `${entry.text} ${rawField(ctx).en.label} ${rawField(ctx).fr.label}` : entry.text) : null;
+    setTimeout(() => {
+      thinking = false;
+      msgs.push(entry.key ? { role: "assistant", key: entry.key } : { role: "assistant", q });
+      renderChat(true);
+    }, 600);
+  }
+
+  $("#composer").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = $("#chatInput");
+    const text = input.value.trim();
+    if (!text || thinking) return;
+    input.value = "";
+    ask({ text });
+  });
+  $("#chatInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#composer").requestSubmit(); }
+  });
+  $("#sugg").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-sugg]");
+    if (b && !thinking) ask({ key: b.dataset.sugg });
+  });
+  $("#ctx").addEventListener("click", (e) => {
+    if (!e.target.closest("#ctxClear")) return;
+    ctxId = null;
+    renderCtx();
+    $("#chatInput").focus();
+  });
+  $("#chatLog").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-ref]");
+    if (!b) return;
+    FH.select(b.dataset.ref);
+    if (tabMode.matches) setTab("facts");
+  });
+
+  function setChatOpen(open) {
+    $("#chatPane").classList.toggle("is-collapsed", !open);
+    const t = $("#chatToggle");
+    t.setAttribute("aria-expanded", String(open));
+    t.textContent = FH.t(open ? "hideChat" : "showChat");
+  }
+  $("#chatToggle").addEventListener("click", () => setChatOpen($("#chatToggle").getAttribute("aria-expanded") !== "true"));
+
+  /* ================= Mobile segmented control ================= */
+  function setTab(tab) {
+    $("#wsGrid").dataset.tab = tab;
+    $$("#seg [data-tab]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tab === tab)));
+    if (tabMode.matches) {
+      const top = $("#seg").getBoundingClientRect().top + window.scrollY;
+      if (window.scrollY > top) window.scrollTo(0, top);
+    }
+  }
+  $("#seg").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-tab]");
+    if (b) setTab(b.dataset.tab);
+  });
+
+  /* ================= New session ================= */
+  $("#newSession").addEventListener("click", () => {
+    FH.state.visited.clear();
+    ctxId = null;
+    docMsg = null;
+    resetChat();
+    renderCtx();
+    renderChat(false);
+    renderDocs();
+    FH.select(null);
+    FH.setPage(1);
+  });
+
+  /* ================= Wiring ================= */
+  FH.mountSheet($("#sheet"));
+
+  FH.on("select", () => {
+    updateIndex();
+    renderFacts(true);
+    updateActions();
+    scrollSelectedIntoView();
+    if (refocusField) {
+      const b = $(`#sheet [data-field="${refocusField}"]`);
+      refocusField = null;
+      if (b) b.focus({ preventScroll: true });
+    }
+  });
+  FH.on("page", renderPager);
+  FH.on("doc", () => { renderDocs(); renderPager(); });
+  FH.on("lang", () => {
+    renderLang();
+    renderReadFirst();
+    renderFormFacts();
+    renderUpStatus();
+    renderDirectory();
+    renderDocs();
+    renderPager();
+    renderIndex();
+    renderFacts(false);
+    updateActions();
+    renderSugg();
+    renderCtx();
+    renderChat(false);
+    setChatOpen($("#chatToggle").getAttribute("aria-expanded") !== "false");
+  });
+
+  resetChat();
+  FH.applyI18n(document);
+  renderLang();
+  renderReadFirst();
+  renderFormFacts();
+  renderDirectory();
+  renderDocs();
+  renderPager();
+  renderIndex();
+  renderSugg();
+  renderCtx();
+  renderChat(false);
+  setChatOpen(true);
+  setTab("facts");
+  FH.select("g-number");
+  renderFacts(false);
+
+  FH.mountSwitcher(() => { if (tabMode.matches) setTab($("#wsGrid").dataset.tab); });
+})();
+</script>
+</body>
+</html>

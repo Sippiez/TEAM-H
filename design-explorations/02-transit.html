@@ -1,0 +1,1225 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<!--
+DIRECTION CONTRACT · 02 Transit
+THESIS: A government form is a journey with stations. Wayfinding signage tells you where you are, what's next and where to go.
+OWN-WORLD: Transit signage and network maps. White ground, near-black rounded sign panels with white type, four semantic line colours (Passport green, Benefits blue, Tax amber, Guarantor purple), 8px route lines, round station dots, simple pictograms, Overpass.
+STORY: The landing is a service network whose stations open official pages, a "Start here" ticket machine and a departures board of sample forms. In the workspace every field is a station on a route line with a sliding "You are here" marker; the right column is the platform sign for the current field, with an Information desk for questions.
+FIRST VIEWPORT: Desktop shows the headline sign, network map, ticket machine and departures board. Phone shows the sign, then the ticket machine.
+FORM: The facsimile stays a plain document on a grey track bed, under a platform bar of document badges and page stops.
+-->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form Helper · Transit</title>
+<link rel="stylesheet" href="shared/form-sheet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #14171a;
+    --ink-2: #3b434b;
+    --rule: #cfd4d8;
+    --bed: #eceef0;
+    --on-dark-2: #c8cfd5;
+    --l-pass: #00843d;
+    --l-ben: #0062b8;
+    --l-tax: #f2a900;
+    --l-guar: #7a3e9d;
+    --font: "Overpass", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font);
+    font-size: 1.0625rem;
+    line-height: 1.5;
+    color: var(--ink);
+    background: #fff;
+  }
+  h1, h2, h3 { margin: 0; font-weight: 800; line-height: 1.15; text-wrap: balance; }
+  p { margin: 0; }
+  button { font: inherit; color: inherit; }
+  .tnum { font-variant-numeric: tabular-nums; }
+  .sr-only {
+    position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  :focus-visible { outline: 3px solid var(--l-ben); outline-offset: 2px; }
+  .on-dark :focus-visible, .on-dark:focus-visible { outline-color: var(--l-tax); }
+
+  .ico { width: 1.25em; height: 1.25em; flex: none; }
+  .pict {
+    --p: 40px;
+    display: inline-grid; place-items: center; flex: none;
+    width: var(--p); height: var(--p);
+    border-radius: 9px;
+    background: var(--ink); color: #fff;
+  }
+  .pict .ico { width: 62%; height: 62%; }
+  .pict.sm { --p: 28px; border-radius: 6px; }
+  .pict.inv { background: #fff; color: var(--ink); }
+
+  /* Line badges */
+  .lb {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 9px 2px; border-radius: 6px;
+    background: var(--c); color: #fff;
+    font-weight: 800; font-size: 0.8125rem; line-height: 1.35;
+    white-space: nowrap;
+  }
+  .lb.tax { color: var(--ink); }
+  .lb.outline { background: #fff; color: var(--c); box-shadow: inset 0 0 0 2px var(--c); }
+  .lb-stack { display: flex; flex-wrap: wrap; gap: 4px; }
+
+  /* Header */
+  .hdr {
+    display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap;
+    min-height: 68px; padding: 10px 24px;
+    border-bottom: 1px solid var(--rule); background: #fff;
+  }
+  .brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    min-height: 44px; padding: 6px 16px 6px 12px; border-radius: 10px;
+    background: var(--ink); color: #fff; text-decoration: none;
+    font-weight: 800; font-size: 1.125rem; letter-spacing: 0.01em;
+  }
+  .brand:hover { background: #2a3036; }
+  .hdr-notice { display: flex; align-items: center; gap: 10px; margin-right: auto; font-weight: 500; font-size: 0.9375rem; }
+  .lang-btn {
+    min-height: 44px; padding: 0 18px; border-radius: 10px;
+    border: 2px solid var(--ink); background: #fff;
+    font-weight: 800; cursor: pointer;
+  }
+  .lang-btn:hover { background: var(--ink); color: #fff; }
+
+  /* ---------------- Landing ---------------- */
+  .landing { max-width: 1360px; margin: 0 auto; padding: 28px 24px 110px; }
+  .l-grid { display: grid; grid-template-columns: 5fr 7fr; gap: 24px; align-items: start; }
+  .l-col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+  .l-col.right { flex-direction: column-reverse; justify-content: flex-end; }
+
+  .hero-sign {
+    background: var(--ink); color: #fff;
+    border-radius: 20px; padding: 32px 36px 36px;
+    display: flex; flex-direction: column; gap: 28px;
+    box-shadow: 0 12px 26px -14px rgb(20 23 26 / 0.55);
+  }
+  .hero-sign .pict { --p: 56px; border-radius: 12px; }
+  .hero-sign h1 { font-size: clamp(2.125rem, 3.3vw, 3.25rem); letter-spacing: -0.02em; line-height: 1.06; }
+  .hero-sign p { margin-top: 16px; color: var(--on-dark-2); font-size: 1.1875rem; max-width: 42ch; }
+
+  .ticket {
+    background: #e9ecee; border: 2px solid var(--ink); border-radius: 20px;
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .ticket-head { display: flex; align-items: center; gap: 12px; padding: 14px 20px; background: var(--ink); color: #fff; }
+  .ticket-head h2 { font-size: 1.375rem; }
+  .ticket-body { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .drop {
+    position: relative;
+    display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 16px;
+    padding: 26px 20px 20px; border: 2px dashed var(--ink); border-radius: 14px;
+    background: #fff; cursor: pointer;
+  }
+  .drop::before {
+    content: ""; position: absolute; left: 50%; top: 9px; transform: translateX(-50%);
+    width: 38%; height: 7px; border-radius: 4px; background: var(--ink);
+  }
+  .drop:hover, .drop.is-over { background: #f6f7f8; border-style: solid; }
+  .drop:focus-within { outline: 3px solid var(--l-ben); outline-offset: 3px; }
+  .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .drop .pict { --p: 52px; grid-row: span 2; }
+  .drop strong { font-size: 1.1875rem; font-weight: 800; line-height: 1.25; }
+  .drop .hint { color: var(--ink-2); }
+  .limits { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
+  .limits li {
+    background: #fff; border: 2px solid var(--ink); border-radius: 8px;
+    padding: 5px 12px 4px; font-weight: 700; font-size: 0.9375rem; font-variant-numeric: tabular-nums;
+  }
+  .status:empty { display: none; }
+  .status { font-weight: 700; padding: 10px 12px; border-radius: 10px; background: #fff; }
+  .supported { display: flex; gap: 10px; align-items: flex-start; font-weight: 700; }
+  .supported .pict { background: var(--l-pass); }
+  .notice { display: flex; gap: 12px; align-items: flex-start; background: #fff; border-radius: 12px; padding: 12px 14px; font-size: 1rem; }
+
+  .map { border: 1px solid var(--rule); border-radius: 20px; padding: 20px 22px 18px; background: #fff; display: flex; flex-direction: column; gap: 10px; }
+  .map-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+  .map-head h2 { font-size: 1.375rem; }
+  .map-head p { color: var(--ink-2); font-weight: 500; }
+  .map-stage { position: relative; width: 100%; margin: 8px 0; }
+  .map-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .stn-link { position: absolute; width: 0; height: 0; color: var(--ink); text-decoration: none; }
+  .stn-link .dot {
+    position: absolute; left: 0; top: 0; width: 22px; height: 22px; transform: translate(-50%, -50%);
+    border-radius: 50%; background: #fff; border: 5px solid var(--c);
+  }
+  .stn-link.is-x .dot { width: 30px; height: 30px; border: 6px solid var(--ink); }
+  .stn-link .lab {
+    position: absolute; width: max-content; max-width: 150px;
+    padding: 3px 6px 2px; border-radius: 6px; background: #fff;
+    font-weight: 700; font-size: 0.9375rem; line-height: 1.22;
+  }
+  .at-right .lab { left: 20px; top: 0; transform: translateY(-50%); }
+  .at-right-up .lab { left: 22px; bottom: -10px; }
+  .at-below .lab { left: 0; top: 20px; transform: translateX(-50%); text-align: center; }
+  .at-above .lab { left: 0; bottom: 20px; transform: translateX(-50%); text-align: center; }
+  .at-above-end .lab { right: 18px; bottom: 14px; text-align: right; }
+  .stn-link:hover .lab { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; }
+  .stn-link:focus-visible { outline: none; }
+  .stn-link:focus-visible .lab { outline: 3px solid var(--l-ben); outline-offset: 2px; }
+  .stn-link.is-match .lab { background: var(--ink); color: #fff; }
+  .stn-link.is-dim { opacity: 0.4; }
+  .map.is-tall .lab { max-width: 240px; font-size: 1rem; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; list-style: none; margin: 0; padding: 0; font-weight: 700; font-size: 0.9375rem; }
+  .legend li { display: flex; align-items: center; gap: 8px; }
+  .legend i { width: 30px; height: 8px; border-radius: 4px; }
+  .legend .x { width: 16px; height: 16px; border-radius: 50%; border: 4px solid var(--ink); background: #fff; }
+  .map-note:empty { display: none; }
+  .map-note { color: var(--ink-2); font-size: 0.9375rem; }
+
+  .board { background: var(--ink); color: #fff; border-radius: 20px; padding: 20px 24px 10px; box-shadow: 0 12px 26px -14px rgb(20 23 26 / 0.55); }
+  .board-head { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; }
+  .board-head h2 { font-size: 1.375rem; }
+  .board-rows { list-style: none; margin: 0; padding: 0; }
+  .board-row {
+    display: grid; grid-template-columns: 7.5rem 1fr auto auto; align-items: center; gap: 8px 16px;
+    padding: 14px 0; border-top: 1px solid #3a4148;
+  }
+  .board-code { color: var(--l-tax); font-weight: 800; font-size: 1.25rem; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+  .board-title { font-weight: 700; font-size: 1.1875rem; line-height: 1.25; }
+  .board-lang { border: 2px solid #8b949c; border-radius: 6px; padding: 1px 8px 0; font-weight: 800; font-size: 0.875rem; color: var(--on-dark-2); }
+  .board-open {
+    min-height: 48px; padding: 0 18px; border: 0; border-radius: 10px;
+    background: var(--l-tax); color: var(--ink); font-weight: 800;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+  }
+  .board-open:hover { background: #ffc22e; }
+
+  .finder { margin-top: 64px; display: grid; grid-template-columns: 5fr 7fr; gap: 24px; align-items: start; }
+  .finder-sign { display: flex; flex-direction: column; gap: 12px; }
+  .finder-sign h2 { display: flex; align-items: center; gap: 12px; font-size: 1.75rem; }
+  .finder-sign > p { color: var(--ink-2); max-width: 46ch; }
+  .finder-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .finder-form label { width: 100%; font-weight: 800; }
+  .finder-form input {
+    flex: 1 1 240px; min-height: 52px; padding: 0 14px;
+    border: 2px solid var(--ink); border-radius: 10px; font: inherit; color: var(--ink); background: #fff;
+  }
+  input::placeholder { color: #59626a; opacity: 1; }
+  .btn-dark {
+    min-height: 52px; padding: 0 18px; border: 0; border-radius: 10px;
+    background: var(--ink); color: #fff; font-weight: 800;
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  }
+  .btn-dark:hover { background: #2a3036; }
+  .svc-list { list-style: none; margin: 0; padding: 0; border: 2px solid var(--ink); border-radius: 16px; overflow: hidden; }
+  .svc-list li + li { border-top: 1px solid var(--rule); }
+  .svc {
+    display: grid; grid-template-columns: 8.5rem 1fr auto; align-items: center; gap: 6px 16px;
+    padding: 14px 18px; color: var(--ink); text-decoration: none;
+  }
+  .svc:hover { background: #f3f4f5; }
+  .svc:hover .svc-name { text-decoration: underline; text-underline-offset: 3px; }
+  .svc:focus-visible { outline-offset: -4px; }
+  .svc-name { display: block; font-weight: 800; font-size: 1.125rem; line-height: 1.3; }
+  .svc-src { display: block; color: var(--ink-2); font-weight: 500; font-size: 0.9375rem; }
+  .svc-end { display: flex; align-items: center; gap: 10px; }
+  .svc-dept { background: var(--ink); color: #fff; border-radius: 6px; padding: 2px 8px 1px; font-weight: 800; font-size: 0.875rem; }
+  .no-match { padding: 18px; font-weight: 700; }
+
+  .l-foot { margin-top: 56px; }
+  .l-foot .notice { background: #f3f4f5; max-width: 80ch; font-weight: 500; }
+
+  /* ---------------- Workspace ---------------- */
+  .ws { display: grid; grid-template-columns: 300px minmax(0, 1fr) 456px; }
+  @media (min-width: 1081px) {
+    body[data-view="workspace"] { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+    body[data-view="workspace"] main { flex: 1; min-height: 0; }
+    .ws { height: 100%; grid-template-rows: minmax(0, 1fr); }
+    .ws-side { overflow: hidden; }
+  }
+  .ws-route { overflow: auto; border-right: 1px solid var(--rule); padding: 20px 14px 100px 10px; }
+  .route-head { padding: 0 6px 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .route-head h2 { font-size: 1.125rem; }
+  .route-count { font-weight: 700; color: var(--ink-2); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
+  .track { position: relative; }
+  .sec-head { position: relative; padding: 16px 0 10px 52px; }
+  .sec-head::before { content: ""; position: absolute; left: 24px; top: 0; bottom: 0; width: 8px; background: var(--c); }
+  .sec:first-child .sec-head::before { display: none; }
+  .sec ol { list-style: none; margin: 0; padding: 0; }
+  .stn {
+    position: relative; display: block; width: 100%;
+    min-height: 48px; padding: 10px 12px 10px 52px;
+    border: 0; border-radius: 12px; background: transparent; color: var(--ink);
+    text-align: left; cursor: pointer;
+  }
+  .stn::before { content: ""; position: absolute; left: 24px; top: 0; bottom: 0; width: 8px; background: var(--c); }
+  .stn.is-first::before { top: 23px; }
+  .stn.is-last::before { bottom: auto; height: 23px; }
+  .stn .dot {
+    position: absolute; left: 18px; top: 13px; width: 20px; height: 20px; z-index: 1;
+    border-radius: 50%; background: #fff; border: 4px solid var(--c);
+  }
+  .stn.is-visited .dot { background: var(--c); }
+  .stn-yah { display: none; font-weight: 800; font-size: 0.8125rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--l-tax); }
+  .stn-label { display: block; font-weight: 500; font-size: 1rem; line-height: 1.3; }
+  .stn-meta { display: block; font-size: 0.8125rem; color: var(--ink-2); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .stn:hover { background: #f1f3f4; }
+  .stn[aria-current="step"] { background: var(--ink); color: #fff; }
+  .stn[aria-current="step"] .stn-yah { display: block; }
+  .stn[aria-current="step"] .stn-label { font-weight: 800; font-size: 1.0625rem; }
+  .stn[aria-current="step"] .stn-meta { color: var(--on-dark-2); }
+  .yah {
+    position: absolute; left: 0; top: 0; z-index: 2;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #fff; border: 8px solid var(--c, var(--l-pass));
+    box-shadow: 0 3px 8px rgb(20 23 26 / 0.35);
+    display: grid; place-items: center; pointer-events: none;
+    transition: transform 300ms var(--ease);
+  }
+  .yah::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+  .yah.no-anim { transition: none; }
+
+  .ws-center { overflow: auto; background: var(--bed); padding: 16px 28px 110px; }
+  .platform {
+    position: sticky; top: 0; z-index: 3;
+    max-width: 780px; margin: 0 auto;
+    background: var(--ink); color: #fff; border-radius: 16px;
+    padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 12px;
+    box-shadow: 0 10px 20px -12px rgb(20 23 26 / 0.6);
+  }
+  .pf-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .doc-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .doc-tab {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 14px 4px 6px;
+    border-radius: 10px; border: 2px solid #59626a; background: transparent; color: #fff;
+    font-weight: 700; font-size: 0.9375rem; cursor: pointer;
+  }
+  .doc-tab .code { background: var(--l-pass); color: #fff; border-radius: 6px; padding: 3px 8px 2px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .doc-tab:hover { border-color: #fff; }
+  .doc-tab[aria-pressed="true"] { background: #fff; color: var(--ink); border-color: #fff; }
+  .pf-count { margin-left: auto; font-weight: 700; color: var(--on-dark-2); font-variant-numeric: tabular-nums; }
+  .add-pdf {
+    min-height: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px;
+    border-radius: 10px; border: 2px dashed #8b949c; background: transparent; color: #fff; font-weight: 800; cursor: pointer;
+  }
+  .add-pdf:hover { border-style: solid; border-color: #fff; }
+  .pages { display: flex; align-items: center; gap: 16px; }
+  .pages-label { font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 6.5em; }
+  .stops { position: relative; flex: 1; display: flex; justify-content: space-between; align-items: center; list-style: none; margin: 0; padding: 0; }
+  .stops::before { content: ""; position: absolute; left: 18px; right: 18px; top: 50%; height: 6px; margin-top: -3px; border-radius: 3px; background: var(--l-pass); }
+  .stops li { position: relative; display: grid; place-items: center; width: 44px; height: 44px; }
+  .stop {
+    width: 34px; height: 34px; padding: 0; border-radius: 50%;
+    border: 4px solid var(--l-pass); background: var(--ink); color: var(--on-dark-2);
+    font-weight: 800; font-size: 0.875rem; font-variant-numeric: tabular-nums;
+    display: grid; place-items: center; cursor: pointer;
+  }
+  .stop.has-fields { background: #fff; color: var(--ink); }
+  .stop:hover { border-color: #fff; }
+  .stop[aria-current="page"] { width: 42px; height: 42px; background: #fff; color: var(--ink); border-color: #fff; box-shadow: 0 0 0 3px var(--ink), 0 0 0 6px var(--l-pass); font-size: 1rem; }
+  .pf-status:empty { display: none; }
+  .pf-status { max-width: 780px; margin: 10px auto 0; font-weight: 700; background: #fff; border-radius: 10px; padding: 10px 14px; }
+  .sheet-wrap { max-width: 780px; margin: 20px auto 0; }
+  .sheet-wrap .form-sheet {
+    --fs-ink: #14171a; --fs-bar: #14171a; --fs-rule: #5f6870;
+    --ff-ring: #14171a; --ff-tint: rgb(20 23 26 / 0.07); --ff-hover: rgb(0 98 184 / 0.07);
+    --ff-visited-mark: #00843d; --ff-radius: 3px;
+    border-radius: 4px;
+    box-shadow: 0 14px 30px -16px rgb(20 23 26 / 0.4), 0 2px 4px rgb(20 23 26 / 0.08);
+  }
+  @media (min-width: 1280px) { .sheet-wrap .form-sheet { font-size: 12px; } }
+  .sheet-wrap .ff[data-field^="g-"] { --ff-visited-mark: #7a3e9d; }
+  .sheet-wrap .ff.is-selected { box-shadow: inset 0 0 0 3px var(--ff-ring); }
+  .sheet-wrap .ff.is-selected::before {
+    content: ""; position: absolute; left: -9px; top: -9px; z-index: 1;
+    width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 5px solid #14171a;
+  }
+  .sheet-wrap .ff:focus-visible { outline: 3px solid var(--l-ben); }
+
+  .ws-side { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--rule); background: #fff; }
+  .tabs { display: flex; gap: 6px; padding: 12px 16px 0; border-bottom: 2px solid var(--ink); }
+  .tab {
+    flex: 1; min-height: 48px; margin-bottom: -2px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border: 2px solid var(--ink); border-radius: 12px 12px 0 0; background: #fff;
+    font-weight: 800; font-size: 1rem; cursor: pointer;
+  }
+  .tab[aria-selected="true"] { background: var(--ink); color: #fff; }
+  .tab[aria-selected="false"]:hover { background: #f1f3f4; }
+  .panel { flex: 1; min-height: 0; overflow: auto; }
+  #panel-ask { display: flex; flex-direction: column; overflow: hidden; }
+
+  .psign {
+    margin: 16px; padding: 20px 22px 18px; border-radius: 18px;
+    background: var(--ink); color: #fff;
+    display: flex; flex-direction: column; gap: 14px;
+    box-shadow: 0 12px 24px -14px rgb(20 23 26 / 0.6);
+  }
+  .psign-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+  .psign-page { font-weight: 700; color: var(--on-dark-2); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
+  .psign h2 { font-size: 1.75rem; letter-spacing: -0.01em; }
+  .psign h2:focus { outline: none; }
+  .psign.empty { flex-direction: row; align-items: center; gap: 16px; }
+  .psign.empty h2 { font-size: 1.375rem; }
+  .req {
+    align-self: flex-start; display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px 5px; border-radius: 8px; background: var(--l-guar); color: #fff;
+    font-weight: 800; font-size: 0.9375rem;
+  }
+  .dirs { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
+  .dir {
+    min-height: 52px; padding: 8px 14px; border-radius: 10px;
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 800; font-size: 1rem; line-height: 1.25; text-align: left; cursor: pointer;
+  }
+  .dir-prev { background: transparent; color: #fff; border: 2px solid #8b949c; }
+  .dir-prev:hover:not(:disabled) { border-color: #fff; }
+  .dir-next { background: #fff; color: var(--ink); border: 2px solid #fff; justify-content: space-between; }
+  .dir-next:hover:not(:disabled) { background: #e3e7ea; }
+  .dir-k { color: #3b434b; font-weight: 700; }
+  .dir:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .fbody { padding: 4px 24px 100px; display: flex; flex-direction: column; gap: 24px; }
+  .fbody-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+  .ground { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.9375rem; }
+  .ground .pict { background: var(--l-pass); }
+  .ground.general .pict { background: var(--l-tax); color: var(--ink); }
+  .ask-btn {
+    min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px;
+    border: 2px solid var(--ink); border-radius: 10px; background: #fff; font-weight: 800; cursor: pointer;
+  }
+  .ask-btn:hover { background: var(--ink); color: #fff; }
+  .fsec h3, .points h3 { font-size: 1.0625rem; margin-bottom: 6px; }
+  .fsec p { max-width: 65ch; }
+  .example {
+    display: inline-block; padding: 6px 12px 4px; border: 2px solid var(--ink); border-radius: 8px;
+    font-weight: 700; font-size: 1.125rem; letter-spacing: 0.02em; font-variant-numeric: tabular-nums;
+  }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
+  .opts li { border: 2px solid var(--ink); border-radius: 999px; padding: 4px 12px 3px; font-weight: 700; }
+  .mist, .points ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .mist li, .points li { display: flex; gap: 10px; align-items: flex-start; }
+  .mist .ico, .points .ico { margin-top: 0.12em; }
+  .points { background: #f4eef8; border-radius: 14px; padding: 16px 18px; }
+  .points h3, .points .ico { color: #5c2a78; }
+  .src-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .src { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 12px; }
+  .src a { font-weight: 700; color: var(--l-ben); text-underline-offset: 3px; }
+  .src a:hover { text-decoration-thickness: 2px; }
+  .src-note, .src-date { color: var(--ink-2); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+
+  .desk { margin: 16px 16px 0; padding: 14px 18px; border-radius: 18px; background: var(--ink); color: #fff; display: flex; align-items: center; gap: 14px; }
+  .desk .pict { --p: 44px; }
+  .desk h2 { font-size: 1.375rem; }
+  .desk p { color: var(--on-dark-2); font-size: 0.9375rem; }
+  .log { flex: 1; min-height: 0; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .msg-a { background: #f3f4f5; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .msg-a h3 { font-size: 1.125rem; }
+  .msg-a ul { margin: 0; padding-left: 1.2em; }
+  .msg-a dl { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  .msg-a dt { font-weight: 800; }
+  .msg-a dd { margin: 0; }
+  .msg-dept { color: var(--ink-2); font-weight: 700; font-size: 0.9375rem; }
+  .msg-tag { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 0.8125rem; color: var(--ink-2); }
+  .msg-a .src { background: #fff; }
+  .msg-u { align-self: flex-end; max-width: 85%; padding: 10px 14px; border-radius: 16px 16px 4px 16px; background: var(--ink); color: #fff; font-weight: 500; }
+  .msg-u small { display: block; color: var(--on-dark-2); font-size: 0.8125rem; font-weight: 700; }
+  .refs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ref {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 12px 3px 8px;
+    border: 2px solid var(--ink); border-radius: 999px; background: #fff; font-weight: 700; font-size: 0.9375rem; cursor: pointer; text-align: left;
+  }
+  .ref .d { flex: none; width: 16px; height: 16px; border-radius: 50%; border: 4px solid var(--c); background: #fff; }
+  .ref:hover { background: var(--ink); color: #fff; }
+  .thinking { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--ink-2); padding: 4px 2px; }
+  .suggest { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 12px; }
+  .chip {
+    min-height: 40px; padding: 4px 14px 3px; border-radius: 999px;
+    border: 2px solid var(--l-ben); background: #fff; color: var(--l-ben);
+    font-weight: 700; font-size: 0.9375rem; cursor: pointer; text-align: left;
+  }
+  .chip:hover { background: var(--l-ben); color: #fff; }
+  .compose { border-top: 2px solid var(--ink); padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 8px; background: #fff; }
+  .ctx { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border-radius: 10px; background: #eef0f2; font-size: 0.9375rem; }
+  .ctx b { font-weight: 800; }
+  .ctx button { margin-left: auto; min-height: 36px; padding: 0 12px; border-radius: 8px; border: 2px solid var(--ink); background: #fff; font-weight: 800; cursor: pointer; }
+  .ctx button:hover { background: var(--ink); color: #fff; }
+  .compose-row { display: flex; gap: 8px; }
+  .compose input { flex: 1; min-width: 0; min-height: 48px; padding: 0 12px; border: 2px solid var(--ink); border-radius: 10px; font: inherit; color: var(--ink); }
+  .send { min-height: 48px; padding: 0 16px; border: 0; border-radius: 10px; background: var(--ink); color: #fff; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .send:disabled { opacity: 0.55; cursor: progress; }
+  .disclose { display: flex; flex-direction: column; gap: 6px; font-size: 0.875rem; color: var(--ink-2); }
+  .disclose > span { display: flex; gap: 8px; align-items: flex-start; }
+  .disclose .ico { color: var(--ink); margin-top: 0.1em; }
+
+  /* ---------------- Responsive ---------------- */
+  @media (max-width: 1100px) {
+    .l-grid, .finder { grid-template-columns: 1fr; }
+    .l-col.right { flex-direction: column; }
+    .l-grid { gap: 24px; }
+  }
+  @media (max-width: 1080px) {
+    .ws { display: block; }
+    .ws-route { overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid var(--rule); padding: 14px 0 10px; }
+    .route-head { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 0 16px 8px; position: sticky; left: 0; }
+    .track { width: max-content; padding: 0 16px; }
+    .track-inner { display: flex; }
+    .sec-head { padding: 0 12px 8px 0; }
+    .sec-head::before { display: none; }
+    .sec ol { display: flex; }
+    .stn { width: 136px; min-height: 0; padding: 44px 8px 8px; text-align: center; }
+    .stn::before { left: 0; right: 0; top: 18px; bottom: auto; width: auto; height: 8px; }
+    .stn.is-first::before { top: 18px; left: 68px; }
+    .stn.is-last::before { top: 18px; height: 8px; right: 68px; }
+    .stn .dot { left: 58px; top: 12px; }
+    .stn-label { font-size: 0.9375rem; }
+    .ws-center { overflow: visible; padding: 12px 12px 24px; }
+    .platform { position: static; }
+    .sheet-wrap .form-sheet { aspect-ratio: auto; }
+    .ws-side { border-left: 0; border-top: 2px solid var(--ink); }
+    .panel, #panel-ask { overflow: visible; }
+    .log { overflow: visible; }
+    .fbody { padding-bottom: 32px; }
+    .compose { padding-bottom: 96px; }
+  }
+  @media (max-width: 640px) {
+    .hdr { padding: 10px 14px; }
+    .hdr-notice { order: 3; width: 100%; margin: 0; }
+    .brand { margin-right: auto; }
+    .landing { padding: 16px 14px 110px; }
+    .hero-sign { padding: 24px 22px 26px; gap: 20px; }
+    .hero-sign h1 { font-size: 2.125rem; }
+    .hero-sign p { font-size: 1.0625rem; }
+    .map { padding: 16px 14px; }
+    .board { padding: 18px 16px 8px; }
+    .board-row { grid-template-columns: 1fr auto; grid-template-areas: "code lang" "title title" "open open"; }
+    .board-code { grid-area: code; }
+    .board-lang { grid-area: lang; }
+    .board-title { grid-area: title; }
+    .board-open { grid-area: open; width: 100%; }
+    .finder { margin-top: 44px; }
+    .finder-sign h2 { font-size: 1.5rem; }
+    .svc { grid-template-columns: 1fr auto; padding: 14px; }
+    .svc .lb-stack { grid-column: 1 / -1; }
+    .pf-count { margin-left: 0; }
+    .pages { flex-direction: column; align-items: stretch; gap: 8px; }
+    .stops li { width: 40px; height: 44px; }
+    .stop { width: 32px; height: 32px; }
+    .stop[aria-current="page"] { width: 38px; height: 38px; }
+    .sheet-wrap .form-sheet { font-size: 10.5px; padding: 16px 14px; }
+    .sheet-wrap .ff { min-height: 44px; }
+    .sheet-wrap .fs-4, .sheet-wrap .fs-3 { grid-template-columns: 1fr 1fr; }
+    .psign { margin: 12px; padding: 18px 16px 16px; }
+    .psign h2 { font-size: 1.5rem; }
+    .dirs { grid-template-columns: 1fr; }
+    .fbody { padding: 4px 16px 32px; }
+    .tabs { padding: 10px 12px 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .yah { transition: none; }
+  }
+</style>
+</head>
+<body>
+<header class="hdr">
+  <a class="brand" href="#landing" id="brand">
+    <svg width="34" height="20" viewBox="0 0 34 20" aria-hidden="true" focusable="false"><path d="M3 10h28" stroke="#00843d" stroke-width="6" stroke-linecap="round"/><circle cx="17" cy="10" r="6" fill="#14171a" stroke="#fff" stroke-width="3.5"/></svg>
+    <span data-i18n="brand"></span>
+  </a>
+  <p class="hdr-notice"><span class="pict sm" data-ico="info" aria-hidden="true"></span><span data-i18n="notOfficial"></span></p>
+  <button class="lang-btn" id="langBtn" type="button"></button>
+</header>
+
+<main id="main">
+  <!-- ================= LANDING ================= -->
+  <div class="landing" data-view-panel="landing">
+    <div class="l-grid">
+      <div class="l-col">
+        <section class="hero-sign on-dark" aria-labelledby="heroTitle">
+          <span class="pict inv" data-ico="arrowDown" aria-hidden="true"></span>
+          <div>
+            <h1 id="heroTitle" data-i18n="heroTitle"></h1>
+            <p data-i18n="heroSub"></p>
+          </div>
+        </section>
+
+        <section class="ticket" aria-labelledby="ticketTitle">
+          <div class="ticket-head on-dark">
+            <span class="pict inv sm" data-ico="arrowR" aria-hidden="true"></span>
+            <h2 id="ticketTitle" data-i18n="startHere"></h2>
+          </div>
+          <div class="ticket-body">
+            <label class="drop" id="drop">
+              <input type="file" id="fileIn" accept="application/pdf,.pdf" multiple>
+              <span class="pict" data-ico="upload" aria-hidden="true"></span>
+              <strong data-i18n="uploadTitle"></strong>
+              <span class="hint" data-i18n="uploadHint"></span>
+            </label>
+            <ul class="limits" id="limits"></ul>
+            <p class="status" id="uploadStatus" role="status"></p>
+            <p class="supported"><span class="pict sm" data-ico="check" aria-hidden="true"></span><span data-i18n="supported"></span></p>
+            <p class="notice"><span class="pict" data-ico="lock" aria-hidden="true"></span><span data-i18n="privacy"></span></p>
+            <p class="notice"><span class="pict" data-ico="chip" aria-hidden="true"></span><span data-i18n="aiDisclosure"></span></p>
+          </div>
+        </section>
+      </div>
+
+      <div class="l-col right">
+        <section class="board on-dark" aria-labelledby="boardTitle">
+          <div class="board-head">
+            <span class="pict inv" data-ico="doc" aria-hidden="true"></span>
+            <h2 id="boardTitle" data-i18n="sampleTitle"></h2>
+          </div>
+          <ul class="board-rows" id="boardRows"></ul>
+        </section>
+
+        <section class="map" id="map" aria-labelledby="mapTitle">
+          <div class="map-head">
+            <h2 id="mapTitle" data-i18n="mapTitle"></h2>
+            <p data-i18n="mapHint"></p>
+          </div>
+          <div class="map-stage" id="mapStage"></div>
+          <ul class="legend" id="legend"></ul>
+          <p class="map-note" id="mapNote"></p>
+        </section>
+      </div>
+    </div>
+
+    <section class="finder" aria-labelledby="finderTitle">
+      <div class="finder-sign">
+        <h2 id="finderTitle"><span class="pict" data-ico="signpost" aria-hidden="true"></span><span data-i18n="serviceTitle"></span></h2>
+        <p data-i18n="serviceSub"></p>
+        <form class="finder-form" id="finderForm" role="search">
+          <label for="svcQ" data-i18n="search"></label>
+          <input id="svcQ" type="search" data-i18n-ph="servicePh" autocomplete="off">
+          <button type="submit" class="btn-dark"><span data-ico="search" class="ico-slot" aria-hidden="true"></span><span data-i18n="go"></span></button>
+        </form>
+      </div>
+      <ul class="svc-list" id="svcList"></ul>
+    </section>
+
+    <footer class="l-foot">
+      <p class="notice"><span class="pict" data-ico="info" aria-hidden="true"></span><span data-i18n="notOfficialLong"></span></p>
+    </footer>
+  </div>
+
+  <!-- ================= WORKSPACE ================= -->
+  <div class="ws" data-view-panel="workspace">
+    <nav class="ws-route" id="route" aria-labelledby="routeTitle">
+      <div class="route-head">
+        <h2 id="routeTitle" data-i18n="fieldsTitle"></h2>
+        <p class="route-count" id="routeCount"></p>
+      </div>
+      <div class="track" id="track">
+        <div class="track-inner" id="routeInner"></div>
+        <span class="yah no-anim" id="yah" aria-hidden="true" hidden></span>
+      </div>
+    </nav>
+
+    <section class="ws-center" aria-labelledby="docTitle">
+      <h2 class="sr-only" id="docTitle"></h2>
+      <div class="platform on-dark">
+        <div class="pf-row">
+          <div class="doc-tabs" id="docTabs" role="group" aria-labelledby="docCount"></div>
+          <span class="pf-count" id="docCount"></span>
+          <button type="button" class="add-pdf" id="addPdf"><span data-ico="plus" aria-hidden="true"></span><span data-i18n="addPdf"></span></button>
+          <input type="file" id="addFile" accept="application/pdf,.pdf" hidden>
+        </div>
+        <div class="pages">
+          <span class="pages-label" id="pagesLabel"></span>
+          <ul class="stops" id="stops"></ul>
+        </div>
+      </div>
+      <p class="pf-status" id="pfStatus" role="status"></p>
+      <div class="sheet-wrap" id="sheet"></div>
+    </section>
+
+    <section class="ws-side" id="side">
+      <div class="tabs" role="tablist" id="tabs">
+        <button type="button" role="tab" class="tab" id="tab-field" data-tab="field" aria-controls="panel-field" aria-selected="true"><span data-ico="signpost" aria-hidden="true"></span><span data-i18n="tabField"></span></button>
+        <button type="button" role="tab" class="tab" id="tab-ask" data-tab="ask" aria-controls="panel-ask" aria-selected="false" tabindex="-1"><span data-ico="info" aria-hidden="true"></span><span data-i18n="tabAsk"></span></button>
+      </div>
+      <div class="panel" id="panel-field" role="tabpanel" aria-labelledby="tab-field" tabindex="0"></div>
+      <div class="panel" id="panel-ask" role="tabpanel" aria-labelledby="tab-ask" hidden>
+        <div class="desk on-dark">
+          <span class="pict inv" data-ico="info" aria-hidden="true"></span>
+          <div><h2 data-i18n="infoDesk"></h2><p data-i18n="chatTitle"></p></div>
+        </div>
+        <div class="log" id="chatLog" role="log" aria-labelledby="tab-ask"></div>
+        <div class="suggest" id="suggest"></div>
+        <form class="compose" id="compose">
+          <div class="ctx" id="ctxChip" hidden></div>
+          <label for="chatIn" class="sr-only" data-i18n="chatTitle"></label>
+          <div class="compose-row">
+            <input id="chatIn" type="text" data-i18n-ph="chatPh" autocomplete="off">
+            <button type="submit" class="send" id="sendBtn"><span data-i18n="send"></span><span data-ico="arrowR" aria-hidden="true"></span></button>
+          </div>
+          <div class="disclose">
+            <span><span data-ico="lock" aria-hidden="true"></span><span data-i18n="privacy"></span></span>
+            <span><span data-ico="chip" aria-hidden="true"></span><span data-i18n="aiDisclosure"></span></span>
+          </div>
+        </form>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="shared/data.js"></script>
+<script src="shared/proto.js"></script>
+<script>
+(function () {
+  const D = FH.data;
+  const esc = FH.esc;
+  const $ = (s, r = document) => r.querySelector(s);
+  const t = (k, v) => esc(FH.t(k, v));
+
+  /* Design-specific copy, added to the shared dictionary so FH.t and data-i18n handle it. */
+  Object.assign(D.i18n.en, {
+    youAreHere: "You are here",
+    nextLabel: "Next:",
+    prevShort: "Previous",
+    endOfLine: "End of the line",
+    tabField: "Field",
+    tabAsk: "Ask",
+    infoDesk: "Information desk",
+    startHere: "Start here",
+    lineP: "Passport",
+    lineB: "Benefits",
+    lineT: "Tax · CRA",
+    interchange: "Interchange",
+    mapTitle: "Service network",
+    mapHint: "Each station opens an official page.",
+    noMatch: "No matching service. Try different words, or browse the stations on the map.",
+    uploadProto: "Prototype: this file isn't processed. Open a sample form to explore.",
+    addProto: "Prototype: adding files isn't available yet.",
+  });
+  Object.assign(D.i18n.fr, {
+    youAreHere: "Vous êtes ici",
+    nextLabel: "Suivant :",
+    prevShort: "Précédent",
+    endOfLine: "Terminus",
+    tabField: "Champ",
+    tabAsk: "Demander",
+    infoDesk: "Comptoir d'information",
+    startHere: "Commencez ici",
+    lineP: "Passeport",
+    lineB: "Prestations",
+    lineT: "Impôt · ARC",
+    interchange: "Correspondance",
+    mapTitle: "Réseau des services",
+    mapHint: "Chaque station ouvre une page officielle.",
+    noMatch: "Aucun service correspondant. Essayez d'autres mots ou parcourez les stations du plan.",
+    uploadProto: "Prototype : ce fichier n'est pas traité. Ouvrez un formulaire exemple pour explorer.",
+    addProto: "Prototype : l'ajout de fichiers n'est pas encore offert.",
+  });
+
+  /* ---------- Pictograms ---------- */
+  const P = {
+    info: '<circle cx="12" cy="12" r="9.5"/><path d="M12 11v6M12 7.5v.01"/>',
+    lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
+    chip: '<rect x="6.5" y="6.5" width="11" height="11" rx="2"/><path d="M9.5 3v3.5M14.5 3v3.5M9.5 17.5V21M14.5 17.5V21M3 9.5h3.5M3 14.5h3.5M17.5 9.5H21M17.5 14.5H21"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    warn: '<path d="M12 3.5L21.5 20h-19z"/><path d="M12 10v4.5M12 17.5v.01"/>',
+    arrowR: '<path d="M4 12h15M13 6l6 6-6 6"/>',
+    arrowL: '<path d="M20 12H5M11 6l-6 6 6 6"/>',
+    arrowDown: '<path d="M12 4v15M6 13l6 6 6-6"/>',
+    person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20.5c.8-4 3.6-6 7-6s6.2 2 7 6"/>',
+    upload: '<path d="M12 15V4M7 9l5-5 5 5"/><path d="M4 15v4.5h16V15"/>',
+    doc: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
+    ext: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v6H4V6h6"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    signpost: '<path d="M12 3v18M12 5h7l2 2.5-2 2.5h-7M12 12H5l-2 2.5L5 17h7"/>',
+    cross: '<circle cx="12" cy="12" r="9.5"/><path d="M9 9l6 6M15 9l-6 6"/>',
+  };
+  const ico = (n) => `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${P[n]}</svg>`;
+  const pict = (n, cls = "") => `<span class="pict ${cls}" aria-hidden="true">${ico(n)}</span>`;
+  document.querySelectorAll("[data-ico]").forEach((el) => { el.innerHTML = ico(el.dataset.ico); });
+
+  /* ---------- Lines ---------- */
+  const LINES = {
+    P: { hex: "#00843d", key: "lineP" },
+    B: { hex: "#0062b8", key: "lineB" },
+    T: { hex: "#f2a900", key: "lineT" },
+  };
+  const SEC_C = { personal: "#00843d", travel: "#00843d", guarantor: "#7a3e9d" };
+  const lb = (L) => `<span class="lb ${L === "T" ? "tax" : ""}" style="--c:${LINES[L].hex}">${t(LINES[L].key)}</span>`;
+
+  /* ================= LANDING ================= */
+  const STN = {
+    passports: ["P"], sin: ["P", "B"], ei: ["B"], ccb: ["B", "T"], cpp: ["B"], oas: ["B"], "cra-sign-in": ["T"],
+  };
+  const MAPS = {
+    wide: {
+      w: 760, h: 400,
+      pos: {
+        passports: [90, 80, "right"], sin: [90, 230, "below"], ei: [290, 230, "below"], ccb: [470, 230, "above-end"],
+        cpp: [570, 300, "below"], oas: [700, 300, "above"], "cra-sign-in": [680, 150, "above"],
+      },
+      paths: { P: [[90, 80], [90, 230]], B: [[90, 230], [470, 230], [540, 300], [700, 300]], T: [[470, 230], [550, 150], [680, 150]] },
+    },
+    tall: {
+      w: 360, h: 620,
+      pos: {
+        passports: [36, 40, "right"], sin: [36, 140, "right"], ei: [36, 240, "right"], ccb: [36, 340, "right-up"],
+        "cra-sign-in": [96, 430, "right"], cpp: [36, 510, "right"], oas: [36, 590, "right"],
+      },
+      paths: { P: [[36, 40], [36, 140]], B: [[36, 140], [36, 590]], T: [[36, 340], [96, 400], [96, 430]] },
+    },
+  };
+  let mapKey = null;
+  const mapLayoutKey = () => {
+    const w = $("#mapStage").clientWidth;
+    return (w ? w >= 600 : window.innerWidth > 720) ? "wide" : "tall";
+  };
+  function renderMap(force) {
+    const k = mapLayoutKey();
+    if (!force && k === mapKey) return;
+    mapKey = k;
+    const M = MAPS[k];
+    const stage = $("#mapStage");
+    $("#map").classList.toggle("is-tall", k === "tall");
+    stage.style.aspectRatio = `${M.w} / ${M.h}`;
+    const svg = `<svg viewBox="0 0 ${M.w} ${M.h}" aria-hidden="true" focusable="false">${Object.entries(M.paths).map(([L, pts]) =>
+      `<polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="${LINES[L].hex}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`).join("")}</svg>`;
+    const links = D.services.map((s) => {
+      const [x, y, at] = M.pos[s.id];
+      const r = FH.resource(s.id);
+      const lines = STN[s.id];
+      return `<a class="stn-link at-${at} ${lines.length > 1 ? "is-x" : ""}" data-svc="${s.id}" href="${r.url}" target="_blank" rel="noopener" style="left:${(x / M.w) * 100}%;top:${(y / M.h) * 100}%;--c:${LINES[lines[0]].hex}"><span class="dot" aria-hidden="true"></span><span class="lab">${esc(s[FH.lang])}${r.note ? `<span class="sr-only"> (${esc(r.note)})</span>` : ""}</span></a>`;
+    }).join("");
+    stage.innerHTML = svg + links;
+    applyMapFilter();
+  }
+  function renderLegend() {
+    $("#legend").innerHTML = ["P", "B", "T"].map((L) => `<li><i style="background:${LINES[L].hex}" aria-hidden="true"></i>${t(LINES[L].key)}</li>`).join("")
+      + `<li><i class="x" aria-hidden="true"></i>${t("interchange")}</li>`;
+    $("#mapNote").textContent = FH.lang === "fr" ? FH.t("sourceLang") : "";
+  }
+
+  const norm = (s) => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const STOP = new Set(["the", "and", "for", "my", "to", "of", "an", "get", "how", "what", "need", "do", "want", "with",
+    "je", "le", "la", "les", "de", "des", "du", "un", "une", "mon", "ma", "mes", "pour", "et", "que", "faire", "veux", "en", "au"]);
+  function matches(s, q) {
+    const toks = norm(q).split(/[^a-z0-9]+/).filter((x) => x.length >= 2 && !STOP.has(x));
+    if (!toks.length) return true;
+    const r = D.resources[s.id];
+    const hay = norm([s.en, s.fr, r.en, r.fr, s.dept].join(" "));
+    return toks.some((x) => hay.includes(x));
+  }
+  const query = () => $("#svcQ").value.trim();
+  function applyMapFilter() {
+    const q = query();
+    document.querySelectorAll(".stn-link").forEach((a) => {
+      const s = D.services.find((x) => x.id === a.dataset.svc);
+      const m = !!q && matches(s, q);
+      a.classList.toggle("is-match", m);
+      a.classList.toggle("is-dim", !!q && !m);
+    });
+  }
+  function renderServices() {
+    const q = query();
+    const list = q ? D.services.filter((s) => matches(s, q)) : D.services;
+    $("#svcList").innerHTML = list.length ? list.map((s) => {
+      const r = FH.resource(s.id);
+      return `<li><a class="svc" href="${r.url}" target="_blank" rel="noopener">
+        <span class="lb-stack">${STN[s.id].map(lb).join("")}</span>
+        <span><span class="svc-name">${esc(s[FH.lang])}</span><span class="svc-src">${esc(r.title)}${r.note ? ` · ${esc(r.note)}` : ""}</span></span>
+        <span class="svc-end"><span class="svc-dept">${esc(s.dept)}</span>${ico("ext")}</span></a></li>`;
+    }).join("") : `<li class="no-match" role="status">${t("noMatch")}</li>`;
+    applyMapFilter();
+  }
+  function renderBoard() {
+    const rows = [
+      { doc: "pptc153", key: "sampleEn", lang: "en", tag: "EN" },
+      { doc: "pptc154", key: "sampleFr", lang: "fr", tag: "FR" },
+    ];
+    $("#boardRows").innerHTML = rows.map((r) => {
+      const d = D.docs.find((x) => x.id === r.doc);
+      const title = FH.t(r.key);
+      return `<li class="board-row">
+        <span class="board-code">${esc(d.number)}</span>
+        <span class="board-title" lang="${r.lang}">${esc(title)}</span>
+        <span class="board-lang" lang="${r.lang}">${r.tag}</span>
+        <button type="button" class="board-open" data-sample="${r.doc}" aria-label="${t("openSample")}: ${esc(title)} (${esc(d.number)})"><span>${t("openSample")}</span>${ico("arrowR")}</button>
+      </li>`;
+    }).join("");
+  }
+  let uploadKey = "";
+  let addKey = "";
+  function renderLanding() {
+    $("#limits").innerHTML = FH.t("limits").split(" · ").map((x) => `<li>${esc(x)}</li>`).join("");
+    $("#uploadStatus").textContent = uploadKey ? FH.t(uploadKey) : "";
+    renderBoard();
+    renderLegend();
+    renderMap(true);
+    renderServices();
+  }
+
+  $("#boardRows").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-sample]");
+    if (!b) return;
+    FH.setDoc(b.dataset.sample);
+    FH.showView("workspace");
+  });
+  const drop = $("#drop");
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("is-over"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => {
+    e.preventDefault();
+    drop.classList.remove("is-over");
+    if (ev === "drop") { uploadKey = "uploadProto"; $("#uploadStatus").textContent = FH.t(uploadKey); }
+  }));
+  $("#fileIn").addEventListener("change", (e) => {
+    if (!e.target.files.length) return;
+    uploadKey = "uploadProto";
+    $("#uploadStatus").textContent = FH.t(uploadKey);
+    e.target.value = "";
+  });
+  $("#svcQ").addEventListener("input", renderServices);
+  $("#finderForm").addEventListener("submit", (e) => { e.preventDefault(); renderServices(); });
+  if ("ResizeObserver" in window) new ResizeObserver(() => renderMap(false)).observe($("#mapStage"));
+
+  /* ================= WORKSPACE ================= */
+  const routeEl = $("#route");
+  const track = $("#track");
+  const routeInner = $("#routeInner");
+  const yah = $("#yah");
+  const horizontal = window.matchMedia("(max-width: 1080px)");
+
+  function renderRoute() {
+    const secs = FH.sectionsInOrder();
+    const total = D.fields.length;
+    let i = 0;
+    routeInner.innerHTML = secs.map((s) => {
+      const c = SEC_C[s.id];
+      const stations = s.fields.map((f) => {
+        const cls = `${i === 0 ? " is-first" : ""}${i === total - 1 ? " is-last" : ""}`;
+        i++;
+        return `<li><button type="button" class="stn${cls}" data-id="${f.id}">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="stn-yah">${t("youAreHere")}</span>
+          <span class="stn-label">${esc(f.label)}</span>
+          <span class="stn-meta">${t("page")} ${f.page}<span class="sr-only stn-vis"></span></span>
+        </button></li>`;
+      }).join("");
+      return `<div class="sec" style="--c:${c}"><div class="sec-head"><span class="lb ${s.id === "travel" ? "outline" : ""}" style="--c:${c}">${esc(s.label)}</span></div><ol>${stations}</ol></div>`;
+    }).join("");
+    updateRoute(false);
+  }
+  function updateRoute(animate) {
+    const sel = FH.state.selectedId;
+    routeInner.querySelectorAll(".stn").forEach((b) => {
+      const id = b.dataset.id;
+      const v = FH.state.visited.has(id);
+      b.classList.toggle("is-visited", v);
+      b.querySelector(".stn-vis").textContent = v ? `, ${FH.t("viewed")}` : "";
+      if (id === sel) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
+    });
+    $("#routeCount").textContent = `${FH.state.visited.size}/${D.fields.length} ${FH.t("viewed")}`;
+    placeMarker(animate);
+  }
+  function placeMarker(animate) {
+    const sel = FH.state.selectedId;
+    const btn = sel ? routeInner.querySelector(`.stn[data-id="${sel}"]`) : null;
+    if (!btn) { yah.hidden = true; return; }
+    if (!btn.offsetParent) return; // workspace hidden; re-placed when shown
+    const wasHidden = yah.hidden;
+    yah.hidden = false;
+    const d = btn.querySelector(".dot").getBoundingClientRect();
+    const tr = track.getBoundingClientRect();
+    const x = d.left + d.width / 2 - tr.left - 18;
+    const y = d.top + d.height / 2 - tr.top - 18;
+    const anim = animate && !wasHidden;
+    yah.classList.toggle("no-anim", !anim);
+    yah.style.setProperty("--c", SEC_C[FH.field(sel).section]);
+    yah.style.transform = `translate(${x}px, ${y}px)`;
+    if (!anim) { void yah.offsetWidth; requestAnimationFrame(() => yah.classList.remove("no-anim")); }
+    scrollRouteTo(btn);
+  }
+  function scrollRouteTo(btn) {
+    const b = btn.getBoundingClientRect();
+    const s = routeEl.getBoundingClientRect();
+    if (horizontal.matches) {
+      if (b.left < s.left + 16 || b.right > s.right - 16) routeEl.scrollLeft += b.left - s.left - (s.width - b.width) / 2;
+    } else if (b.top < s.top + 72 || b.bottom > s.bottom - 72) {
+      routeEl.scrollTop += b.top - s.top - (s.height - b.height) / 2;
+    }
+  }
+  routeInner.addEventListener("click", (e) => {
+    const b = e.target.closest(".stn");
+    if (b) FH.select(b.dataset.id);
+  });
+  routeInner.addEventListener("keydown", (e) => {
+    const keys = ["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft", "Home", "End"];
+    if (!keys.includes(e.key)) return;
+    const btns = [...routeInner.querySelectorAll(".stn")];
+    const i = btns.indexOf(document.activeElement);
+    if (i < 0) return;
+    e.preventDefault();
+    const j = e.key === "Home" ? 0 : e.key === "End" ? btns.length - 1
+      : (e.key === "ArrowDown" || e.key === "ArrowRight") ? Math.min(btns.length - 1, i + 1) : Math.max(0, i - 1);
+    btns[j].focus();
+  });
+
+  function renderPlatform() {
+    const doc = FH.doc();
+    $("#docTitle").textContent = `${doc.number} · ${doc.title[FH.lang]}`;
+    $("#docTabs").innerHTML = D.docs.map((d) =>
+      `<button type="button" class="doc-tab" data-doc="${d.id}" aria-pressed="${d.id === FH.state.docId}"><span class="code">${esc(d.number)}</span><span>${esc(d.short[FH.lang])}</span></button>`).join("");
+    $("#docCount").textContent = FH.t("docsCount", { n: D.docs.length });
+    $("#pfStatus").textContent = addKey ? FH.t(addKey) : "";
+    renderStops();
+  }
+  function renderStops() {
+    const doc = FH.doc();
+    const p = FH.state.page;
+    const withFields = new Set(D.fields.map((f) => f.page));
+    $("#pagesLabel").textContent = `${FH.t("page")} ${p} ${FH.t("of")} ${doc.pages}`;
+    $("#stops").innerHTML = Array.from({ length: doc.pages }, (_, k) => k + 1).map((n) =>
+      `<li><button type="button" class="stop ${withFields.has(n) ? "has-fields" : ""}" data-page="${n}" ${n === p ? 'aria-current="page"' : ""} aria-label="${t("page")} ${n} ${t("of")} ${doc.pages}">${n}</button></li>`).join("");
+  }
+  $("#docTabs").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-doc]");
+    if (b && b.dataset.doc !== FH.state.docId) FH.setDoc(b.dataset.doc);
+  });
+  $("#stops").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-page]");
+    if (!b) return;
+    FH.setPage(Number(b.dataset.page));
+    const nb = $(`#stops [data-page="${b.dataset.page}"]`);
+    if (nb) nb.focus();
+  });
+  $("#addPdf").addEventListener("click", () => $("#addFile").click());
+  $("#addFile").addEventListener("change", (e) => {
+    if (!e.target.files.length) return;
+    addKey = "addProto";
+    $("#pfStatus").textContent = FH.t(addKey);
+    e.target.value = "";
+  });
+
+  /* ---------- Platform sign (field explanation) ---------- */
+  const sec = (key, inner) => (inner ? `<section class="fsec"><h3>${t(key)}</h3>${inner}</section>` : "");
+  const para = (s) => (s ? `<p>${esc(s)}</p>` : "");
+  function renderSign() {
+    const panel = $("#panel-field");
+    const keep = document.activeElement && panel.contains(document.activeElement) ? document.activeElement.dataset.step : null;
+    const f = FH.state.selectedId ? FH.field(FH.state.selectedId) : null;
+    if (!f) {
+      panel.innerHTML = `<div class="psign empty on-dark">${pict("signpost", "inv")}<h2>${t("selectPrompt")}</h2></div>`;
+      return;
+    }
+    const all = D.fields;
+    const prev = f.index > 0 ? FH.field(all[f.index - 1].id) : null;
+    const next = f.index < all.length - 1 ? FH.field(all[f.index + 1].id) : null;
+    const c = SEC_C[f.section];
+    const doc = FH.doc();
+    panel.innerHTML = `
+      <div class="psign on-dark">
+        <div class="psign-top">
+          <span class="lb" style="--c:${c}">${esc(f.sectionLabel)}</span>
+          <span class="psign-page">${t("page")} ${f.page} ${t("of")} ${doc.pages}</span>
+        </div>
+        <h2 id="fieldTitle" tabindex="-1">${esc(f.label)}</h2>
+        ${f.bold ? `<p class="req">${ico("person")}<span>${t("required")}</span></p>` : ""}
+        <div class="dirs">
+          <button type="button" class="dir dir-prev" data-step="-1" ${prev ? `aria-label="${t("prev")}: ${esc(prev.label)}"` : "disabled"}>${ico("arrowL")}<span>${t("prevShort")}</span></button>
+          <button type="button" class="dir dir-next" data-step="1" ${next ? "" : "disabled"}>${next
+            ? `<span><span class="dir-k">${t("nextLabel")}</span> ${esc(next.label)}</span>`
+            : `<span>${t("endOfLine")}</span>`}${ico("arrowR")}</button>
+        </div>
+      </div>
+      <div class="fbody">
+        <div class="fbody-top">
+          <p class="ground ${f.grounded ? "" : "general"}">${pict(f.grounded ? "check" : "warn", "sm")}<span>${t(f.grounded ? "grounded" : "general")}</span></p>
+          <button type="button" class="ask-btn" data-ask>${ico("info")}<span>${t("askField")}</span></button>
+        </div>
+        ${sec("meaning", para(f.meaning))}
+        ${sec("enter", para(f.enter))}
+        ${sec("example", f.example ? `<p class="example">${esc(f.example)}</p>` : "")}
+        ${sec("options", f.options ? `<ul class="opts">${f.options.map((o) => `<li>${esc(o)}</li>`).join("")}</ul>` : "")}
+        ${sec("find", para(f.find))}
+        ${f.points ? `<section class="points"><h3>${esc(f.points.title)}</h3><ul>${f.points.items.map((x) => `<li>${ico("check")}<span>${esc(x)}</span></li>`).join("")}</ul></section>` : ""}
+        ${sec("mistakes", f.mistakes.length ? `<ul class="mist">${f.mistakes.map((m) => `<li>${ico("cross")}<span>${esc(m)}</span></li>`).join("")}</ul>` : "")}
+        ${sec("sources", FH.sourceList(f.sources, "src"))}
+      </div>`;
+    if (keep) {
+      const b = panel.querySelector(`[data-step="${keep}"]`);
+      (b && !b.disabled ? b : $("#fieldTitle")).focus();
+    }
+  }
+  $("#panel-field").addEventListener("click", (e) => {
+    const s = e.target.closest("[data-step]");
+    if (s) { FH.step(Number(s.dataset.step)); return; }
+    if (e.target.closest("[data-ask]")) askAboutField();
+  });
+
+  /* ---------- Tabs ---------- */
+  function setTab(name, focus) {
+    document.querySelectorAll(".tab").forEach((b) => {
+      const on = b.dataset.tab === name;
+      b.setAttribute("aria-selected", String(on));
+      b.tabIndex = on ? 0 : -1;
+    });
+    $("#panel-field").hidden = name !== "field";
+    $("#panel-ask").hidden = name !== "ask";
+    if (focus) $(`.tab[data-tab="${name}"]`).focus();
+    if (name === "ask") scrollLog();
+  }
+  $("#tabs").addEventListener("click", (e) => { const b = e.target.closest(".tab"); if (b) setTab(b.dataset.tab); });
+  $("#tabs").addEventListener("keydown", (e) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+    e.preventDefault();
+    const cur = document.activeElement.dataset.tab;
+    setTab(e.key === "Home" ? "field" : e.key === "End" ? "ask" : cur === "field" ? "ask" : "field", true);
+  });
+
+  /* ---------- Information desk (chat) ---------- */
+  const chat = [
+    { kind: "overview" },
+    { role: "user", key: "suggestion1" },
+    { role: "assistant", q: "guarantor" },
+  ];
+  let askCtx = null;
+  let thinking = false;
+  const log = $("#chatLog");
+  const ctxHint = (id) => (id.startsWith("g-") ? "guarantor" : id === "dob" ? "birth" : id);
+  function answer(m) {
+    let r = FH.reply(m.key ? FH.t(m.key) : m.q);
+    const generic = !r.refs.length && r.sources.length === 1 && r.sources[0].id === "passports";
+    if (m.ctx && generic) r = FH.reply(ctxHint(m.ctx));
+    return r;
+  }
+  const tag = () => `<p class="msg-tag">${ico("info")}<span>${t("protoReply")}</span></p>`;
+  const refChip = (id) => {
+    const f = FH.field(id);
+    return `<button type="button" class="ref" data-ref="${id}" style="--c:${SEC_C[f.section]}"><span class="d" aria-hidden="true"></span>${esc(f.label)}</button>`;
+  };
+  function msgHTML(m) {
+    if (m.kind === "overview") {
+      const o = FH.overview();
+      return `<article class="msg msg-a">${tag()}
+        <h3>${t("overviewTitle")}: ${esc(o.title)}</h3>
+        <p class="msg-dept">${esc(o.department)}</p>
+        <p>${esc(o.summary)}</p>
+        <dl>
+          <div><dt>${t("who")}</dt><dd>${esc(o.who)}</dd></div>
+          <div><dt>${t("need")}</dt><dd><ul>${o.need.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></dd></div>
+          <div><dt>${t("submit")}</dt><dd>${esc(o.submit)}</dd></div>
+        </dl>
+        ${FH.sourceList(o.sources, "src")}
+      </article>`;
+    }
+    if (m.role === "user") {
+      const f = m.ctx ? FH.field(m.ctx) : null;
+      return `<div class="msg msg-u">${f ? `<small>${t("askingAbout")}: ${esc(f.label)}</small>` : ""}${esc(m.key ? FH.t(m.key) : m.text)}</div>`;
+    }
+    const r = answer(m);
+    return `<article class="msg msg-a">${tag()}
+      <p>${esc(r.text)}</p>
+      ${r.list ? `<ul>${r.list.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+      ${r.refs.length ? `<div class="refs">${r.refs.map(refChip).join("")}</div>` : ""}
+      ${FH.sourceList(r.sources, "src")}
+    </article>`;
+  }
+  const thinkingHTML = () => `<div class="thinking">${ico("clock")}<span>${t("thinking")}</span></div>`;
+  function renderChat() {
+    log.innerHTML = chat.map(msgHTML).join("") + (thinking ? thinkingHTML() : "");
+  }
+  function scrollLog() { log.scrollTop = log.scrollHeight; }
+  function renderSuggest() {
+    $("#suggest").innerHTML = ["suggestion1", "suggestion2", "suggestion3"].map((k) => `<button type="button" class="chip" data-suggest="${k}">${t(k)}</button>`).join("");
+  }
+  function renderCtx() {
+    const box = $("#ctxChip");
+    if (!askCtx) { box.hidden = true; box.innerHTML = ""; return; }
+    box.hidden = false;
+    box.innerHTML = `<span>${t("askingAbout")}: <b>${esc(FH.field(askCtx).label)}</b></span><button type="button" id="ctxClear">${t("clear")}</button>`;
+  }
+  function send(m) {
+    if (thinking) return;
+    const msg = { role: "user", ctx: askCtx, ...m };
+    chat.push(msg);
+    log.insertAdjacentHTML("beforeend", msgHTML(msg));
+    thinking = true;
+    log.insertAdjacentHTML("beforeend", thinkingHTML());
+    $("#sendBtn").disabled = true;
+    scrollLog();
+    setTimeout(() => {
+      const a = { role: "assistant", ctx: msg.ctx, key: msg.key, q: msg.text };
+      chat.push(a);
+      thinking = false;
+      const th = log.querySelector(".thinking");
+      if (th) th.remove();
+      log.insertAdjacentHTML("beforeend", msgHTML(a));
+      $("#sendBtn").disabled = false;
+      scrollLog();
+    }, 600);
+  }
+  function askAboutField() {
+    if (!FH.state.selectedId) return;
+    askCtx = FH.state.selectedId;
+    renderCtx();
+    setTab("ask");
+    $("#chatIn").focus();
+  }
+  $("#compose").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const inp = $("#chatIn");
+    const text = inp.value.trim();
+    if (!text) { inp.focus(); return; }
+    inp.value = "";
+    send({ text });
+  });
+  $("#compose").addEventListener("click", (e) => {
+    if (e.target.closest("#ctxClear")) { askCtx = null; renderCtx(); $("#chatIn").focus(); }
+  });
+  $("#suggest").addEventListener("click", (e) => { const b = e.target.closest("[data-suggest]"); if (b) send({ key: b.dataset.suggest }); });
+  log.addEventListener("click", (e) => { const b = e.target.closest("[data-ref]"); if (b) FH.select(b.dataset.ref); });
+
+  /* ---------- Shell ---------- */
+  function renderLangBtn() {
+    const b = $("#langBtn");
+    b.textContent = FH.t("langName");
+    b.setAttribute("lang", FH.lang === "en" ? "fr" : "en");
+    document.title = `${FH.t("brand")} · Transit`;
+  }
+  $("#langBtn").addEventListener("click", () => FH.toggleLang());
+  $("#brand").addEventListener("click", (e) => { e.preventDefault(); FH.showView("landing"); });
+
+  function renderAll() {
+    FH.applyI18n(document);
+    renderLangBtn();
+    renderLanding();
+    renderRoute();
+    renderPlatform();
+    renderSign();
+    renderChat();
+    renderSuggest();
+    renderCtx();
+  }
+
+  FH.on("lang", renderAll);
+  FH.on("doc", renderPlatform);
+  FH.on("page", renderStops);
+  FH.on("select", () => { updateRoute(true); renderSign(); });
+
+  renderAll();
+  FH.mountSheet($("#sheet"));
+  FH.select("g-number");
+
+  window.addEventListener("resize", () => placeMarker(false));
+  horizontal.addEventListener("change", () => placeMarker(false));
+  FH.mountSwitcher((v) => {
+    requestAnimationFrame(() => {
+      if (v === "workspace") placeMarker(false);
+      else renderMap(false);
+    });
+  });
+})();
+</script>
+</body>
+</html>

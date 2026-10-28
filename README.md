@@ -108,4 +108,9 @@ checklist; required reviews and checks are configured separately in GitHub.
 - [docs/decisions/](docs/decisions/): decision records.
 - [docs/research/](docs/research/): research notes and sources.
 - [web/](web/): Next.js app for the Form Helper MVP.
+- [DESIGN.md](DESIGN.md): the chosen visual system (Paper Route, decision 0003).
+- [design-explorations/](design-explorations/): six static UI direction
+  prototypes. Direction 6, `06-paper-route.html`, is the chosen reference.
+  Open `index.html` through a local static
+  server, for example `python3 -m http.server --directory design-explorations`.
 - [.agents/skills/](.agents/skills/): existing reusable agent workflows.
