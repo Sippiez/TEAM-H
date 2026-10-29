@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { cn } from "cn";
+import { fieldSearchScore } from "@/lib/field-search";
 import type { FormField } from "@/lib/types";
 
 import { useI18n } from "./i18n";
@@ -29,9 +30,17 @@ export function Route({ fields, selectedId, visited, onSelect }: RouteProps) {
   const lastSelected = useRef<string | null>(null);
 
   const runs = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     const shown = q
-      ? fields.filter((f) => f.label.toLowerCase().includes(q) || f.section.toLowerCase().includes(q))
+      ? fields.filter(
+          (field) =>
+            fieldSearchScore(q, [
+              field.label,
+              field.section,
+              field.path,
+              field.rawName,
+            ]) > 0,
+        )
       : fields;
     const out: { key: string; section: string; items: FormField[] }[] = [];
     for (const f of shown) {
