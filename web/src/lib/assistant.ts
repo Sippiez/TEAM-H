@@ -105,7 +105,20 @@ function explainSelected(field: FieldSummary, form?: FormContext): AssistantRepl
   if (e.commonMistakes.length) {
     lines.push("**Avoid:**", ...e.commonMistakes.slice(0, 2).map((m) => `- ${m}`));
   }
-  return { text: lines.join("\n"), resources: e.sources.slice(0, 2), highlightFieldId: field.id };
+  return {
+    text: lines.join("\n"),
+    resources: e.sources.slice(0, 2),
+    fieldRefs: [fieldReference(field, form)],
+  };
+}
+
+function fieldReference(field: FieldSummary, form?: FormContext) {
+  return {
+    id: field.id,
+    label: field.label,
+    page: field.page,
+    document: form?.formNumber ?? form?.fileName ?? "Current document",
+  };
 }
 
 const SUGGESTIONS_WITH_FORM =
@@ -153,7 +166,7 @@ export function reply(req: ChatRequest): AssistantReply {
     const others = rest.slice(0, 3).map((m) => m.field);
     const e = explainField(best.field, form?.formNumber);
     const text = [
-      `That goes in **${best.field.label}** on page ${best.field.page} (${best.field.section}). I've highlighted it on the form.`,
+      `That goes in **${best.field.label}** on page ${best.field.page} (${best.field.section}). Select its reference below to open it on the form.`,
       e.whatToEnter,
       e.keyPoints ? `**${e.keyPoints.title}:**\n${e.keyPoints.items.map((i) => `- ${i}`).join("\n")}` : "",
       others.length ? "Related fields:" : "",
@@ -162,8 +175,7 @@ export function reply(req: ChatRequest): AssistantReply {
       .join("\n");
     return {
       text,
-      fieldRefs: [best.field, ...others].map((f) => ({ id: f.id, label: f.label })),
-      highlightFieldId: best.field.id,
+      fieldRefs: [best.field, ...others].map((f) => fieldReference(f, form)),
       resources: e.sources.slice(0, 1),
     };
   }

@@ -28,7 +28,7 @@ const NAVIGATOR_SUGGESTIONS = [
 ];
 
 /** Where a selection came from. Clicks on the sheet itself never scroll the sheet. */
-type Origin = "sheet" | "route" | "step" | "ref" | "reply";
+type Origin = "sheet" | "route" | "step" | "ref";
 type Tab = "field" | "ask";
 
 function toContext(form: LoadedForm): FormContext {
@@ -144,7 +144,7 @@ export function FormHelperApp() {
         page: field.page,
         ctxCleared: false,
         visited: d.visited.has(id) ? d.visited : new Set(d.visited).add(id),
-        tab: origin === "reply" ? d.tab : "field",
+        tab: "field",
       }));
       if (!requested.current.has(`${target.key}:${id}`)) void loadExplanation(target.key, field, target.form.formNumber);
       if (target.key !== activeRef.current) return;
@@ -152,6 +152,8 @@ export function FormHelperApp() {
         if (origin !== "sheet") setScrollKey((k) => k + 1);
       } else if (origin === "sheet" || origin === "route") {
         revealSide();
+      } else if (origin === "ref") {
+        setScrollKey((k) => k + 1);
       }
     },
     [isDesktop, loadExplanation, revealSide, updateDoc],
@@ -180,16 +182,13 @@ export function FormHelperApp() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const reply = (await res.json()) as AssistantReply;
         push({ id: nextId(), role: "assistant", ...reply });
-        if (reply.highlightFieldId && target && reply.highlightFieldId !== fieldId) {
-          selectField(target, reply.highlightFieldId, "reply");
-        }
       } catch {
         push({ id: nextId(), role: "assistant", text: t.chatError });
       } finally {
         setPending(false);
       }
     },
-    [selectField, updateDoc, t.chatError],
+    [updateDoc, t.chatError],
   );
 
   const openPdf = async (data: ArrayBuffer, fileName: string) => {
@@ -396,6 +395,9 @@ export function FormHelperApp() {
     <div className="flex min-h-dvh flex-col desk:h-dvh desk:overflow-hidden">
       {header}
       <main className="flex min-h-0 flex-1 flex-col desk:grid desk:grid-cols-[300px_minmax(0,1fr)_456px]">
+        <p className="sr-only" role="status" aria-live="polite">
+          {selected ? t.fieldSelected(selected.label, selected.page) : ""}
+        </p>
         <h1 className="sr-only">
           {t.brand}: {form.formNumber ?? form.fileName}
         </h1>

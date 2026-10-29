@@ -107,6 +107,10 @@ export function PdfPage({
     const el = wrapperRef.current?.querySelector<HTMLElement>(`[data-field-id="${CSS.escape(selectedId)}"]`);
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     el?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center", inline: "nearest" });
+    el?.classList.remove("is-arrived");
+    if (!el || reduce) return;
+    const timer = window.setTimeout(() => el.classList.add("is-arrived"), 300);
+    return () => window.clearTimeout(timer);
     // Only an explicit request scrolls; re-renders for the same request must not.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollKey, viewport]);

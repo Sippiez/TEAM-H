@@ -91,6 +91,11 @@ export function FieldPanel({
           className="text-[23px] tracking-[-0.01em] focus:outline-none focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-ink sm:text-[27px]"
         >
           <span className="pr-hl">{selected.label}</span>
+          {selected.required && (
+            <span className="ml-2 inline-flex align-middle rounded-sm border border-ink px-2 py-0.5 text-[13px] font-bold tracking-normal">
+              {t.required}
+            </span>
+          )}
         </h2>
         {selected.tooltip && selected.tooltip !== selected.label && (
           <p className="text-[15px] text-ink-2">

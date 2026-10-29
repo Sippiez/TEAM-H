@@ -15,12 +15,15 @@ interface RouteProps {
   onSelect: (fieldId: string) => void;
 }
 
+type FieldFilter = "all" | "required" | "explained";
+
 const HORIZONTAL = "(max-width: 1080px)";
 const KEYS = ["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft", "Home", "End"];
 
 /** Fields drawn as stations on one line, grouped into contiguous section runs. */
 export function Route({ fields, selectedId, visited, onSelect }: RouteProps) {
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<FieldFilter>("all");
   const { t: tr } = useI18n();
   const navRef = useRef<HTMLElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -30,9 +33,11 @@ export function Route({ fields, selectedId, visited, onSelect }: RouteProps) {
 
   const runs = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const shown = q
-      ? fields.filter((f) => f.label.toLowerCase().includes(q) || f.section.toLowerCase().includes(q))
-      : fields;
+    const shown = fields.filter((f) => {
+      if (filter === "required" && !f.required) return false;
+      if (filter === "explained" && !visited.has(f.id)) return false;
+      return !q || f.label.toLowerCase().includes(q) || f.section.toLowerCase().includes(q);
+    });
     const out: { key: string; section: string; items: FormField[] }[] = [];
     for (const f of shown) {
       const last = out.at(-1);
@@ -40,7 +45,9 @@ export function Route({ fields, selectedId, visited, onSelect }: RouteProps) {
       else out.push({ key: `${f.section}-${f.id}`, section: f.section, items: [f] });
     }
     return out;
-  }, [fields, query]);
+  }, [fields, filter, query, visited]);
+
+  const hasRequiredFields = fields.some((f) => f.required);
 
   const place = useCallback(
     (animate: boolean, scroll: boolean) => {
@@ -129,6 +136,30 @@ export function Route({ fields, selectedId, visited, onSelect }: RouteProps) {
         <p className="text-[15px] text-ink-2 tabular-nums" aria-live="polite">
           {tr.viewed(visited.size, fields.length)}
         </p>
+        <div role="group" aria-label={tr.fieldFilters} className="flex w-full flex-wrap gap-1.5 pt-1">
+          {(
+            [
+              ["all", tr.allFields],
+              ...(hasRequiredFields ? [["required", tr.requiredFields] as const] : []),
+              ["explained", tr.explainedFields],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={filter === value}
+              onClick={() => setFilter(value)}
+              className={cn(
+                "min-h-9 cursor-pointer rounded-full border px-3 text-[14px] font-semibold",
+                filter === value
+                  ? "border-ink bg-highlighter text-ink"
+                  : "border-quiet-stroke bg-paper text-ink-2 hover:border-ink hover:bg-hover-wash",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         {fields.length > 12 && (
           <div className="w-full pt-2 max-desk:max-w-[min(360px,calc(100vw-32px))]">
             <label htmlFor="route-find" className="mb-1 block text-[15px] font-bold">
@@ -173,6 +204,11 @@ export function Route({ fields, selectedId, visited, onSelect }: RouteProps) {
                           <span className="pr-stn-dot" aria-hidden="true" />
                           <span className="pr-stn-yah">{tr.youAreHere}</span>
                           <span className="pr-stn-label">{f.label}</span>
+                          {f.required && (
+                            <span className="mt-1 inline-flex rounded-sm border border-ink px-1.5 py-0.5 text-[12px] font-bold leading-tight">
+                              {tr.required}
+                            </span>
+                          )}
                           <span className="pr-stn-meta">
                             {tr.page(f.page)}
                             {seen && <span className="sr-only">{tr.viewedSr}</span>}
