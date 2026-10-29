@@ -9,7 +9,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { applyAssociation } from "@/lib/context-association";
 import { summarizeField } from "@/lib/field-context";
 import { loadForm, type LoadedForm } from "@/lib/pdf/extract";
-import type { ChatMessage, FieldExplanation, FormContext, FormField } from "@/lib/types";
+import type { ChatMessage, ChatRequest, FieldExplanation, FormContext, FormField } from "@/lib/types";
 
 import { ChatPanel } from "./chat-panel";
 import { FieldPanel } from "./field-panel";
@@ -34,12 +34,14 @@ const NAVIGATOR_SUGGESTIONS = [
 type Origin = "sheet" | "route" | "step" | "ref";
 type Tab = "field" | "ask";
 
-function toContext(form: LoadedForm): FormContext {
+function toContext(form: LoadedForm, selectedFieldId?: string): FormContext {
   return {
     formNumber: form.formNumber,
     fileName: form.fileName,
     pageCount: form.pageCount,
-    fields: form.fields.map(summarizeField),
+    fields: form.fields
+      .filter((field) => selectedFieldId === undefined || field.id === selectedFieldId)
+      .map(summarizeField),
   };
 }
 
@@ -240,7 +242,7 @@ export function FormHelperApp() {
       text: string | null,
       target: Target | null,
       fieldId: string | null,
-      intent?: "overview",
+      intent?: ChatRequest["intent"],
     ) => {
       const requestKey = target?.key ?? "navigator";
       if (chatRequests.current.has(requestKey)) return;
@@ -359,10 +361,13 @@ export function FormHelperApp() {
             message: text ?? undefined,
             intent,
             form: target
-              ? toContext(docsRef.current.find((doc) => doc.key === target.key)?.form ?? target.form)
+              ? toContext(
+                  docsRef.current.find((doc) => doc.key === target.key)?.form ?? target.form,
+                  intent === "field" ? fieldId ?? undefined : undefined,
+                )
               : undefined,
             selectedFieldId: fieldId ?? undefined,
-            history,
+            history: intent === "field" ? undefined : history,
             language: lang,
           }),
         });
@@ -565,7 +570,7 @@ export function FormHelperApp() {
     if (!active || !target) return;
     updateDoc(active.key, (d) => ({ ...d, ctxCleared: false, tab: "ask" }));
     if (!isDesktop) revealSide();
-    void sendChat("What should I enter in this field?", target, field.id);
+    void sendChat("What should I enter in this field?", target, field.id, "field");
   };
 
   const setTab = (tab: Tab) => {

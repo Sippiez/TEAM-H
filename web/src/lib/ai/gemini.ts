@@ -5,6 +5,7 @@ import type { AssociationRequest } from "@/lib/context-association";
 
 import type {
   ChatHistoryMessage,
+  ChatRequest,
   FieldExplanation,
   FieldSummary,
   FormContext,
@@ -56,6 +57,7 @@ function fieldForPrompt(field: FormContext["fields"][number], fullContext = true
 function buildContext(
   form: FormContext | undefined,
   selectedFieldId: string | undefined,
+  intent: ChatRequest["intent"],
 ): string {
   if (!form) {
     return JSON.stringify({
@@ -83,10 +85,10 @@ function buildContext(
     selectedField: selectedField
       ? fieldForPrompt(selectedField)
       : null,
-    fields: form.fields
+    fields: intent === "field" ? [] : form.fields
       .slice(0, MAX_FIELDS_IN_PROMPT)
       .map((field) => fieldForPrompt(field, false)),
-    fieldsTruncated: form.fields.length > MAX_FIELDS_IN_PROMPT,
+    fieldsTruncated: intent !== "field" && form.fields.length > MAX_FIELDS_IN_PROMPT,
   });
 }
 
@@ -145,7 +147,7 @@ function buildSystemInstruction(language: "en" | "fr"): string {
 
 export interface StreamChatInput {
   message?: string;
-  intent?: "overview";
+  intent?: ChatRequest["intent"];
   form?: FormContext;
   selectedFieldId?: string;
   history?: ChatHistoryMessage[];
@@ -173,10 +175,10 @@ export async function streamGeminiChat(input: StreamChatInput) {
 
   const prompt = [
     "FORM_CONTEXT:",
-    buildContext(input.form, input.selectedFieldId),
+    buildContext(input.form, input.selectedFieldId, input.intent),
     "",
     "RECENT_CONVERSATION:",
-    historyAsPrompt(input.history),
+    historyAsPrompt(input.intent === "field" ? undefined : input.history),
     "",
     "CURRENT_USER_REQUEST:",
     currentRequest,

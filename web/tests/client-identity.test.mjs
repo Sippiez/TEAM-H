@@ -36,12 +36,23 @@ function reloadClientModule() {
     },
   });
   const exports = {};
+  const fieldContext = {};
+  const { outputText: fieldContextText } = ts.transpileModule(
+    readFileSync(new URL("../src/lib/field-context.ts", import.meta.url), "utf8"),
+    { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } },
+  );
+  vm.runInNewContext(fieldContextText, { exports: fieldContext });
   // Re-evaluate the real module's allocators while retaining existing list keys,
   // as Fast Refresh does with component state. No component is rendered here.
   vm.runInNewContext(`${outputText}
     exports.messageKey = nextId;
     exports.documentKey = () => ${documentKey};
-  `, { exports, require: () => ({}), crypto: webcrypto });
+    exports.toContext = toContext;
+  `, {
+    exports,
+    require: (name) => name === "@/lib/field-context" ? fieldContext : {},
+    crypto: webcrypto,
+  });
   return exports;
 }
 
@@ -61,4 +72,23 @@ test("retained document keys do not collide after Fast Refresh", () => {
   documents.push(refreshed.documentKey());
 
   assert.equal(new Set(documents).size, documents.length, `Duplicate document keys: ${documents}`);
+});
+
+test("field-only browser context excludes other fields but keeps document identity and instructions", () => {
+  const { toContext } = reloadClientModule();
+  const selected = {
+    id: "selected", path: "form.name", page: 1, type: "text",
+    label: "Name", section: "Applicant",
+    context: { status: "resolved", source: "layout", question: "Full name?", instructions: ["Printed guidance"] },
+  };
+  const form = {
+    formNumber: "TEST 123", fileName: "test.pdf", pageCount: 2,
+    fields: [{ ...selected, id: "unrelated" }, selected],
+  };
+  const focused = JSON.parse(JSON.stringify(toContext(form, selected.id)));
+  assert.deepEqual(focused, {
+    formNumber: form.formNumber, fileName: form.fileName, pageCount: form.pageCount,
+    fields: [selected],
+  });
+  assert.equal(toContext(form).fields.length, 2, "Ordinary chat and overviews retain all fields");
 });

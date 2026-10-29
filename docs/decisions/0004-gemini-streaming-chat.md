@@ -42,6 +42,12 @@ loader; removing it breaks CSS compilation.
 Send at most 250 sanitized field summaries to Gemini, plus the selected field
 even if it falls outside that list, document metadata and 12 recent messages
 capped at 1,000 characters each. Never send PDF bytes or entered field values.
+The **Ask about this field** action uses a dedicated `field` intent: the browser
+sends only the selected field and document identity, omitting chat history.
+The server requires a valid selected field, and the Gemini prompt excludes the
+field catalogue and prior messages even if a caller supplies them. The selected
+field retains its full bounded question, instructions and options. Regular chat
+and overviews keep their existing broader context.
 Metadata and messages remain untrusted input; prompts prohibit invented
 requirements, personal-information requests and professional advice. This is
 prompt-based risk reduction, not a guarantee of factuality or injection safety.
