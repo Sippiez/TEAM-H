@@ -18,8 +18,8 @@ import { Route } from "./route";
 import { btnSecondary } from "./styles";
 import { WorkspacePanels } from "./workspace-panels";
 
-const MAX_BYTES = 10 * 1024 * 1024;
-const MAX_DOCS = 5;
+const MAX_BYTES = 25 * 1024 * 1024;
+const MAX_DOCS = 30;
 const SAMPLE = { url: "/forms/pptc153.pdf", name: "pptc153.pdf" };
 
 const NAVIGATOR_SUGGESTIONS = [
@@ -400,6 +400,16 @@ export function FormHelperApp() {
     setLoading(true);
     try {
       const loaded = await loadForm(data, fileName);
+      if (loaded.fields.length === 0) {
+        void loaded.doc.loadingTask.destroy();
+        toast.error(t.noFieldsTitle, { description: t.noFieldsBody });
+        return;
+      }
+      if (!loaded.formNumber) {
+        void loaded.doc.loadingTask.destroy();
+        toast.error(t.unknownFormTitle, { description: t.unknownFormBody });
+        return;
+      }
       const key = `d-${crypto.randomUUID()}`;
       setDocs((ds) => [
         ...ds,
@@ -420,7 +430,6 @@ export function FormHelperApp() {
       ]);
       activate(key);
       window.scrollTo({ top: 0 });
-      if (loaded.fields.length === 0) toast.warning(t.noFieldsTitle, { description: t.noFieldsBody });
       void sendChat(null, { key, form: loaded }, null, "overview");
     } catch (err) {
       console.error(err);

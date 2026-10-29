@@ -214,7 +214,11 @@ const en = {
 
   // Toasts
   noFieldsTitle: "No fillable fields found",
-  noFieldsBody: "This MVP works with fillable PDFs. Scanned or flattened forms aren't supported yet.",
+  noFieldsBody:
+    "This MVP works with fillable PDFs. Scanned, image-only or flattened forms aren't supported, so this file can't be opened.",
+  unknownFormTitle: "Form not recognized",
+  unknownFormBody:
+    "We couldn't find a government form number in this PDF. Only recognized Canadian government forms are supported.",
   openFailTitle: "Couldn't open this PDF",
   openFailBody: "It may be damaged, password-protected or an XFA-only form.",
   tooLargeTitle: "File too large",
@@ -421,7 +425,10 @@ const fr: Dict = {
 
   noFieldsTitle: "Aucun champ à remplir trouvé",
   noFieldsBody:
-    "Ce prototype fonctionne avec les PDF à remplir. Les formulaires numérisés ou aplatis ne sont pas encore pris en charge.",
+    "Ce prototype fonctionne avec les PDF à remplir. Les formulaires numérisés, en image seulement ou aplatis ne sont pas pris en charge, ce fichier ne peut donc pas être ouvert.",
+  unknownFormTitle: "Formulaire non reconnu",
+  unknownFormBody:
+    "Nous n'avons pas trouvé de numéro de formulaire gouvernemental dans ce PDF. Seuls les formulaires reconnus du gouvernement canadien sont pris en charge.",
   openFailTitle: "Impossible d'ouvrir ce PDF",
   openFailBody: "Il est peut-être endommagé, protégé par un mot de passe ou au format XFA seulement.",
   tooLargeTitle: "Fichier trop volumineux",
