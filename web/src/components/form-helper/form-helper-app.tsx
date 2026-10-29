@@ -31,7 +31,7 @@ const NAVIGATOR_SUGGESTIONS = [
 ];
 
 /** Where a selection came from. Clicks on the sheet itself never scroll the sheet. */
-type Origin = "sheet" | "route" | "step" | "ref" | "reply";
+type Origin = "sheet" | "route" | "step" | "ref";
 type Tab = "field" | "ask";
 
 function toContext(form: LoadedForm): FormContext {
@@ -218,7 +218,7 @@ export function FormHelperApp() {
         page: field.page,
         ctxCleared: false,
         visited: d.visited.has(id) ? d.visited : new Set(d.visited).add(id),
-        tab: origin === "reply" ? d.tab : "field",
+        tab: "field",
       }));
       if (!requested.current.has(`${target.key}:${id}`)) void loadExplanation(target.key, field, target.form.formNumber);
       if (target.key !== activeRef.current) return;
@@ -226,6 +226,8 @@ export function FormHelperApp() {
         if (origin !== "sheet") setScrollKey((k) => k + 1);
       } else if (origin === "sheet" || origin === "route") {
         revealSide();
+      } else if (origin === "ref") {
+        setScrollKey((k) => k + 1);
       }
     },
     [isDesktop, loadExplanation, revealSide, updateDoc],
@@ -363,7 +365,6 @@ export function FormHelperApp() {
             language: lang,
           }),
         });
-
         if (!res.ok) {
           const payload = (await res
             .json()
@@ -663,6 +664,9 @@ export function FormHelperApp() {
     <div className="flex min-h-dvh flex-col desk:h-dvh desk:overflow-hidden">
       {header}
       <main className="pr-workspace flex min-h-0 flex-1 flex-col">
+        <p className="sr-only" role="status" aria-live="polite">
+          {selected ? t.fieldSelected(selected.label, selected.page) : ""}
+        </p>
         <h1 className="sr-only">
           {t.brand}: {form.formNumber ?? form.fileName}
         </h1>

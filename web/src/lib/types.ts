@@ -39,6 +39,8 @@ export interface FormField {
   context?: FieldContext;
   /** Browser-only evidence for on-demand association; never includes field values. */
   contextCandidates?: FieldContextCandidates;
+  /** Present only when the PDF marks the field as required. */
+  required?: boolean;
 }
 
 export type FieldSummary = Pick<
@@ -98,6 +100,8 @@ export interface FormOverview {
 export interface FieldRef {
   id: string;
   label: string;
+  page: number;
+  document: string;
 }
 
 export interface AssistantReply {
@@ -105,7 +109,6 @@ export interface AssistantReply {
   resources?: Resource[];
   overview?: FormOverview;
   fieldRefs?: FieldRef[];
-  highlightFieldId?: string;
 }
 
 export interface ChatMessage extends Partial<AssistantReply> {

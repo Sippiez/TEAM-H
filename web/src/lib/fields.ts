@@ -17,6 +17,7 @@ export interface RawField {
   optionLabels?: Record<string, string>;
   context?: FieldContext;
   contextCandidates?: FieldContextCandidates;
+  required?: boolean;
 }
 
 /** "PPTC_153[0].Page1[0].#subform[2].Name[0]" -> "PPTC_153.Page1.Name" */
@@ -74,6 +75,7 @@ export function enrichFields(raw: RawField[], formNumber?: string): FormField[] 
       section: rule?.section ?? genericSection(f.path, f.page),
       context,
       contextCandidates: f.contextCandidates,
+      required: f.required,
     };
   });
 }
