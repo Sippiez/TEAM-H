@@ -863,7 +863,10 @@
   }
 
   .pr-hl-swipe {
-    animation: pr-hl-swipe 1800ms linear 150ms both;
+    background-repeat: no-repeat;
+    background-position: left center;
+    background-size: 100% 100%;
+    animation: fh-swipe 450ms var(--ease-route) both;
   }
 
   .pr-ff.is-selected::before {
@@ -1042,16 +1045,6 @@
   from {
     background-size: 0% 100%;
   }
-  to {
-    background-size: 100% 100%;
-  }
-}
-
-@keyframes pr-hl-swipe {
-  from {
-    background-size: 0% 100%;
-  }
-
   to {
     background-size: 100% 100%;
   }

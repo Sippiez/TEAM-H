@@ -16,6 +16,7 @@ import { setLang, useI18n } from "./i18n";
 import { Landing } from "./landing";
 import { Route } from "./route";
 import { btnSecondary } from "./styles";
+import { WorkspacePanels } from "./workspace-panels";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_DOCS = 5;
@@ -602,10 +603,11 @@ export function FormHelperApp() {
   return (
     <div className="flex min-h-dvh flex-col desk:h-dvh desk:overflow-hidden">
       {header}
-      <main className="flex min-h-0 flex-1 flex-col desk:grid desk:grid-cols-[300px_minmax(0,1fr)_456px]">
+      <main className="flex min-h-0 flex-1 flex-col">
         <h1 className="sr-only">
           {t.brand}: {form.formNumber ?? form.fileName}
         </h1>
+        <WorkspacePanels desktop={isDesktop}>
         <Route
           key={active.key}
           fields={form.fields}
@@ -727,6 +729,7 @@ export function FormHelperApp() {
             />
           </div>
         </aside>
+        </WorkspacePanels>
       </main>
     </div>
   );

@@ -138,6 +138,8 @@ const en = {
 
   // Route
   fieldsTitle: "Fields on this form",
+  resizeFieldsPanel: "Resize fields panel",
+  resizeDetailsPanel: "Resize field details and questions panel",
   viewed: (v: number, n: number) => `${v} of ${n} viewed`,
   findField: "Find a field",
   noFieldMatch: "No fields match.",
@@ -346,6 +348,8 @@ const fr: Dict = {
   explainFieldAria: (label, seen) => `Expliquer le champ : ${label}${seen ? " (consulté)" : ""}`,
 
   fieldsTitle: "Champs de ce formulaire",
+  resizeFieldsPanel: "Redimensionner le panneau des champs",
+  resizeDetailsPanel: "Redimensionner le panneau des détails et des questions",
   viewed: (v, n) => `${v} sur ${n} consultés`,
   findField: "Trouver un champ",
   noFieldMatch: "Aucun champ correspondant.",

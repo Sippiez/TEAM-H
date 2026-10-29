@@ -254,8 +254,12 @@ counts and example values.
   and retains the actual 10 MB limit, local-PDF privacy statement and
   rule-based assistant disclosure. It does not claim the French sample or
   AI integration exists.
-- **Workspace at 1081px and above:** a height-locked
-  `300px | minmax(0, 1fr) | 456px` grid. Each column scrolls independently.
+- **Workspace at 1081px and above:** height-locked resizable columns, initially
+  `300px | remaining space | 456px`, with two 8px drag dividers. Each column
+  scrolls independently. The fields panel has a 220px minimum and a 35% maximum;
+  the details panel has a 300px minimum and a 50% maximum. The document keeps
+  at least 280px. Dividers support dragging, keyboard arrow keys, and
+  double-click to restore the adjacent panel's default size.
   - Left: the vertical route of fields, grouped by form section.
   - Centre: a sticky document bar, then the form sheet, at most 780px wide.
     The bar is one card with two rows: document tabs, then "N of 5
@@ -266,7 +270,11 @@ counts and example values.
   - Zoom and Outline fields live in a small paper toolbar (card border,
     sheet shadow) that floats at the bottom of the sheet and stays in view
     while it scrolls. It comes before the sheet in focus order.
-  - Right: Field and Ask tabs.
+  - Right: Field and Ask tabs. The heading's highlighter mark sweeps left to
+    right over 450ms when the selected field changes, without hiding or moving
+    the text. Reduced motion shows the complete mark immediately. The Next
+    button keeps its label on one line and ellipsizes when needed; its full
+    label remains available to assistive technology and in its hover title.
 - **1080px and below:** the columns stack. The route becomes a horizontally
   scrolling line of 136px stations above the document.
 - **640px and below:** phone padding (14–16px), the notice wraps under the
