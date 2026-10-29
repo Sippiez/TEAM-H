@@ -1,7 +1,7 @@
 /** Paper Route control styles (see DESIGN.md › Components). */
 
 const base =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border-[1.5px] font-bold text-ink disabled:cursor-not-allowed disabled:opacity-45";
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border-[1.5px] font-bold text-ink transition-colors duration-150 motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-45";
 
 export const btnPrimary = `${base} min-h-12 border-ink bg-highlighter px-3.5 hover:bg-highlighter-deep disabled:hover:bg-highlighter`;
 

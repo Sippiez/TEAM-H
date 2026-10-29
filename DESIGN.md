@@ -250,6 +250,15 @@ counts and example values.
   The landing display uses `clamp(2.1rem, 2.9vw, 2.85rem)` and the directory
   heading uses 28px (24px on phones).
   These are scoped reference-design exceptions, not workspace token changes.
+  The two preview sheets slide past one another once on landing-page mount
+  (600–650ms, route easing), settling into their unchanged resting positions.
+  Margin notes and connectors resolve together over 220ms, and the selected
+  date-of-birth field gets a 350ms highlighter swipe; the sequence finishes
+  within 800ms. The hero and upload remain available throughout. Supporting
+  motion is limited to 150ms control-colour feedback, a 3px upload-icon nudge
+  on hover/focus/drag, and a 180ms fade when opening the service navigator.
+  There are no decorative loops or scroll reveals. Reduced motion skips
+  the entrance, swipe and supporting transitions.
   Unlike the prototype, production offers only the bundled English PPTC 153
   and retains the actual 10 MB limit, local-PDF privacy statement and
   rule-based assistant disclosure. It does not claim the French sample or
