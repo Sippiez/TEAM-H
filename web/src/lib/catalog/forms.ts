@@ -542,6 +542,9 @@ export function findKnownForm(formNumber?: string): KnownForm | undefined {
 const GENERIC_FORM_NUMBER =
   /\b(PPTC|IMM|ISP|RC|NAS|EMP|INS|CIT|ESDC|SC|GST|TD1?|CPP)[\s-]?(\d{1,5}[A-Z]?)\b/;
 
+const T_SERIES_FORM_NUMBER =
+  /\bT(\d{1,4}[A-Z]{0,2})\b/;
+
 export function detectFormNumber(pageText: string, fieldNames: string[]): string | undefined {
   for (const form of KNOWN_FORMS) {
     if (form.detect.test(pageText) || fieldNames.some((n) => form.detect.test(n))) {
@@ -549,7 +552,9 @@ export function detectFormNumber(pageText: string, fieldNames: string[]): string
     }
   }
   const m = pageText.match(GENERIC_FORM_NUMBER);
-  return m ? `${m[1]} ${m[2]}` : undefined;
+  if (m) return `${m[1]} ${m[2]}`;
+  const t = pageText.match(T_SERIES_FORM_NUMBER);
+  return t ? `T${t[1]}` : undefined;
 }
 
 export type ResolvedRule = Omit<FieldRule, "match">;
