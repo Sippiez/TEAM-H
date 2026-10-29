@@ -89,6 +89,7 @@ export interface ChatMessage extends Partial<AssistantReply> {
   id: string;
   role: "user" | "assistant";
   text: string;
+  language?: "en" | "fr";
 }
 
 export interface ChatHistoryMessage {
