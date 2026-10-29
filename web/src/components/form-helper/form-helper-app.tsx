@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { cn } from "cn";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { loadForm, type LoadedForm } from "@/lib/pdf/extract";
-import type { AssistantReply, ChatMessage, FieldExplanation, FormContext, FormField } from "@/lib/types";
+import type { ChatMessage, FieldExplanation, FormContext, FormField } from "@/lib/types";
 
 import { ChatPanel } from "./chat-panel";
 import { FieldPanel } from "./field-panel";
@@ -65,13 +65,11 @@ interface DocSession {
 
 type Target = { key: string; form: LoadedForm };
 
-let messageCounter = 0;
-const nextId = () => `m-${++messageCounter}`;
-let docCounter = 0;
+const nextId = () => `m-${crypto.randomUUID()}`;
 
 export function FormHelperApp() {
   const isDesktop = useMediaQuery("(min-width: 1081px)");
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [docs, setDocs] = useState<DocSession[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -82,10 +80,29 @@ export function FormHelperApp() {
   const requested = useRef(new Set<string>());
   const sideRef = useRef<HTMLElement>(null);
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ field: null, ask: null });
+  const navMessagesRef = useRef<ChatMessage[]>([]);
+  const docsRef = useRef<DocSession[]>([]);
+  const chatRequests = useRef(new Map<string, AbortController>());
+
+  useEffect(() => {
+    const requests = chatRequests.current;
+    return () => {
+      for (const controller of requests.values()) controller.abort();
+      requests.clear();
+    };
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = t.htmlLang;
   }, [t.htmlLang]);
+
+  useEffect(() => {
+    navMessagesRef.current = navMessages;
+  }, [navMessages]);
+
+  useEffect(() => {
+    docsRef.current = docs;
+  }, [docs]);
 
   const active = docs.find((d) => d.key === activeKey) ?? null;
   const form = active?.form ?? null;
@@ -159,37 +176,211 @@ export function FormHelperApp() {
 
   /** Posts to the assistant. A null target is the landing page's service navigator. */
   const sendChat = useCallback(
-    async (text: string | null, target: Target | null, fieldId: string | null, intent?: "overview") => {
-      const push = (msg: ChatMessage) =>
-        target ? updateDoc(target.key, (d) => ({ ...d, messages: [...d.messages, msg] })) : setNavMessages((m) => [...m, msg]);
+    async (
+      text: string | null,
+      target: Target | null,
+      fieldId: string | null,
+      intent?: "overview",
+    ) => {
+      const requestKey = target?.key ?? "navigator";
+      if (chatRequests.current.has(requestKey)) return;
+      const controller = new AbortController();
+      chatRequests.current.set(requestKey, controller);
+      const isCurrent = () => chatRequests.current.get(requestKey) === controller;
+      const currentMessages = target
+        ? docsRef.current.find((doc) => doc.key === target.key)?.messages ?? []
+        : navMessagesRef.current;
+
+      const push = (message: ChatMessage) => {
+        if (!isCurrent()) return;
+        const msg = { ...message, language: lang };
+        return target
+          ? updateDoc(target.key, (doc) => ({
+              ...doc,
+              messages: [...doc.messages, msg],
+            }))
+          : setNavMessages((messages) => [
+              ...messages,
+              msg,
+            ]);
+      };
+
+      const updateMessage = (
+        messageId: string,
+        text: string,
+      ) => {
+        if (!isCurrent()) return;
+        return target
+          ? updateDoc(target.key, (doc) => ({
+              ...doc,
+              messages: doc.messages.map((message) =>
+                message.id === messageId
+                  ? { ...message, text }
+                  : message,
+              ),
+            }))
+          : setNavMessages((messages) =>
+              messages.map((message) =>
+                message.id === messageId
+                  ? { ...message, text }
+                  : message,
+              ),
+            );
+      };
+
+      const removeMessage = (messageId: string) => {
+        if (!isCurrent()) return;
+        return target
+          ? updateDoc(target.key, (doc) => ({
+              ...doc,
+              messages: doc.messages.filter(
+                (message) => message.id !== messageId,
+              ),
+            }))
+          : setNavMessages((messages) =>
+              messages.filter(
+                (message) => message.id !== messageId,
+              ),
+            );
+      };
+
       const setPending = (pending: boolean) =>
-        target ? updateDoc(target.key, (d) => ({ ...d, pending })) : setNavPending(pending);
-      if (text) push({ id: nextId(), role: "user", text });
+        target
+          ? updateDoc(target.key, (doc) => ({
+              ...doc,
+              pending,
+            }))
+          : setNavPending(pending);
+
+      const history = currentMessages
+        .filter(
+          (message) =>
+            message.role === "user" ||
+            message.role === "assistant",
+        )
+        .slice(-12)
+        .map((message) => ({
+          role: message.role,
+          text: message.text,
+        }));
+
+      if (text) {
+        push({
+          id: nextId(),
+          role: "user",
+          text,
+        });
+      }
+
+      const assistantMessageId = nextId();
+
+      push({
+        id: assistantMessageId,
+        role: "assistant",
+        text: "",
+      });
+
       setPending(true);
+
+      const timeout = window.setTimeout(
+        () => controller.abort(),
+        30_000,
+      );
+
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+          },
+          cache: "no-store",
+          signal: controller.signal,
           body: JSON.stringify({
             message: text ?? undefined,
             intent,
-            form: target ? toContext(target.form) : undefined,
+            form: target
+              ? toContext(target.form)
+              : undefined,
             selectedFieldId: fieldId ?? undefined,
+            history,
+            language: lang,
           }),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const reply = (await res.json()) as AssistantReply;
-        push({ id: nextId(), role: "assistant", ...reply });
-        if (reply.highlightFieldId && target && reply.highlightFieldId !== fieldId) {
-          selectField(target, reply.highlightFieldId, "reply");
+
+        if (!res.ok) {
+          const payload = (await res
+            .json()
+            .catch(() => null)) as
+            | { error?: string }
+            | null;
+
+          throw new Error(
+            payload?.error || `HTTP ${res.status}`,
+          );
         }
-      } catch {
-        push({ id: nextId(), role: "assistant", text: t.chatError });
+
+        if (!res.body) {
+          throw new Error(
+            "The server returned no response stream",
+          );
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let completeText = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+
+          if (done) break;
+
+          completeText += decoder.decode(value, {
+            stream: true,
+          });
+
+          updateMessage(
+            assistantMessageId,
+            completeText,
+          );
+        }
+
+        completeText += decoder.decode();
+
+        if (!completeText.trim()) {
+          throw new Error(
+            "The AI returned an empty response",
+          );
+        }
+
+        updateMessage(assistantMessageId, completeText);
+      } catch (error) {
+        if (!isCurrent()) return;
+        removeMessage(assistantMessageId);
+
+        push({
+          id: nextId(),
+          role: "assistant",
+          text:
+            controller.signal.aborted ||
+            (error instanceof Error && error.name === "AbortError")
+              ? t.chatTimeout
+              : t.chatError,
+        });
       } finally {
-        setPending(false);
+        window.clearTimeout(timeout);
+        if (isCurrent()) {
+          setPending(false);
+          chatRequests.current.delete(requestKey);
+        }
       }
     },
-    [selectField, updateDoc, t.chatError],
+    [
+      lang,
+      setNavMessages,
+      t.chatError,
+      t.chatTimeout,
+      updateDoc,
+    ],
   );
 
   const openPdf = async (data: ArrayBuffer, fileName: string) => {
@@ -208,7 +399,7 @@ export function FormHelperApp() {
     setLoading(true);
     try {
       const loaded = await loadForm(data, fileName);
-      const key = `d-${++docCounter}`;
+      const key = `d-${crypto.randomUUID()}`;
       setDocs((ds) => [
         ...ds,
         {
@@ -269,6 +460,9 @@ export function FormHelperApp() {
   const closeDoc = (key: string) => {
     const idx = docs.findIndex((d) => d.key === key);
     if (idx < 0) return;
+    const controller = chatRequests.current.get(key);
+    chatRequests.current.delete(key);
+    controller?.abort();
     void docs[idx].form.doc.loadingTask.destroy();
     forget(key);
     const rest = docs.filter((d) => d.key !== key);
@@ -284,6 +478,11 @@ export function FormHelperApp() {
   };
 
   const reset = () => {
+    for (const controller of chatRequests.current.values()) controller.abort();
+    chatRequests.current.clear();
+    navMessagesRef.current = [];
+    setNavMessages([]);
+    setNavPending(false);
     for (const d of docs) void d.form.doc.loadingTask.destroy();
     requested.current = new Set();
     setDocs([]);

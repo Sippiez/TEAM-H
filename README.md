@@ -32,15 +32,18 @@ shadcn/ui). See [docs/mvp-design.md](docs/mvp-design.md) and
 
 - **Prerequisites:** Node.js 20.9 or later and npm (verified with the Node
   version managed by nvm in WSL Ubuntu 24.04).
-- **Install:** `cd web && npm install`
+- **Install:** `cd web && npm ci`
 - **Run locally:** `npm run dev`, then open <http://localhost:3000>. Choose
   **Adult passport application** under **Try a sample form** to use the bundled adult passport
   application (PPTC 153).
-- **Checks:** `npm run typecheck`, `npm run lint` and `npm run build`.
+- **Checks:** `npm test`, `npm run typecheck`, `npm run lint` and `npm run build`.
 - **Deployment:** TODO.
 
 `predev` and `prebuild` copy the pdf.js worker into `web/public/` (it's
-gitignored). There are no automated tests yet.
+gitignored). `npm test` uses Node's built-in runner and the existing TypeScript
+compiler to exercise chat validation, prompts, streaming, errors, timeouts and
+cancellation with an isolated fake provider, plus message/document identity
+across Fast Refresh; it needs no API key or network.
 
 If you're behind a TLS-inspecting proxy, `next/font` and npm can fail to
 download. Point Node at your organisation's root CA instead of disabling TLS
@@ -50,13 +53,25 @@ verification:
 export NODE_EXTRA_CA_CERTS=/path/to/your-root-ca.pem
 ```
 
-The assistant is a rule-based demo. No AI model or API key is needed yet.
+Chat uses server-side Gemini streaming and needs `GEMINI_API_KEY` (see below).
+The default is the stable `gemini-3.1-flash-lite`, with low reasoning effort
+to limit cost and latency. It is the cheapest stable thinking model verified
+accessible with the configured account; older 2.5 models returned 404.
+See [decision 0004](docs/decisions/0004-gemini-streaming-chat.md).
+Field-panel explanations remain rule-based and work without a key.
+
+PDF bytes and entered field values stay in the browser. Chat shares bounded
+form and field metadata (including the filename), the selected field, and recent
+messages with the external AI provider. Do not include personal information in
+chat, filenames or field labels. Responses are not official guidance and can be
+wrong; verify government requirements using the official guide.
 
 You can keep up to five PDFs open as document tabs. **Add PDF** opens
 another, and each tab has its own close button. The button to the left of
 **New session** switches the interface between English and French, and the
-choice is saved in the browser. Only interface text is translated.
-Explanations, assistant replies and linked resources stay in English. The
+choice is saved in the browser. New chat answers use the interface language at
+request time; existing answers are not retranslated. Curated field explanations
+and linked resources stay in English. The
 French copy is a draft and needs review by a fluent speaker.
 
 The landing page carries over **design concept 1 (Marginalia)**: a blank study
@@ -68,17 +83,26 @@ opens the bundled English PPTC 153.
 
 ### Environment configuration
 
-[.env.example](.env.example) is a comment-only template until configuration is
-needed. Add variable names, safe example values, and descriptions as they are
-introduced. If the chosen tooling uses a local `.env` file, copy the template:
+For the web application, copy [web/.env.example](web/.env.example) from `web/`
+only if you do not already have `.env.local`:
 
 ```sh
-cp .env.example .env
+cp -n .env.example .env.local
 ```
 
-Keep actual credentials in your local environment or an approved secret store,
-never in Git. Update this section with the chosen tooling's configuration steps;
-copying the file alone does not load it.
+Set `GEMINI_API_KEY` to a Google AI Studio key in that ignored local file or in
+your deployment's server-side secret store. `GEMINI_MODEL` optionally overrides
+`gemini-3.1-flash-lite`. Never prefix either variable with `NEXT_PUBLIC_`.
+Next.js loads `.env.local`; restart the server after changing it. Never commit
+actual credentials. The root [.env.example](.env.example) remains a generic
+workspace template, not the web app's configuration.
+
+Chat has a 30-second deadline. Missing configuration returns 503; provider
+startup failures return 502 and deadline expiry returns 504. After text has
+started streaming, failures interrupt the body and the client shows a retryable
+error instead of keeping a partial answer. New session and document removal
+abort their pending chats. This hackathon endpoint still needs deployment-level
+access controls and rate limits before public exposure.
 
 ## Collaboration
 
