@@ -35,6 +35,7 @@ export function PdfPage({
   const { t } = useI18n();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const lastScroll = useRef<{ doc: PDFDocumentProxy; key: number } | null>(null);
   const [width, setWidth] = useState(0);
   const [loaded, setLoaded] = useState<{ doc: PDFDocumentProxy; n: number; page: PDFPageProxy } | null>(
     null,
@@ -104,12 +105,17 @@ export function PdfPage({
 
   useEffect(() => {
     if (!scrollKey || !selectedId || !viewport) return;
+    if (lastScroll.current?.doc === doc && lastScroll.current.key === scrollKey) return;
     const el = wrapperRef.current?.querySelector<HTMLElement>(`[data-field-id="${CSS.escape(selectedId)}"]`);
+    if (!el) return;
+    lastScroll.current = { doc, key: scrollKey };
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center", inline: "nearest" });
-    // Only an explicit request scrolls; re-renders for the same request must not.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scrollKey, viewport]);
+    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center", inline: "nearest" });
+    el.classList.remove("is-arrived");
+    if (!el || reduce) return;
+    const timer = window.setTimeout(() => el.classList.add("is-arrived"), 300);
+    return () => window.clearTimeout(timer);
+  }, [doc, scrollKey, selectedId, viewport]);
 
   return (
     <div ref={wrapperRef} className="w-full">

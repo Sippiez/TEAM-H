@@ -12,6 +12,7 @@ export interface RawField {
   tooltip?: string;
   /** Radio export values or choice display values. */
   options?: string[];
+  required?: boolean;
 }
 
 /** "PPTC_153[0].Page1[0].#subform[2].Name[0]" -> "PPTC_153.Page1.Name" */
@@ -60,6 +61,7 @@ export function enrichFields(raw: RawField[], formNumber?: string): FormField[] 
       tooltip: f.tooltip ? cleanWhitespace(f.tooltip) : undefined,
       options,
       section: rule?.section ?? genericSection(f.path, f.page),
+      required: f.required,
     };
   });
 }

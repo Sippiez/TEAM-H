@@ -165,6 +165,19 @@ existing question-and-answer tool. The document workspace keeps the Paper Route
 layout. The preview is illustrative, not an editable form; the working sample
 opens the bundled English PPTC 153.
 
+On landing-page load, the two preview sheets slide over one another and settle
+into the existing paper stack, followed by a brief highlighter swipe. Controls
+use short colour transitions, the upload icon nudges on hover or keyboard focus,
+and the service navigator fades in when opened. Nothing loops; reduced-motion
+preferences show the final composition immediately and remove these transitions.
+
+On desktop, drag either divider beside the document to resize the fields and
+details panels. You can also focus a divider and use the arrow keys, or
+double-click it to restore its adjacent panel's default width. On smaller
+screens the workspace stays stacked. Selecting a field sweeps its heading's
+highlight from left to right (unless reduced motion is enabled); long Next
+labels truncate instead of wrapping.
+
 ### Environment configuration
 
 For the web application, copy [web/.env.example](web/.env.example) from `web/`

@@ -105,13 +105,18 @@ export function FieldPanel({
           <span key={selected.id} className="pr-hl pr-hl-swipe">
             {selected.label}
           </span>
+          {selected.required && (
+            <span className="ml-2 inline-flex align-middle rounded-sm border border-ink px-2 py-0.5 text-[13px] font-bold tracking-normal">
+              {t.required}
+            </span>
+          )}
         </h2>
         {selected.tooltip && selected.tooltip !== selected.label && (
           <p className="text-[15px] text-ink-2">
             {t.pdfLabel} <q>{selected.tooltip}</q>
           </p>
         )}
-        <div className="mt-1 grid gap-2 sm:grid-cols-[auto_1fr]">
+        <div className="mt-1 grid min-w-0 gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
           <button
             ref={prevRef}
             type="button"
@@ -130,19 +135,20 @@ export function FieldPanel({
             ref={nextRef}
             type="button"
             disabled={!next}
+            title={next ? `${t.nextLabel} ${next.label}` : t.lastField}
             onClick={() => step(1, next)}
             className={cn(
               btnPrimary,
-              "justify-between px-3.5 py-2 text-left text-[15.5px] leading-tight",
+              "min-w-0 justify-between px-3.5 py-2 text-left text-[15.5px] leading-tight",
             )}
           >
             {next ? (
-              <span>
+              <span className="min-w-0 truncate">
                 <span className="font-semibold text-ink-2">{t.nextLabel}</span>{" "}
                 {next.label}
               </span>
             ) : (
-              <span>{t.lastField}</span>
+              <span className="min-w-0 truncate">{t.lastField}</span>
             )}
             <ArrowRightIcon className={icon} strokeWidth={2.25} aria-hidden />
           </button>

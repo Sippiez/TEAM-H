@@ -61,15 +61,16 @@ export function MarginaliaPreview() {
     if (!desk) return;
 
     const sheet = desk.querySelector<HTMLElement>(".marginalia-sheet");
+    const form = desk.querySelector<HTMLElement>(".marginalia-form");
     const list = desk.querySelector<HTMLOListElement>(".marginalia-notes");
-    if (!sheet || !list) return;
+    if (!sheet || !form || !list) return;
 
     const narrow = window.matchMedia("(max-width: 860px)");
     let frame = 0;
     let disposed = false;
 
     function layout() {
-      if (!desk || !list) return;
+      if (!desk || !list || !sheet || !form) return;
 
       const notes = Array.from(list.querySelectorAll<HTMLElement>("[data-preview-note]"));
       if (narrow.matches) {
@@ -81,6 +82,8 @@ export function MarginaliaPreview() {
 
       const listRect = list.getBoundingClientRect();
       const deskRect = desk.getBoundingClientRect();
+      const sheetRect = sheet.getBoundingClientRect();
+      const formRect = form.getBoundingClientRect();
       const next: Leader[] = [];
       let floor = 0;
 
@@ -91,13 +94,14 @@ export function MarginaliaPreview() {
         if (!id || !field || !title) continue;
 
         const fieldRect = field.getBoundingClientRect();
-        const fieldY = fieldRect.top + fieldRect.height / 2;
+        // Measure the resting paper position, not its animated entrance.
+        const fieldY = fieldRect.top - formRect.top + sheetRect.top + fieldRect.height / 2;
         const top = Math.max(floor, fieldY - listRect.top - title.offsetHeight / 2);
         note.style.top = `${top}px`;
         floor = top + note.offsetHeight + 28;
 
         const titleRect = title.getBoundingClientRect();
-        const startX = fieldRect.right - deskRect.left;
+        const startX = fieldRect.right - formRect.left + sheetRect.left - deskRect.left;
         const startY = fieldY - deskRect.top;
         const endX = titleRect.left - deskRect.left - 10;
         const endY = titleRect.top + titleRect.height / 2 - deskRect.top;

@@ -157,7 +157,7 @@ export function Landing({
                   aria-hidden
                 />
               ) : (
-                <FileUpIcon className="size-9" strokeWidth={1.8} aria-hidden />
+                <FileUpIcon className="marginalia-upload-icon size-9" strokeWidth={1.8} aria-hidden />
               )}
 
               <strong className="mt-3 text-[22px] leading-tight font-extrabold">
@@ -212,7 +212,7 @@ export function Landing({
               disabled={loading}
               className={cn(
                 "mt-2.5 flex min-h-16 w-full flex-col items-start justify-center rounded-md border-[1.5px] border-ink bg-paper px-4 py-2.5 text-left shadow-card",
-                "transition-colors hover:bg-highlighter focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink",
+                "transition-colors duration-150 motion-reduce:transition-none hover:bg-highlighter focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink",
                 "disabled:cursor-not-allowed disabled:opacity-50",
               )}
             >

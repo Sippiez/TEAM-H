@@ -18,13 +18,14 @@ import { setLang, useI18n } from "./i18n";
 import { Landing } from "./landing";
 import { Route } from "./route";
 import { btnSecondary } from "./styles";
+import { WorkspacePanels } from "./workspace-panels";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_DOCS = 5;
 const SAMPLE = { url: "/forms/pptc153.pdf", name: "pptc153.pdf" };
 
 /** Where a selection came from. Clicks on the sheet itself never scroll the sheet. */
-type Origin = "sheet" | "route" | "step" | "ref" | "reply";
+type Origin = "sheet" | "route" | "step" | "ref";
 type Tab = "field" | "ask";
 
 function toContext(form: LoadedForm): FormContext {
@@ -157,7 +158,7 @@ export function FormHelperApp() {
         page: field.page,
         ctxCleared: false,
         visited: d.visited.has(id) ? d.visited : new Set(d.visited).add(id),
-        tab: origin === "reply" ? d.tab : "field",
+        tab: "field",
       }));
       if (!requested.current.has(`${target.key}:${id}`)) void loadExplanation(target.key, field, target.form.formNumber);
       if (target.key !== activeRef.current) return;
@@ -165,6 +166,8 @@ export function FormHelperApp() {
         if (origin !== "sheet") setScrollKey((k) => k + 1);
       } else if (origin === "sheet" || origin === "route") {
         revealSide();
+      } else if (origin === "ref") {
+        setScrollKey((k) => k + 1);
       }
     },
     [isDesktop, loadExplanation, revealSide, updateDoc],
@@ -304,7 +307,6 @@ export function FormHelperApp() {
             lookupChoice: options?.lookupChoice,
           }),
         });
-
         if (!res.ok) {
           responseError = res.status === 503 ? "not_configured" : res.status === 504 ? "timeout" : "unavailable";
           const payload = (await res
@@ -555,18 +557,11 @@ export function FormHelperApp() {
         onClick={reset}
         className="group inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-[19px] font-extrabold tracking-[-0.01em] whitespace-nowrap max-sm:mr-auto"
       >
-        {active ? (
-          <svg width="34" height="20" viewBox="0 0 34 20" aria-hidden="true" focusable="false">
-            <path d="M3 10h28" className="stroke-ink" strokeWidth="2" strokeLinecap="round" />
-            <circle cx="17" cy="10" r="6" className="fill-highlighter stroke-ink" strokeWidth="2.5" />
-          </svg>
-        ) : (
-          <svg width="24" height="28" viewBox="0 0 28 32" aria-hidden="true" focusable="false">
-            <rect x="3" y="2" width="22" height="28" rx="2" className="fill-paper stroke-ink" strokeWidth="1.6" />
-            <rect x="6" y="11.5" width="16" height="6" className="fill-highlighter" />
-            <path d="M8 8h12M8 14.5h10M8 21h12M8 25h8" className="stroke-ink" strokeWidth="1.4" />
-          </svg>
-        )}
+        <svg width="24" height="28" viewBox="0 0 28 32" aria-hidden="true" focusable="false">
+          <rect x="3" y="2" width="22" height="28" rx="2" className="fill-paper stroke-ink" strokeWidth="1.6" />
+          <rect x="6" y="11.5" width="16" height="6" className="fill-highlighter" />
+          <path d="M8 8h12M8 14.5h10M8 21h12M8 25h8" className="stroke-ink" strokeWidth="1.4" />
+        </svg>
         <span className="underline-offset-[0.2em] group-hover:underline">{t.brand}</span>
         <span className="sr-only">{t.brandHome}</span>
       </button>
@@ -626,10 +621,14 @@ export function FormHelperApp() {
   return (
     <div className="flex min-h-dvh flex-col desk:h-dvh desk:overflow-hidden">
       {header}
-      <main className="flex min-h-0 flex-1 flex-col desk:grid desk:grid-cols-[300px_minmax(0,1fr)_456px]">
+      <main className="pr-workspace flex min-h-0 flex-1 flex-col">
+        <p className="sr-only" role="status" aria-live="polite">
+          {selected ? t.fieldSelected(selected.label, selected.page) : ""}
+        </p>
         <h1 className="sr-only">
           {t.brand}: {form.formNumber ?? form.fileName}
         </h1>
+        <WorkspacePanels desktop={isDesktop}>
         <Route
           key={active.key}
           fields={form.fields}
@@ -753,6 +752,7 @@ export function FormHelperApp() {
             />
           </div>
         </aside>
+        </WorkspacePanels>
       </main>
     </div>
   );

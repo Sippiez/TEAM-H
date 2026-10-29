@@ -127,6 +127,40 @@
 }
 
 @layer components {
+  html:has(.pr-workspace),
+  body:has(.pr-workspace),
+  .pr-workspace,
+  .pr-workspace * {
+    scrollbar-width: none;
+  }
+
+  html:has(.pr-workspace)::-webkit-scrollbar,
+  body:has(.pr-workspace)::-webkit-scrollbar,
+  .pr-workspace::-webkit-scrollbar,
+  .pr-workspace *::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pr-workspace .pr-document-scroll {
+    scrollbar-width: auto;
+  }
+
+  .pr-workspace .pr-document-scroll::-webkit-scrollbar {
+    display: block;
+    width: 0;
+    height: 12px;
+  }
+
+  .pr-workspace .pr-document-scroll::-webkit-scrollbar-thumb {
+    border: 3px solid var(--color-desk);
+    border-radius: 999px;
+    background: var(--color-quiet-stroke);
+  }
+
+  .pr-workspace .pr-document-scroll::-webkit-scrollbar-track {
+    background: var(--color-desk);
+  }
+
   /* Highlighter mark behind a heading. */
   .pr-hl {
     background: linear-gradient(
@@ -178,6 +212,7 @@
   .marginalia-sheet {
     position: relative;
     min-width: 0;
+    --paper-back-rest: rotate(-2deg) translate(-12px, 10px);
   }
 
   .marginalia-sheet::before {
@@ -187,7 +222,7 @@
     background: var(--color-paper);
     border: 1px solid var(--color-rule-2);
     box-shadow: var(--shadow-card);
-    transform: rotate(-2deg) translate(-12px, 10px);
+    transform: var(--paper-back-rest);
   }
 
   .marginalia-form {
@@ -494,7 +529,7 @@
     }
 
     .marginalia-sheet::before {
-      transform: rotate(-1.5deg) translate(-4px, 6px);
+      --paper-back-rest: rotate(-1.5deg) translate(-4px, 6px);
     }
 
     .marginalia-form {
@@ -582,6 +617,40 @@
   .marginalia-drop-active::before {
     border-style: solid;
     border-width: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .marginalia-sheet::before {
+      animation: marginalia-paper-back 600ms var(--ease-route) backwards;
+    }
+
+    .marginalia-form {
+      animation: marginalia-paper-front 650ms var(--ease-route) backwards;
+    }
+
+    .marginalia-field.is-selected {
+      background-image: linear-gradient(var(--color-highlighter), var(--color-highlighter));
+      background-color: transparent;
+      background-repeat: no-repeat;
+      animation: fh-swipe 350ms 430ms var(--ease-route) backwards;
+    }
+
+    .marginalia-notes,
+    .marginalia-leaders {
+      animation: marginalia-ink-in 220ms 380ms ease-out backwards;
+    }
+
+    .marginalia-upload-icon {
+      transition: translate 180ms var(--ease-route);
+    }
+
+    .marginalia-drop:is(:hover, :focus-within, .marginalia-drop-active) .marginalia-upload-icon {
+      translate: 0 -3px;
+    }
+
+    .marginalia-navigator[open] > div {
+      animation: marginalia-ink-in 180ms ease-out;
+    }
   }
 
   /* ---------- Route of fields (signature) ---------- */
@@ -861,9 +930,15 @@
     box-shadow: inset 0 0 0 2px var(--color-highlighter-ink);
     animation: fh-swipe 250ms var(--ease-route) both;
   }
+  .pr-ff.is-selected.is-arrived {
+    animation: fh-arrive 650ms ease-out;
+  }
 
   .pr-hl-swipe {
-    animation: pr-hl-swipe 1800ms linear 150ms both;
+    background-repeat: no-repeat;
+    background-position: left center;
+    background-size: 100% 100%;
+    animation: fh-swipe 450ms var(--ease-route) both;
   }
 
   .pr-ff.is-selected::before {
@@ -1047,17 +1122,46 @@
   }
 }
 
-@keyframes pr-hl-swipe {
-  from {
-    background-size: 0% 100%;
+@keyframes fh-arrive {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 2px var(--color-highlighter-ink), 0 0 0 0 rgb(255 233 77 / 0);
   }
+  45% {
+    box-shadow: inset 0 0 0 2px var(--color-highlighter-ink), 0 0 0 7px rgb(255 233 77 / 0.65);
+  }
+}
 
+@keyframes marginalia-paper-back {
+  from {
+    transform: translate(-36px, 12px) rotate(-5deg);
+  }
   to {
-    background-size: 100% 100%;
+    transform: var(--paper-back-rest);
+  }
+}
+
+@keyframes marginalia-paper-front {
+  from {
+    translate: 48px -12px;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+
+@keyframes marginalia-ink-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .marginalia-drop,
+  .marginalia-drop::before,
   .pr-yah,
   .pr-ff {
     transition: none;

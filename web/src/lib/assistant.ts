@@ -1,6 +1,7 @@
 import { findKnownForm, resolveRule } from "@/lib/catalog/forms";
 import { getResources, RESOURCES } from "@/lib/catalog/resources";
 import { explainField } from "@/lib/explain";
+import { fieldSearchScore } from "@/lib/field-search";
 import { tokenize } from "@/lib/text";
 import type {
   AssistantReply,
@@ -73,20 +74,14 @@ export function searchResources(query: string, limit = 3): Resource[] {
 }
 
 function rankFields(query: string, form: FormContext): { field: FieldSummary; score: number }[] {
-  const tokens = new Set(tokenize(query));
   const known = findKnownForm(form.formNumber);
   return form.fields
     .map((field) => {
       const rule = resolveRule(known, field.path);
-      const label = new Set(tokenize(field.label));
-      const keywords = new Set((rule?.keywords ?? []).flatMap((k) => tokenize(k)));
-      const section = new Set(tokenize(field.section));
-      let score = 0;
-      for (const t of tokens) {
-        if (label.has(t)) score += 3;
-        if (keywords.has(t)) score += 2;
-        if (section.has(t)) score += 1;
-      }
+      const score =
+        fieldSearchScore(query, [field.label]) * 3 +
+        fieldSearchScore(query, rule?.keywords ?? []) * 2 +
+        fieldSearchScore(query, [field.section]);
       return { field, score };
     })
     .filter((x) => x.score >= 3)
@@ -105,7 +100,20 @@ function explainSelected(field: FieldSummary, form?: FormContext): AssistantRepl
   if (e.commonMistakes.length) {
     lines.push("**Avoid:**", ...e.commonMistakes.slice(0, 2).map((m) => `- ${m}`));
   }
-  return { text: lines.join("\n"), resources: e.sources.slice(0, 2), highlightFieldId: field.id };
+  return {
+    text: lines.join("\n"),
+    resources: e.sources.slice(0, 2),
+    fieldRefs: [fieldReference(field, form)],
+  };
+}
+
+function fieldReference(field: FieldSummary, form?: FormContext) {
+  return {
+    id: field.id,
+    label: field.label,
+    page: field.page,
+    document: form?.formNumber ?? form?.fileName ?? "Current document",
+  };
 }
 
 const SUGGESTIONS_WITH_FORM =
@@ -147,13 +155,26 @@ export function reply(req: ChatRequest): AssistantReply {
   const fieldMatches = form ? rankFields(message, form) : [];
   const resources = searchResources(message);
   const wantsField = FIND_FIELD.test(message);
+  const nameSearchTerms = new Set(["name", "given", "first", "last", "surname", "family", "nom", "prenom"]);
+  const queryTokens = tokenize(message);
+
+  if (
+    fieldMatches.length > 1 &&
+    queryTokens.length === 1 &&
+    nameSearchTerms.has(queryTokens[0])
+  ) {
+    return {
+      text: "I found several name fields. Choose the one you mean:",
+      fieldRefs: fieldMatches.slice(0, 4).map(({ field }) => fieldReference(field, form)),
+    };
+  }
 
   if (fieldMatches.length && (wantsField || fieldMatches[0].score >= (resources.length ? 6 : 3))) {
     const [best, ...rest] = fieldMatches;
     const others = rest.slice(0, 3).map((m) => m.field);
     const e = explainField(best.field, form?.formNumber);
     const text = [
-      `That goes in **${best.field.label}** on page ${best.field.page} (${best.field.section}). I've highlighted it on the form.`,
+      `That goes in **${best.field.label}** on page ${best.field.page} (${best.field.section}). Select its reference below to open it on the form.`,
       e.whatToEnter,
       e.keyPoints ? `**${e.keyPoints.title}:**\n${e.keyPoints.items.map((i) => `- ${i}`).join("\n")}` : "",
       others.length ? "Related fields:" : "",
@@ -162,8 +183,7 @@ export function reply(req: ChatRequest): AssistantReply {
       .join("\n");
     return {
       text,
-      fieldRefs: [best.field, ...others].map((f) => ({ id: f.id, label: f.label })),
-      highlightFieldId: best.field.id,
+      fieldRefs: [best.field, ...others].map((f) => fieldReference(f, form)),
       resources: e.sources.slice(0, 1),
     };
   }
