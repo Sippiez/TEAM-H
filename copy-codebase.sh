@@ -5,18 +5,44 @@ set -uo pipefail
 usage() {
     cat <<'EOF'
 Usage:
-  ./copy-codebase.sh [-o OUTPUT.txt] PATH [PATH ...]
+  ./copy-codebase.sh [-o OUTPUT.txt] [-x EXCLUDE]... PATH [PATH ...]
+
+Options:
+  -o FILE       Write the context to FILE.
+                Default: codebase-context.txt
+
+  -x PATTERN    Exclude a file, directory, or glob pattern.
+                This option may be supplied multiple times.
+                Patterns are matched against Git-repository-relative paths.
+
+  -h            Show this help message.
 
 Examples:
   ./copy-codebase.sh backend frontend/src
-  ./copy-codebase.sh -o copilot-context.txt backend/apps frontend/src
-  ./copy-codebase.sh -o context.txt backend/config/settings.py frontend/src
+
+  ./copy-codebase.sh \
+    -o copilot-context.txt \
+    backend/apps frontend/src
+
+  ./copy-codebase.sh \
+    -o context.txt \
+    -x '.gitignore' \
+    -x '.vscode' \
+    -x '*.lock' \
+    backend frontend/src
+
+  ./copy-codebase.sh \
+    -x 'node_modules' \
+    -x '*.min.js' \
+    -x 'frontend/generated' \
+    .
 
 Behavior:
   - PATH arguments may be files or directories.
   - Directories are processed recursively.
   - Each file is preceded by its Git-repository-relative path.
   - Git-ignored and untracked files are excluded by default.
+  - Files and directories matching an -x pattern are excluded.
   - Binary files are skipped.
   - The output file itself is excluded.
 EOF
@@ -28,10 +54,16 @@ die() {
 }
 
 output="codebase-context.txt"
+excludes=()
 
-while getopts ":o:h" option; do
+while getopts ":o:x:h" option; do
     case "$option" in
-        o) output="$OPTARG" ;;
+        o)
+            output="$OPTARG"
+            ;;
+        x)
+            excludes+=("$OPTARG")
+            ;;
         h)
             usage
             exit 0
@@ -73,6 +105,29 @@ trap 'rm -f "$temp_file"' EXIT
 declare -A seen=()
 files=()
 
+is_excluded() {
+    local relative="$1"
+    local pattern
+
+    for pattern in "${excludes[@]}"; do
+        # Make patterns such as "./.vscode" equivalent to ".vscode".
+        pattern="${pattern#./}"
+
+        # Remove a trailing slash, so ".vscode/" also works.
+        pattern="${pattern%/}"
+
+        # Match:
+        #   1. The path itself, including glob expressions.
+        #   2. Anything contained inside an excluded directory.
+        if [[ "$relative" == $pattern ||
+              "$relative" == "$pattern/"* ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 add_file() {
     local file="$1"
     local relative
@@ -81,6 +136,11 @@ add_file() {
 
     # Skip files that are not tracked by Git.
     [[ -n "$relative" ]] || return 0
+
+    # Skip explicitly excluded files and directories.
+    if is_excluded "$relative"; then
+        return 0
+    fi
 
     # Skip duplicate paths and the output file.
     [[ -z "${seen[$relative]+x}" ]] || return 0
@@ -108,7 +168,7 @@ for input in "$@"; do
 done
 
 (( ${#files[@]} > 0 )) ||
-    die "No tracked files were found in the supplied paths."
+    die "No tracked, non-excluded files were found in the supplied paths."
 
 for relative in "${files[@]}"; do
     file="$repo_root/$relative"
