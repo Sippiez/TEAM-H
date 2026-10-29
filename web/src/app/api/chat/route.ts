@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { streamGeminiChat } from "@/lib/ai/gemini";
+import { abortable } from "@/lib/abortable";
+import { validateLookupChoice, validateLookupContext } from "@/lib/official/catalog";
 import type {
   ChatStreamEvent,
   ChatHistoryMessage,
@@ -86,6 +88,12 @@ function sanitizeHistory(value: unknown): ChatHistoryMessage[] {
 }
 
 function validateRequest(body: ChatRequest): string | null {
+  if (body.lookupContext !== undefined && !validateLookupContext(body.lookupContext)) {
+    return "Invalid lookup context";
+  }
+  if (body.lookupChoice !== undefined && !validateLookupChoice(body.lookupChoice)) {
+    return "Invalid lookup choice";
+  }
   if (
     body.intent !== undefined &&
     body.intent !== "overview"
@@ -145,21 +153,6 @@ function validateRequest(body: ChatRequest): string | null {
   }
 
   return null;
-}
-
-async function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
-  let onAbort: () => void = () => {};
-  const aborted = new Promise<never>((_, reject) => {
-    onAbort = () => reject(signal.reason);
-    signal.addEventListener("abort", onAbort, { once: true });
-    if (signal.aborted) onAbort();
-  });
-
-  try {
-    return await Promise.race([operation, aborted]);
-  } finally {
-    signal.removeEventListener("abort", onAbort);
-  }
 }
 
 export async function POST(request: Request) {
@@ -230,6 +223,8 @@ export async function POST(request: Request) {
       history: sanitizeHistory(body.history),
       language: body.language ?? "en",
       signal: timeoutController.signal,
+      lookupContext: body.lookupContext,
+      lookupChoice: body.lookupChoice,
     }), timeoutController.signal);
 
     const iterator = geminiStream[Symbol.asyncIterator]();

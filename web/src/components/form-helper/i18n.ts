@@ -66,8 +66,9 @@ const en = {
   supported: "Works with fillable PDFs. Scanned or flattened forms aren't supported yet.",
   privacyLead: "Your form stays on your device.",
   privacyRest:
-    "The PDF is read in your browser and isn't uploaded. Chat sends the filename, form and field metadata, and recent messages to an external AI service, not PDF bytes or entered field values. Official search sends only catalog service keywords and the selected jurisdiction to a separate search provider — never chat history, files, field values or personal details.",
-  rulesNotAi: "Chat answers use an external AI model. For official search, only catalog service keywords and the selected jurisdiction are sent to the search provider — never your chat history, file, field values or personal details.",
+    "The PDF is read in your browser and isn't uploaded. Chat sends the filename, form and field metadata, and recent messages to Google Gemini, not PDF bytes or entered field values. Official lookup checks pages directly first, then uses Google Search grounding only if that fails. Search requests contain only catalog keywords, jurisdiction and recognized public form references — never chat history, filenames or field values.",
+  rulesNotAi: "Chat uses Google Gemini. Official lookup checks pages directly first, using Brave discovery if configured. Google Search grounding is the fallback. Search requests contain only catalog keywords, jurisdiction and recognized public form references, not chat history, filenames or field values. Google generates its grounding search queries and retains grounding requests and responses for 30 days. Sources identify whether the app fetched the page or Google grounded the answer.",
+  aiPrivacyDetails: "AI and search privacy",
   sampleTitle: "Try a sample form",
   sampleName: "Adult passport application",
   sampleLangTitle: "English",
@@ -186,7 +187,25 @@ const en = {
   youAsked: "You asked: ",
   answer: "Answer:",
   showFieldSr: " (show this field)",
-  thinking: "Thinking…",
+  thinking: "Working on your question…",
+  preparingAnswer: "Preparing an answer from the verified official pages…",
+  chooseService: "Which service is this about?",
+  chooseJurisdiction: "Which province or territory?",
+  selectOption: "Choose an option",
+  continueLookup: "Find official information",
+  savedLinks: "Saved official links — not checked live",
+  officialWebsite: (name: string) => `${name} official website`,
+  downloadRestricted: "This official page links to a download outside the permitted domains. The app has not opened or verified that download.",
+  aiNotConfigured: "The AI assistant isn't enabled here yet. Field explanations and saved official links are still available.",
+  navigatorSuggestions: [
+    "How do I renew a passport?",
+    "I lost my job. How do I apply for Employment Insurance?",
+    "How do I get a Social Insurance Number?",
+  ],
+  overviewSuggestion: "Give me an overview of this form",
+  downloadSuggestion: "Where do I download this form?",
+  fieldSuggestion: "What does this field mean?",
+  feesSuggestion: "What are the fees for this service?",
   askingAbout: "Asking about:",
   stopAsking: (label: string) => `Stop asking about ${label}`,
   clear: "Clear",
@@ -202,19 +221,30 @@ const en = {
   chatError: "Sorry, I couldn't reach the assistant. Please try again.",
   chatTimeout: "The AI response took too long. Please try again.",
   liveSource: (date: string) => `Live official source — retrieved ${date}`,
+  googleGroundedSource: (date: string) => `Google Search grounded — searched ${date}; page not checked directly`,
+  googleSearchSuggestions: "Google Search suggestions",
   reviewedSnapshot: (date: string) => `Reviewed snapshot — reviewed ${date}; not checked live`,
   unreviewedSavedGuidance: "Saved guidance — review date unrecorded; not checked live",
   lookupStatus: (outcome: OfficialLookupSummary): string => {
     switch (outcome.status) {
       case "verified":
+        if (outcome.method === "google_grounding") return `${outcome.fallbackReason ? "The direct lookup could not verify a usable page, so Google Search was used as a fallback. " : ""}This answer cites Google-grounded official-domain sources; the app has not independently fetched those pages.`;
         return outcome.partial
           ? "Some official pages could not be verified; this answer uses only the verified pages."
           : "Current information was checked against the official source shown below.";
       case "clarification_required":
-        return "Choose a supported service and identify Canada federal, a province, or a territory. Do not include personal details.";
+        return outcome.serviceId
+          ? "I know which service you mean. Choose a province or territory so I can check the right official instructions."
+          : "I couldn't identify the service from this question or form. Choose one below; there's no need to share personal details.";
       case "no_verified_results":
+        if (outcome.method === "google_grounding") return "Google Search did not return usable grounding with only permitted official sources. No answer from model memory is shown.";
         return "No verified official result was found for this service and jurisdiction.";
       case "unavailable":
+        if (outcome.reason === "grounding_quota") return `${outcome.fallbackReason ? "The direct lookup did not succeed, and the Google fallback is also unavailable. " : ""}Google Search grounding has reached this project's quota. Check Gemini billing and search quota, or try later. Saved official links below have not been checked live.`;
+        if (outcome.reason === "grounding_failed") return "Google Search grounding is unavailable. Try again later, or open a saved official link below.";
+        if (outcome.method === "google_grounding" && outcome.reason === "deadline") return "Google Search grounding took too long. Try again, or open a saved official link below.";
+        if (outcome.reason === "provider_not_configured") return "Live search isn't enabled for this service here yet. You can use the saved official links below, but they haven't been checked live.";
+        if (outcome.reason === "deadline") return "The official pages took too long to respond. Try again, or open a saved official link below.";
         return "Current official information could not be verified. Please try again later.";
     }
   },
@@ -296,8 +326,9 @@ const fr: Dict = {
   supported: "Fonctionne avec les PDF à remplir. Les formulaires numérisés ou aplatis ne sont pas encore pris en charge.",
   privacyLead: "Votre formulaire reste sur votre appareil.",
   privacyRest:
-    "Le PDF est lu dans votre navigateur et n'est pas téléversé. Le clavardage transmet le nom du fichier, les métadonnées du formulaire et des champs et les messages récents à un service d'IA externe, pas le PDF ni les valeurs saisies. La recherche officielle transmet uniquement les mots-clés du catalogue et le territoire choisi à un fournisseur distinct — jamais l’historique, les fichiers, les valeurs saisies ou des renseignements personnels.",
-  rulesNotAi: "Le clavardage utilise un modèle d’IA externe. Pour la recherche officielle, seuls les mots-clés du catalogue et le territoire choisi sont transmis au fournisseur de recherche — jamais l’historique, le fichier, les valeurs saisies ou des renseignements personnels.",
+    "Le PDF est lu dans votre navigateur et n'est pas téléversé. Le clavardage transmet le nom du fichier, les métadonnées et les messages récents à Google Gemini, pas le PDF ni les valeurs saisies. L'application vérifie d'abord les pages directement et utilise Google Search seulement en cas d'échec. Les recherches contiennent uniquement les mots-clés du catalogue, le territoire et les références publiques reconnues, jamais l'historique, le nom du fichier ni les valeurs saisies.",
+  rulesNotAi: "Le clavardage utilise Google Gemini. L'application vérifie d'abord les pages directement, avec Brave si configuré, puis utilise Google Search en cas d'échec. Les recherches contiennent uniquement les mots-clés du catalogue, le territoire et les références publiques reconnues, pas l'historique, le nom du fichier ni les valeurs saisies. Google génère ses recherches et conserve les requêtes et réponses pendant 30 jours. Chaque source distingue une page consultée directement d'une réponse appuyée par Google.",
+  aiPrivacyDetails: "Confidentialité : IA et recherche",
   sampleTitle: "Essayer un formulaire exemple",
   sampleName: "Demande de passeport pour adultes (version anglaise)",
   sampleLangTitle: "Anglais",
@@ -410,7 +441,25 @@ const fr: Dict = {
   youAsked: "Vous avez demandé : ",
   answer: "Réponse :",
   showFieldSr: " (afficher ce champ)",
-  thinking: "Réflexion…",
+  thinking: "Traitement de votre question…",
+  preparingAnswer: "Préparation d'une réponse à partir des pages officielles vérifiées…",
+  chooseService: "De quel service s'agit-il ?",
+  chooseJurisdiction: "Quelle province ou quel territoire ?",
+  selectOption: "Choisir une option",
+  continueLookup: "Trouver les renseignements officiels",
+  savedLinks: "Liens officiels enregistrés — non vérifiés en direct",
+  officialWebsite: (name) => `Site officiel : ${name}`,
+  downloadRestricted: "Cette page officielle renvoie à un téléchargement hors des domaines autorisés. L'application n'a pas ouvert ni vérifié ce téléchargement.",
+  aiNotConfigured: "L'assistant IA n'est pas encore activé ici. Les explications des champs et les liens officiels enregistrés restent disponibles.",
+  navigatorSuggestions: [
+    "Comment renouveler mon passeport ?",
+    "J'ai perdu mon emploi. Comment demander l'assurance-emploi ?",
+    "Comment obtenir un numéro d'assurance sociale ?",
+  ],
+  overviewSuggestion: "Donne-moi un aperçu de ce formulaire",
+  downloadSuggestion: "Où télécharger ce formulaire ?",
+  fieldSuggestion: "Que signifie ce champ ?",
+  feesSuggestion: "Quels sont les frais de ce service ?",
   askingAbout: "Question sur :",
   stopAsking: (label) => `Ne plus poser de question sur ${label}`,
   clear: "Effacer",
@@ -426,19 +475,30 @@ const fr: Dict = {
   chatError: "Désolé, impossible de joindre l'assistant. Veuillez réessayer.",
   chatTimeout: "La réponse de l'IA a pris trop de temps. Veuillez réessayer.",
   liveSource: (date: string) => `Source officielle en direct — consultée le ${date}`,
+  googleGroundedSource: (date: string) => `Source via Google Search — recherche le ${date} ; page non consultée directement`,
+  googleSearchSuggestions: "Suggestions de Google Search",
   reviewedSnapshot: (date: string) => `Copie révisée — révisée le ${date} ; non vérifiée en direct`,
   unreviewedSavedGuidance: "Conseils enregistrés — date de révision non consignée ; non vérifiés en direct",
   lookupStatus: (outcome: OfficialLookupSummary): string => {
     switch (outcome.status) {
       case "verified":
+        if (outcome.method === "google_grounding") return `${outcome.fallbackReason ? "La vérification directe n'a pas fourni de page exploitable ; Google Search a servi de solution de repli. " : ""}Cette réponse cite des sources officielles appuyées par Google. L'application n'a pas consulté ces pages directement.`;
         return outcome.partial
           ? "Certaines pages officielles n’ont pas pu être vérifiées ; cette réponse utilise uniquement les pages vérifiées."
           : "Les renseignements actuels ont été vérifiés auprès de la source officielle ci-dessous.";
       case "clarification_required":
-        return "Choisissez un service pris en charge et précisez le gouvernement fédéral, une province ou un territoire. N’incluez pas de renseignements personnels.";
+        return outcome.serviceId
+          ? "Le service est identifié. Choisissez une province ou un territoire pour vérifier les bonnes instructions officielles."
+          : "Le service n'a pas pu être identifié à partir de la question ou du formulaire. Choisissez-le ci-dessous, sans renseignements personnels.";
       case "no_verified_results":
+        if (outcome.method === "google_grounding") return "Google Search n'a pas fourni de réponse exploitable citant uniquement des sources officielles autorisées. Aucune réponse issue de la mémoire du modèle n'est affichée.";
         return "Aucun résultat officiel vérifié n’a été trouvé pour ce service et ce territoire de compétence.";
       case "unavailable":
+        if (outcome.reason === "grounding_quota") return `${outcome.fallbackReason ? "La vérification directe a échoué et la solution de repli Google est aussi indisponible. " : ""}Le quota Google Search du projet est atteint. Vérifiez la facturation et le quota de recherche Gemini, ou réessayez plus tard. Les liens enregistrés ci-dessous n'ont pas été vérifiés en direct.`;
+        if (outcome.reason === "grounding_failed") return "Google Search est indisponible. Réessayez plus tard ou ouvrez un lien officiel enregistré ci-dessous.";
+        if (outcome.method === "google_grounding" && outcome.reason === "deadline") return "Google Search a mis trop de temps à répondre. Réessayez ou ouvrez un lien officiel enregistré ci-dessous.";
+        if (outcome.reason === "provider_not_configured") return "La recherche en direct n'est pas encore activée pour ce service ici. Les liens officiels enregistrés ci-dessous n'ont pas été vérifiés en direct.";
+        if (outcome.reason === "deadline") return "Les pages officielles ont mis trop de temps à répondre. Réessayez ou ouvrez un lien officiel enregistré ci-dessous.";
         return "Les renseignements officiels actuels n’ont pas pu être vérifiés. Veuillez réessayer plus tard.";
     }
   },

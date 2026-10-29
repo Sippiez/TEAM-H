@@ -1,4 +1,6 @@
 import type { Resource } from "@/lib/types";
+import type { FacetId, ServiceId } from "@/lib/official/catalog";
+import type { JurisdictionId } from "@/lib/official/hosts";
 
 const PASSPORTS =
   "https://www.canada.ca/en/immigration-refugees-citizenship/services/canadian-passports";
@@ -9,6 +11,14 @@ const PASSPORT_PROGRAM = "IRCC – Passport Program";
  * record a content-review date; these remain saved guidance, not live sources.
  */
 export const RESOURCES: Resource[] = [
+  {
+    id: "sk-student-aid-forms",
+    title: "Saskatchewan Student Aid — printable applications and forms",
+    url: "https://www.saskatchewan.ca/residents/education-and-learning/saskatchewan-student-aid/student-loans-and-grants/printable-applications-and-forms",
+    department: "Government of Saskatchewan",
+    description: "Official paper applications and supporting forms, organized by study year and full-time or part-time study.",
+    tags: ["student", "aid", "loans", "grants", "saskatchewan", "application"],
+  },
   {
     id: "passports",
     title: "Canadian passports",
@@ -260,4 +270,38 @@ export function getResources(ids: string[]): Resource[] {
     const r = BY_ID.get(id);
     return r ? [r] : [];
   });
+}
+
+const SERVICE_RESOURCE_IDS: Record<ServiceId, string[]> = {
+  passport: ["passports"],
+  income_tax: ["income-tax"],
+  social_insurance: ["sin"],
+  employment_insurance: ["ei", "ei-regular"],
+  child_benefits: ["ccb"],
+  pension: ["cpp"],
+  old_age_security: ["oas"],
+  student_aid: [],
+  health_card: [],
+  driver_licence: [],
+  housing_support: [],
+};
+
+export function getServiceResources(
+  serviceId: ServiceId,
+  facetId?: FacetId,
+  jurisdiction: JurisdictionId = "federal",
+): Resource[] {
+  if (serviceId === "student_aid") {
+    return jurisdiction === "sk" ? getResources(["sk-student-aid-forms"]) : [];
+  }
+  if (jurisdiction !== "federal") return [];
+  if (serviceId === "passport") {
+    if (facetId === "fees") return getResources(["passport-fees"]);
+    if (facetId === "steps") return getResources(["passport-new-adult", "passport-submit"]);
+    if (facetId === "documents") return getResources(["passport-get-form", "passport-required-docs"]);
+  }
+  if (serviceId === "income_tax" && facetId === "documents") {
+    return getResources(["cra-forms", "income-tax"]);
+  }
+  return getResources(SERVICE_RESOURCE_IDS[serviceId]);
 }

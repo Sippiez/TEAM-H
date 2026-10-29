@@ -22,7 +22,7 @@ export const SERVICE_CATALOG = {
   employment_insurance: {
     label: "Employment Insurance benefits",
     labelFr: "prestations d’assurance-emploi",
-    keywords: ["Employment Insurance", "EI benefits"],
+    keywords: ["Employment Insurance", "EI benefits", "EI"],
     keywordsFr: ["assurance-emploi", "prestations AE"],
   },
   child_benefits: {
@@ -32,10 +32,22 @@ export const SERVICE_CATALOG = {
     keywordsFr: ["allocation pour enfants", "prestations familiales"],
   },
   pension: {
-    label: "retirement pension benefits",
-    labelFr: "prestations de pension de retraite",
-    keywords: ["retirement pension", "Canada Pension Plan"],
+    label: "Canada Pension Plan (CPP) retirement pension",
+    labelFr: "pension de retraite du Régime de pensions du Canada (RPC)",
+    keywords: ["retirement pension", "Canada Pension Plan", "CPP"],
     keywordsFr: ["pension de retraite", "Régime de pensions du Canada"],
+  },
+  old_age_security: {
+    label: "Old Age Security (OAS) and Guaranteed Income Supplement (GIS)",
+    labelFr: "Sécurité de la vieillesse (SV) et Supplément de revenu garanti (SRG)",
+    keywords: ["Old Age Security", "OAS", "Guaranteed Income Supplement", "GIS"],
+    keywordsFr: ["Sécurité de la vieillesse", "Supplément de revenu garanti", "SRG"],
+  },
+  student_aid: {
+    label: "student aid, loans and grants",
+    labelFr: "aide financière, prêts et bourses aux étudiants",
+    keywords: ["student aid", "student loan", "student loans", "student grants"],
+    keywordsFr: ["aide financière aux étudiants", "aide aux étudiants", "prêts étudiants", "bourses étudiantes"],
   },
   health_card: {
     label: "provincial or territorial health card",
@@ -60,6 +72,73 @@ export const SERVICE_CATALOG = {
 export type ServiceId = keyof typeof SERVICE_CATALOG;
 export type FacetId = "overview" | "steps" | "fees" | "documents";
 
+export const PUBLIC_FORMS = {
+  pptc153: {
+    formNumber: "PPTC 153",
+    serviceId: "passport",
+    jurisdiction: "federal",
+    url: "https://www.canada.ca/en/immigration-refugees-citizenship/services/canadian-passports/new-adult-passport/get-application-form.html",
+  },
+  isp1000: {
+    formNumber: "ISP 1000",
+    serviceId: "pension",
+    jurisdiction: "federal",
+    url: "https://www.canada.ca/en/services/benefits/publicpensions/cpp/apply.html",
+  },
+  isp3550: {
+    formNumber: "ISP 3550",
+    serviceId: "old_age_security",
+    jurisdiction: "federal",
+    url: "https://www.canada.ca/en/services/benefits/publicpensions/old-age-security/apply.html",
+  },
+  sk154091: {
+    formNumber: "154091",
+    title: "Full-Time Post-Secondary Student Saskatchewan Student Aid 2026-27",
+    serviceId: "student_aid",
+    jurisdiction: "sk",
+    url: "https://www.saskatchewan.ca/residents/education-and-learning/saskatchewan-student-aid/student-loans-and-grants/printable-applications-and-forms",
+    reference: /\b154091\b|\bFull-Time Post-Secondary Student\s+Saskatchewan Student Aid\s+2026[-\u2013]27\b|\b2026[-\u2013]27\s+Full-Time Saskatchewan Student Aid\b/i,
+  },
+} as const;
+
+export type PublicFormId = keyof typeof PUBLIC_FORMS;
+
+export interface LookupContext {
+  serviceId?: ServiceId;
+  jurisdiction?: JurisdictionId;
+  facetId?: FacetId;
+  formId?: PublicFormId;
+}
+
+export type LookupChoice = Pick<LookupContext, "serviceId" | "jurisdiction">;
+
+export function validateLookupChoice(value: unknown): LookupChoice | null {
+  const context = validateLookupContext(value);
+  if (!context || Object.keys(context).length === 0 ||
+    context.formId !== undefined || context.facetId !== undefined) return null;
+  return context;
+}
+
+export function publicFormForNumber(value?: string): PublicFormId | undefined {
+  const normalized = value?.trim().toUpperCase().replace(/[.!?]+$/, "").replace(/[\s-]/g, "");
+  return (Object.keys(PUBLIC_FORMS) as PublicFormId[]).find(
+    (id) => PUBLIC_FORMS[id].formNumber.replace(/\s/g, "") === normalized,
+  );
+}
+
+export function publicFormReference(formId: PublicFormId, text: string): RegExpExecArray | null {
+  const form = PUBLIC_FORMS[formId];
+  if ("reference" in form) return form.reference.exec(text);
+  const number = form.formNumber
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\s+/g, "[\\s-]*");
+  return new RegExp(`\\b${number}\\b`, "i").exec(text);
+}
+
+export function publicFormsInText(text: string): PublicFormId[] {
+  return (Object.keys(PUBLIC_FORMS) as PublicFormId[]).filter((id) => publicFormReference(id, text));
+}
+
 const FACETS: Record<FacetId, { en: string; fr: string }> = {
   overview: { en: "official program information", fr: "renseignements officiels sur le programme" },
   steps: { en: "how to apply application steps", fr: "comment présenter une demande étapes" },
@@ -71,7 +150,7 @@ const FACET_CUES: Record<FacetId, string[]> = {
   overview: ["overview", "about", "information", "what is", "aperçu", "renseignements", "à propos"],
   steps: ["how to", "how do", "apply", "application steps", "renew", "steps", "comment", "demande", "renouvel", "étapes"],
   fees: ["fee", "fees", "cost", "price", "how much", "pay", "frais", "coût", "cout", "prix", "combien"],
-  documents: ["document", "form", "proof", "what do i need", "required", "documents", "formulaire", "preuve", "pièce", "requis"],
+  documents: ["document", "form", "proof", "what do i need", "required", "documents", "formulaire", "preuve", "pièce", "requis", "download", "télécharger", "téléchargement"],
 };
 
 const JURISDICTION_KEYWORDS: Record<JurisdictionId, { en: string; fr: string }> = {
@@ -100,13 +179,36 @@ export interface LookupSelection {
   jurisdiction: JurisdictionId;
   facetId: FacetId;
   language: "en" | "fr";
+  formId?: PublicFormId;
+}
+
+export function validateLookupContext(value: unknown): LookupContext | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const object = value as Record<string, unknown>;
+  if (Object.keys(object).some((key) => !["serviceId", "jurisdiction", "facetId", "formId"].includes(key))) return null;
+  const serviceId = SERVICE_IDS.find((id) => id === object.serviceId);
+  const jurisdiction = JURISDICTION_IDS.find((id) => id === object.jurisdiction);
+  const facetId = FACET_IDS.find((id) => id === object.facetId);
+  const formId = (Object.keys(PUBLIC_FORMS) as PublicFormId[]).find((id) => id === object.formId);
+  if (
+    (object.serviceId !== undefined && !serviceId) ||
+    (object.jurisdiction !== undefined && !jurisdiction) ||
+    (object.facetId !== undefined && !facetId) ||
+    (object.formId !== undefined && !formId)
+  ) return null;
+  return {
+    ...(serviceId ? { serviceId } : {}),
+    ...(jurisdiction ? { jurisdiction } : {}),
+    ...(facetId ? { facetId } : {}),
+    ...(formId ? { formId } : {}),
+  };
 }
 
 export function validateLookupSelection(value: unknown): LookupSelection | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const object = value as Record<string, unknown>;
   if (
-    Object.keys(object).sort().join(",") !==
+    Object.keys(object).filter((key) => key !== "formId").sort().join(",") !==
     ["facetId", "jurisdiction", "language", "serviceId"].sort().join(",") ||
     typeof object.serviceId !== "string" ||
     !SERVICE_IDS.includes(object.serviceId as ServiceId) ||
@@ -118,7 +220,24 @@ export function validateLookupSelection(value: unknown): LookupSelection | null 
   ) {
     return null;
   }
-  return object as unknown as LookupSelection;
+  const context = validateLookupContext({
+    serviceId: object.serviceId,
+    jurisdiction: object.jurisdiction,
+    facetId: object.facetId,
+    ...(object.formId !== undefined ? { formId: object.formId } : {}),
+  });
+  if (!context?.serviceId || !context.jurisdiction || !context.facetId) return null;
+  if (context.formId) {
+    const form = PUBLIC_FORMS[context.formId];
+    if (form.serviceId !== context.serviceId || form.jurisdiction !== context.jurisdiction) return null;
+  }
+  return {
+    serviceId: context.serviceId,
+    jurisdiction: context.jurisdiction,
+    facetId: context.facetId,
+    language: object.language,
+    ...(context.formId ? { formId: context.formId } : {}),
+  };
 }
 
 export function buildCanonicalQuery(selection: LookupSelection): string {
@@ -128,16 +247,26 @@ export function buildCanonicalQuery(selection: LookupSelection): string {
   const terms = selection.language === "fr"
     ? [jurisdiction.fr, ...service.keywordsFr, facet.fr]
     : [jurisdiction.en, ...service.keywords, facet.en];
+  if (selection.formId) terms.push(PUBLIC_FORMS[selection.formId].formNumber);
   return terms.join(" ").replace(/\s+/g, " ").trim().slice(0, 240);
 }
 
-function normalizedText(text: string): string {
-  return text.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+export function normalizedText(text: string): string {
+  return text.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[’‘]/g, "'").replace(/\s+/g, " ");
 }
 
-function containsPhrase(text: string, phrase: string): boolean {
+export function containsPhrase(text: string, phrase: string): boolean {
   const escaped = normalizedText(phrase).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`).test(text);
+}
+
+export function requestedFacet(message: string): FacetId {
+  const text = normalizedText(message);
+  if (/\b(download|telecharger|telechargement)\b/.test(text)) return "documents";
+  const matches = FACET_IDS.filter((id) =>
+    FACET_CUES[id].some((cue) => containsPhrase(text, cue)),
+  );
+  return matches.length === 1 ? matches[0] : "overview";
 }
 
 export function serviceMatchesText(text: string, serviceId: ServiceId): boolean {

@@ -56,6 +56,10 @@ function parseEvent(frame: string): ChatStreamEvent | null {
       LOOKUP_STATUSES.has(outcome.status ?? "") &&
       typeof outcome.reason === "string" &&
       typeof outcome.partial === "boolean" &&
+      (outcome.fallbackReason === undefined ||
+        (typeof outcome.fallbackReason === "string" && outcome.fallbackReason.length <= 80)) &&
+      (outcome.searchSuggestionsHtml === undefined ||
+        (typeof outcome.searchSuggestionsHtml === "string" && outcome.searchSuggestionsHtml.length <= 32_000)) &&
       Array.isArray(value.sources) &&
       value.sources.every(isResource)
     ) {

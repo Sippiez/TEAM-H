@@ -8,6 +8,7 @@ import { cn } from "cn";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { loadForm, type LoadedForm } from "@/lib/pdf/extract";
 import { readChatEvents } from "@/lib/chat-stream";
+import type { LookupChoice, LookupContext } from "@/lib/official/catalog";
 import type { ChatMessage, ChatStreamEvent, FieldExplanation, FormContext, FormField } from "@/lib/types";
 
 import { ChatPanel } from "./chat-panel";
@@ -21,12 +22,6 @@ import { btnSecondary } from "./styles";
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_DOCS = 5;
 const SAMPLE = { url: "/forms/pptc153.pdf", name: "pptc153.pdf" };
-
-const NAVIGATOR_SUGGESTIONS = [
-  "How do I renew a passport for the Canada federal government?",
-  "I lost my job. What federal Employment Insurance can I apply for?",
-  "What are the steps to get a federal Social Insurance Number in Canada?",
-];
 
 /** Where a selection came from. Clicks on the sheet itself never scroll the sheet. */
 type Origin = "sheet" | "route" | "step" | "ref" | "reply";
@@ -182,6 +177,7 @@ export function FormHelperApp() {
       target: Target | null,
       fieldId: string | null,
       intent?: "overview",
+      options?: { lookupContext?: LookupContext; lookupChoice?: LookupChoice; displayText?: string; retry?: boolean },
     ) => {
       const requestKey = target?.key ?? "navigator";
       if (chatRequests.current.has(requestKey)) return;
@@ -191,6 +187,13 @@ export function FormHelperApp() {
       const currentMessages = target
         ? docsRef.current.find((doc) => doc.key === target.key)?.messages ?? []
         : navMessagesRef.current;
+      const lastLookup = [...currentMessages].reverse().find((message) => message.role === "assistant")?.lookup;
+      const lookupContext = options?.lookupContext ?? {
+        ...(lastLookup?.serviceId ? { serviceId: lastLookup.serviceId } : {}),
+        ...(lastLookup?.jurisdiction ? { jurisdiction: lastLookup.jurisdiction } : {}),
+        ...(lastLookup?.facetId ? { facetId: lastLookup.facetId } : {}),
+        ...(lastLookup?.formId ? { formId: lastLookup.formId } : {}),
+      };
 
       const push = (message: ChatMessage) => {
         if (!isCurrent()) return;
@@ -229,22 +232,6 @@ export function FormHelperApp() {
             );
       };
 
-      const removeMessage = (messageId: string) => {
-        if (!isCurrent()) return;
-        return target
-          ? updateDoc(target.key, (doc) => ({
-              ...doc,
-              messages: doc.messages.filter(
-                (message) => message.id !== messageId,
-              ),
-            }))
-          : setNavMessages((messages) =>
-              messages.filter(
-                (message) => message.id !== messageId,
-              ),
-            );
-      };
-
       const setPending = (pending: boolean) =>
         target
           ? updateDoc(target.key, (doc) => ({
@@ -265,11 +252,11 @@ export function FormHelperApp() {
           text: message.text,
         }));
 
-      if (text) {
+      if (text && !options?.retry) {
         push({
           id: nextId(),
           role: "user",
-          text,
+          text: options?.displayText ?? text,
         });
       }
 
@@ -279,6 +266,13 @@ export function FormHelperApp() {
         id: assistantMessageId,
         role: "assistant",
         text: "",
+        request: {
+          message: text ?? undefined,
+          intent,
+          selectedFieldId: fieldId ?? undefined,
+          lookupContext,
+          lookupChoice: options?.lookupChoice,
+        },
       });
 
       setPending(true);
@@ -288,6 +282,7 @@ export function FormHelperApp() {
         30_000,
       );
 
+      let responseError: ChatMessage["error"] = "connection";
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
@@ -305,10 +300,13 @@ export function FormHelperApp() {
             selectedFieldId: fieldId ?? undefined,
             history,
             language: lang,
+            lookupContext,
+            lookupChoice: options?.lookupChoice,
           }),
         });
 
         if (!res.ok) {
+          responseError = res.status === 503 ? "not_configured" : res.status === 504 ? "timeout" : "unavailable";
           const payload = (await res
             .json()
             .catch(() => null)) as
@@ -345,7 +343,10 @@ export function FormHelperApp() {
               resources: event.sources,
             });
           } else if (event.type === "error") {
-            updateMessage(assistantMessageId, { incomplete: true });
+            updateMessage(assistantMessageId, {
+              incomplete: true,
+              error: event.code === "unavailable" ? "timeout" : "unavailable",
+            });
           } else if (event.type === "complete") {
             completed = true;
             updateMessage(assistantMessageId, { incomplete: !event.complete });
@@ -364,16 +365,13 @@ export function FormHelperApp() {
         updateMessage(assistantMessageId, { text: completeText });
       } catch (error) {
         if (!isCurrent()) return;
-        removeMessage(assistantMessageId);
-
-        push({
-          id: nextId(),
-          role: "assistant",
-          text:
+        updateMessage(assistantMessageId, {
+          incomplete: true,
+          error:
             controller.signal.aborted ||
             (error instanceof Error && error.name === "AbortError")
-              ? t.chatTimeout
-              : t.chatError,
+              ? "timeout"
+              : responseError,
         });
       } finally {
         window.clearTimeout(timeout);
@@ -386,8 +384,6 @@ export function FormHelperApp() {
     [
       lang,
       setNavMessages,
-      t.chatError,
-      t.chatTimeout,
       updateDoc,
     ],
   );
@@ -505,7 +501,7 @@ export function FormHelperApp() {
     if (!active || !target) return;
     updateDoc(active.key, (d) => ({ ...d, ctxCleared: false, tab: "ask" }));
     if (!isDesktop) revealSide();
-    void sendChat("What should I enter in this field?", target, field.id);
+    void sendChat(t.fieldSuggestion, target, field.id);
   };
 
   const setTab = (tab: Tab) => {
@@ -515,10 +511,27 @@ export function FormHelperApp() {
   const askingAbout = active?.ctxCleared ? undefined : selected;
 
   const formSuggestions = askingAbout
-    ? ["What should I enter in this field?", "Give me an overview of this form"]
-    : form?.formNumber === "PPTC 153"
-      ? ["Give me an overview of this form", "Who can be my guarantor?", "Where do I put my date of birth?", "How much does a passport cost?"]
-      : ["Give me an overview of this form", "Where do I put my address?"];
+    ? [t.fieldSuggestion, t.downloadSuggestion, t.overviewSuggestion]
+    : [t.overviewSuggestion, t.downloadSuggestion, t.feesSuggestion];
+
+  const retryChat = (message: ChatMessage, destination: Target | null) => {
+    if (!message.request) return;
+    void sendChat(message.request.message ?? null, destination, message.request.selectedFieldId ?? null, message.request.intent, {
+      lookupContext: message.request.lookupContext,
+      lookupChoice: message.request.lookupChoice,
+      retry: true,
+    });
+  };
+
+  const resolveChat = (message: ChatMessage, destination: Target | null, choice: LookupChoice, label: string) => {
+    if (!message.request) return;
+    const question = message.request.message ?? label;
+    void sendChat(question, destination, message.request.selectedFieldId ?? null, undefined, {
+      lookupContext: { ...message.request.lookupContext, ...choice },
+      lookupChoice: { ...message.request.lookupChoice, ...choice },
+      displayText: label,
+    });
+  };
 
   const mapHighlight = useMemo(() => {
     const last = [...navMessages].reverse().find((m) => m.role === "assistant");
@@ -597,7 +610,9 @@ export function FormHelperApp() {
                 messages={navMessages}
                 pending={navPending}
                 onSend={(text) => void sendChat(text, null, null)}
-                suggestions={NAVIGATOR_SUGGESTIONS}
+                onRetry={(message) => retryChat(message, null)}
+                onResolve={(message, choice, label) => resolveChat(message, null, choice, label)}
+                suggestions={t.navigatorSuggestions}
                 placeholder={t.navPlaceholder}
                 inputLabel={t.navInputLabel}
               />
@@ -727,6 +742,8 @@ export function FormHelperApp() {
               messages={active.messages}
               pending={active.pending}
               onSend={(text) => void sendChat(text, target, active.ctxCleared ? null : active.selectedId)}
+              onRetry={(message) => retryChat(message, target)}
+              onResolve={(message, choice, label) => resolveChat(message, target, choice, label)}
               onFieldRef={(id) => selectField(target, id, "ref")}
               askingAbout={askingAbout}
               onClearAsking={() => updateDoc(active.key, (d) => ({ ...d, ctxCleared: true }))}

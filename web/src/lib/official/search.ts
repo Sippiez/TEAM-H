@@ -2,6 +2,7 @@ import "server-only";
 
 import type { LookupSelection } from "./catalog";
 import { allowedRootForSelection, buildCanonicalQuery } from "./catalog";
+import { getServiceResources } from "../catalog/resources";
 
 export interface SearchCandidate {
   url: string;
@@ -11,6 +12,7 @@ export interface SearchCandidate {
 export interface SearchResult {
   candidates: SearchCandidate[];
   rejectedSponsored: number;
+  method: "official_page" | "search";
 }
 
 async function readJsonBodyLimited(response: Response, maxBytes: number): Promise<unknown> {
@@ -46,7 +48,15 @@ export async function searchOfficialCandidates(
   signal: AbortSignal,
 ): Promise<SearchResult> {
   const apiKey = process.env.BRAVE_SEARCH_API_KEY;
-  if (!apiKey) throw new Error("provider_not_configured");
+  if (!apiKey) {
+    const pages = getServiceResources(selection.serviceId, selection.facetId, selection.jurisdiction);
+    if (pages.length === 0) throw new Error("provider_not_configured");
+    return {
+      candidates: pages.map(({ url }) => ({ url, sponsored: false })),
+      rejectedSponsored: 0,
+      method: "official_page",
+    };
+  }
 
   const query = buildCanonicalQuery(selection);
   const site = allowedRootForSelection(selection);
@@ -86,5 +96,5 @@ export async function searchOfficialCandidates(
     candidates.push({ url: item.url, sponsored: false });
     if (candidates.length === 5) break;
   }
-  return { candidates, rejectedSponsored };
+  return { candidates, rejectedSponsored, method: "search" };
 }

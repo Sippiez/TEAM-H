@@ -135,3 +135,16 @@ export function parseAllowedOfficialUrl(value: string): AllowedOfficialUrl | nul
     return null;
   }
 }
+
+export function isGoogleGroundingRedirect(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return value.length <= 8192 &&
+      url.protocol === "https:" &&
+      url.hostname === "vertexaisearch.cloud.google.com" &&
+      !url.port && !url.username && !url.password && !url.hash && !url.search &&
+      /^\/grounding-api-redirect\/[A-Za-z0-9_-]+$/.test(url.pathname);
+  } catch {
+    return false;
+  }
+}

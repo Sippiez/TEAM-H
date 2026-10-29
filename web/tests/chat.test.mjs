@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
+import crypto from "node:crypto";
 import ts from "typescript";
 
 // Use the existing compiler and Node runner; isolate SDK calls and credentials.
@@ -17,7 +18,7 @@ function loadModule(path, imports, globals = {}) {
       assert.ok(Object.hasOwn(imports, name), `Unexpected import: ${name}`);
       return imports[name];
     },
-    Error, DOMException, AbortController, ReadableStream, TextEncoder,
+    Error, DOMException, AbortController, ReadableStream, TextEncoder, URL,
     Response, setTimeout, clearTimeout,
     ...globals,
   }, { filename: path });
@@ -27,9 +28,13 @@ function loadModule(path, imports, globals = {}) {
 function setupRoute(streamGeminiChat, env = { GEMINI_API_KEY: "test-only" }) {
   const timers = new Map();
   const logs = [];
+  const hosts = loadModule("../src/lib/official/hosts.ts", {});
+  const catalog = loadModule("../src/lib/official/catalog.ts", { "./hosts": hosts });
   const route = loadModule("../src/app/api/chat/route.ts", {
     "next/server": { NextResponse: Response },
     "@/lib/ai/gemini": { streamGeminiChat },
+    "@/lib/official/catalog": catalog,
+    "@/lib/abortable": loadModule("../src/lib/abortable.ts", {}),
   }, {
     process: { env },
     console: { error: (...args) => logs.push(args) },
@@ -69,6 +74,9 @@ test("malformed requests fail before contacting the provider", async (t) => {
     { ...message, selectedFieldId: "missing" },
     { ...message, form: { ...form, fields: [{ ...field, page: 2 }] } },
     { ...message, form: { ...form, fields: [{ ...field, type: "unknown" }] } },
+    { ...message, lookupContext: { serviceId: "passport", query: "PERSONAL-CANARY" } },
+    { ...message, lookupChoice: { jurisdiction: "evil.test" } },
+    { ...message, lookupChoice: { serviceId: "passport", formId: "isp1000" } },
   ];
   for (const body of invalid) {
     await t.test(JSON.stringify(body), async () => {
@@ -223,11 +231,33 @@ function setupGemini({
   functionArgs = null,
   functionCalls = null,
   finalChunks = [{ text: "verified [source:live-source-id]" }],
+  groundedLookup = async () => assert.fail("Injected lookup must be used"),
+  directPage,
 } = {}) {
   const calls = [];
+  const directAttempts = [];
   const officialHosts = loadModule("../src/lib/official/hosts.ts", {});
   const officialCatalog = loadModule("../src/lib/official/catalog.ts", {
     "./hosts": officialHosts,
+  });
+  const officialContext = loadModule("../src/lib/official/context.ts", {
+    "./catalog": officialCatalog,
+    "./hosts": officialHosts,
+  });
+  const officialLookup = loadModule("../src/lib/official/lookup.ts", {
+    "server-only": {}, "node:crypto": crypto,
+    "@/lib/abortable": loadModule("../src/lib/abortable.ts", {}),
+    "./catalog": officialCatalog, "./hosts": officialHosts,
+    "./search": { searchOfficialCandidates: async () => ({ candidates: [], rejectedSponsored: 0 }) },
+    "./fetch": {
+      fetchOfficialPage: async (url) => {
+        directAttempts.push(url);
+        if (directPage) return { url, language: "en-CA", ...directPage };
+        throw new Error("direct-fetch-test-failure");
+      },
+      isArchivedPage: (page) => page.archived === true,
+      OfficialFetchError: class extends Error {},
+    },
   });
   const { streamGeminiChat } = loadModule("../src/lib/ai/gemini.ts", {
     "server-only": {},
@@ -254,11 +284,11 @@ function setupGemini({
       },
     },
     "@/lib/official/catalog": officialCatalog,
-    "@/lib/official/lookup": {
-      lookupOfficialInformation: async () => assert.fail("Injected lookup must be used"),
-    },
+    "@/lib/official/context": officialContext,
+    "@/lib/official/lookup": officialLookup,
+    "@/lib/official/grounding": { lookupGoogleGrounding: groundedLookup },
   }, { process: { env } });
-  return { streamGeminiChat, calls };
+  return { streamGeminiChat, calls, directAttempts };
 }
 
 async function collect(stream) {
@@ -266,6 +296,70 @@ async function collect(stream) {
   for await (const event of stream) events.push(event);
   return events;
 }
+
+test("the default lookup falls back to Google Search after a failed direct fetch without a second synthesis", async () => {
+  const { streamGeminiChat, calls, directAttempts } = setupGemini({
+    groundedLookup: async (selection, signal, dependencies) => {
+      assert.equal(selection.serviceId, "student_aid");
+      assert.equal(selection.jurisdiction, "sk");
+      await dependencies.generate("CANONICAL-PUBLIC-QUERY", signal);
+      return {
+        outcome: { ...selection, status: "verified", reason: "none", partial: false, method: "google_grounding" },
+        answer: "Use the official student aid forms page. [1]",
+        sources: [{
+          id: "google-source", url: "https://www.saskatchewan.ca/forms",
+          title: "Student Aid forms", department: "Saskatchewan", description: "", tags: [],
+          provenance: { kind: "google_grounded", searchedAt: "2026-10-29T20:00:00Z" },
+        }],
+      };
+    },
+  });
+  const events = await collect(await streamGeminiChat({
+    message: "Where do I download this form? PRIVATE-QUESTION-CANARY",
+    form: { ...form, formNumber: "154091", fileName: "PRIVATE-FILENAME-CANARY.pdf" },
+    history: [{ role: "user", text: "PRIVATE-HISTORY-CANARY" }], language: "en",
+  }));
+  assert.equal(calls.length, 1);
+  assert.equal(directAttempts.length, 1);
+  assert.equal(events[0].outcome.fallbackReason, "fetch_failed");
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[0].config.tools)), [{ googleSearch: {} }]);
+  assert.equal(calls[0].contents, "CANONICAL-PUBLIC-QUERY");
+  assert.doesNotMatch(JSON.stringify(calls), /PRIVATE-/);
+  assert.equal(events.filter((event) => event.type === "delta").map((event) => event.text).join(""), "Use the official student aid forms page. [1]");
+});
+
+test("a successful default direct lookup synthesizes verified excerpts without calling Google Search", async () => {
+  const url = "https://www.saskatchewan.ca/residents/education-and-learning/saskatchewan-student-aid/student-loans-and-grants/printable-applications-and-forms";
+  const sourceId = `live-${crypto.createHash("sha256").update(url).digest("hex").slice(0, 16)}`;
+  const { streamGeminiChat, calls, directAttempts } = setupGemini({
+    directPage: {
+      title: "2026-27 Full-Time Saskatchewan Student Aid forms",
+      text: "Download the 2026-27 Full-Time Saskatchewan Student Aid application from this official forms page.",
+    },
+    finalChunks: [
+      { text: `Use the official application page [source:${sourceId}].` },
+      { text: " [source:forged-id] https://forged.example/" },
+    ],
+  });
+  const events = await collect(await streamGeminiChat({
+    message: "Where do I download this form?",
+    form: { ...form, formNumber: "154091", fileName: "PRIVATE-FILENAME-CANARY.pdf" },
+    history: [{ role: "assistant", text: "STALE-ANSWER-CANARY" }], language: "en",
+  }));
+  assert.equal(directAttempts.length, 1);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].kind, "stream");
+  assert.equal(calls[0].config.tools, undefined);
+  assert.match(calls[0].contents, /Download the 2026-27 Full-Time Saskatchewan Student Aid/);
+  assert.doesNotMatch(calls[0].contents, /PRIVATE-FILENAME-CANARY|STALE-ANSWER-CANARY/);
+  assert.equal(events[0].outcome.method, "official_page");
+  assert.equal(events[0].outcome.fallbackReason, undefined);
+  assert.equal(events[0].sources[0].provenance.kind, "live_official");
+  assert.equal(events[0].sources[0].evidence, undefined);
+  const answer = events.filter((event) => event.type === "delta").map((event) => event.text).join("");
+  assert.match(answer, /\[1\]/);
+  assert.doesNotMatch(answer, /forged-id|https?:\/\//);
+});
 
 test("metadata-only Gemini prompt bounds context and excludes PDF bytes and field values", async () => {
   const { streamGeminiChat, calls } = setupGemini({
@@ -337,7 +431,7 @@ test("a Gemini 2.5 override uses its supported nonzero thinking budget", async (
   assert.equal(call.config.thinkingConfig.thinkingLevel, undefined);
 });
 
-test("official synthesis requires one bounded function call and only verified evidence", async () => {
+test("resolved requests display the grounded answer without planning or another model call", async () => {
   const functionArgs = {
     serviceId: "health_card",
     jurisdiction: "on",
@@ -354,16 +448,9 @@ test("official synthesis requires one bounded function call and only verified ev
     language: "en-CA",
     jurisdiction: "on",
     facetId: "steps",
-    provenance: { kind: "live_official", retrievedAt: "2026-10-29T18:00:00.000Z" },
-    evidence: "Use the official online application process.",
+    provenance: { kind: "google_grounded", searchedAt: "2026-10-29T18:00:00.000Z" },
   };
-  const { streamGeminiChat, calls } = setupGemini({
-    functionArgs,
-    finalChunks: [
-      { text: "Apply using the current instructions [source:live-" },
-      { text: "source-id]. [source:forged-id] https://forged.example/" },
-    ],
-  });
+  const { streamGeminiChat, calls } = setupGemini({ functionArgs });
   const stream = await streamGeminiChat({
     message: "How do I apply for a health card in Ontario? PRIVATE-CANARY",
     language: "en",
@@ -373,26 +460,18 @@ test("official synthesis requires one bounded function call and only verified ev
       return {
         outcome: { status: "verified", reason: "none", partial: false, jurisdiction: "on" },
         sources: [source],
+        answer: "Apply using the current instructions. [1]",
       };
     },
   });
   const events = await collect(stream);
-  const planner = calls.find((item) => item.kind === "planner");
-  const final = calls.find((item) => item.kind === "stream");
-  assert.equal(planner.config.toolConfig.functionCallingConfig.mode, "ANY");
-  assert.deepEqual(Array.from(planner.config.toolConfig.functionCallingConfig.allowedFunctionNames), [
-    "lookup_official_information",
-  ]);
-  assert.equal(planner.config.tools[0].functionDeclarations.length, 1);
-  assert.equal(planner.config.tools[0].functionDeclarations[0].parametersJsonSchema.additionalProperties, false);
-  assert.doesNotMatch(final.contents, /STALE-ANSWER-CANARY|https:\/\/www\.ontario\.ca/);
-  assert.match(final.contents, /Use the official online application process/);
+  assert.equal(calls.length, 0);
   const lookupEvent = events.find((event) => event.type === "lookup");
   assert.equal(lookupEvent.sources[0].evidence, undefined);
   assert.equal(lookupEvent.sources[0].url, source.url);
   const answer = events.filter((event) => event.type === "delta").map((event) => event.text).join("");
-  assert.match(answer, /\[source:live-source-id\]/);
-  assert.doesNotMatch(answer, /forged-id|https?:\/\//);
+  assert.equal(answer, "Apply using the current instructions. [1]");
+  assert.doesNotMatch(answer, /STALE-ANSWER-CANARY|PRIVATE-CANARY/);
 });
 
 test("unavailable lookup has no free-form current-facts fallback", async () => {
@@ -414,6 +493,91 @@ test("unavailable lookup has no free-form current-facts fallback", async () => {
   assert.equal(events.length, 1);
   assert.equal(events[0].type, "lookup");
   assert.equal(calls.filter((item) => item.kind === "stream").length, 0);
+});
+
+test("a verified adapter result missing its answer never triggers a synthesis fallback", async () => {
+  const { streamGeminiChat, calls } = setupGemini();
+  const stream = await streamGeminiChat({
+    message: "Where do I download this form?",
+    form: { ...form, formNumber: "154091" },
+    language: "en",
+    lookup: async () => ({
+      outcome: { status: "verified", reason: "none", partial: false },
+      sources: [{
+        id: "incomplete-adapter-result",
+        provenance: { kind: "google_grounded", searchedAt: "2026-10-29T20:00:00Z" },
+      }],
+    }),
+  });
+  await assert.rejects(collect(stream), /official-source answer or its sources were empty/);
+  assert.equal(calls.length, 0);
+});
+
+test("the open-form download request dispatches canonical form IDs without planning", async () => {
+  const { streamGeminiChat, calls } = setupGemini();
+  let dispatched;
+  const stream = await streamGeminiChat({
+    message: "where do I download this form from?",
+    form: { ...form, formNumber: "ISP 1000", fileName: "PERSONAL-FILE-CANARY.pdf" },
+    history: [{ role: "assistant", text: "STALE-ANSWER-CANARY" }],
+    language: "en",
+    lookup: async (args) => {
+      dispatched = args;
+      return {
+        outcome: { status: "unavailable", reason: "fetch_failed", partial: false },
+        sources: [],
+      };
+    },
+  });
+  const events = await collect(stream);
+  assert.deepEqual(JSON.parse(JSON.stringify(dispatched)), {
+    serviceId: "pension", jurisdiction: "federal", facetId: "documents", language: "en", formId: "isp1000",
+  });
+  assert.equal(calls.length, 0);
+  assert.equal(events[0].outcome.formId, "isp1000");
+  assert.doesNotMatch(JSON.stringify(dispatched), /PERSONAL-FILE-CANARY|STALE-ANSWER-CANARY/);
+});
+
+test("ISP 3550 with a selected field resumes the download question and never routes to CPP", async () => {
+  const { streamGeminiChat, calls } = setupGemini();
+  let dispatched;
+  const stream = await streamGeminiChat({
+    message: "ISP 3550",
+    form: { ...form, formNumber: "ISP 3550", fileName: "PERSONAL-FILE-CANARY.pdf" },
+    selectedFieldId: field.id,
+    lookupContext: { facetId: "overview" },
+    history: [
+      { role: "user", text: "where do I download this from?" },
+      { role: "assistant", text: "Choose the service. STALE-ANSWER-CANARY" },
+      { role: "user", text: "ISP 3550" },
+      { role: "assistant", text: "Choose the service again." },
+    ],
+    language: "en",
+    lookup: async (args) => {
+      dispatched = args;
+      return {
+        outcome: { status: "verified", reason: "none", partial: false, ...args },
+        answer: "Use the official application page. [1]",
+        sources: [{
+          id: "oas-source",
+          title: "Old Age Security application",
+          url: "https://www.canada.ca/en/services/benefits/publicpensions/old-age-security/apply.html",
+          department: "Canada", description: "", tags: [], language: "en-CA",
+          jurisdiction: "federal", facetId: "documents",
+          provenance: { kind: "google_grounded", searchedAt: "2026-10-29T19:00:00.000Z" },
+        }],
+      };
+    },
+  });
+  const events = await collect(stream);
+  assert.deepEqual(JSON.parse(JSON.stringify(dispatched)), {
+    serviceId: "old_age_security", jurisdiction: "federal",
+    facetId: "documents", language: "en", formId: "isp3550",
+  });
+  assert.equal(calls.length, 0);
+  assert.doesNotMatch(JSON.stringify(dispatched), /PERSONAL-FILE-CANARY|STALE-ANSWER-CANARY/);
+  assert.equal(events[0].outcome.formId, "isp3550");
+  assert.match(events.filter((event) => event.type === "delta").map((event) => event.text).join(""), /\[1\]/);
 });
 
 test("selected-field wording cannot bypass current-instructions lookup", async (t) => {
@@ -440,7 +604,7 @@ test("selected-field wording cannot bypass current-instructions lookup", async (
       });
       const events = await collect(stream);
       assert.equal(lookups, 1);
-      assert.equal(calls.filter((call) => call.kind === "planner").length, 1);
+      assert.equal(calls.filter((call) => call.kind === "planner").length, 0);
       assert.equal(calls.filter((call) => call.kind === "stream").length, 0);
       assert.equal(events[0].type, "lookup");
     });
@@ -469,16 +633,15 @@ test("plain field-meaning questions remain metadata-only in both languages", asy
   }
 });
 
-test("planner selections require explicit service, facet, and jurisdiction; repeated calls are rejected", async (t) => {
+test("unresolved or repeated planner calls produce guided clarification", async (t) => {
   const valid = {
     name: "lookup_official_information",
     args: { serviceId: "health_card", jurisdiction: "on", facetId: "steps", language: "en" },
   };
   for (const [label, messageText, functionCalls] of [
     ["missing jurisdiction", "How do I apply for a health card?", [valid]],
-    ["missing service", "How do I apply in Ontario?", [valid]],
-    ["ambiguous facet", "How do I apply and what fees are there for a health card in Ontario?", [valid]],
-    ["repeated call", "How do I apply for a health card in Ontario?", [valid, valid]],
+    ["missing service", "How do I apply in Ontario?", []],
+    ["repeated call", "Which service can help me?", [valid, valid]],
   ]) {
     await t.test(label, async () => {
       let dispatched;
@@ -495,7 +658,7 @@ test("planner selections require explicit service, facet, and jurisdiction; repe
         },
       });
       const events = await collect(stream);
-      assert.equal(dispatched, null);
+      assert.equal(dispatched, undefined);
       assert.equal(events[0].outcome.status, "clarification_required");
     });
   }

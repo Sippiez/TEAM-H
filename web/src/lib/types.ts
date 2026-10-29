@@ -1,3 +1,5 @@
+import type { LookupChoice, LookupContext } from "./official/catalog";
+
 /** PDF user-space rectangle: [x1, y1, x2, y2]. */
 export type PdfRect = [number, number, number, number];
 
@@ -41,10 +43,12 @@ export interface Resource {
   language?: "en-CA" | "fr-CA";
   jurisdiction?: string;
   provenance?: SourceProvenance;
+  citationUrl?: string;
 }
 
 export type SourceProvenance =
   | { kind: "live_official"; retrievedAt: string }
+  | { kind: "google_grounded"; searchedAt: string }
   | { kind: "reviewed_snapshot"; reviewedAt: string }
   | { kind: "saved_guidance"; reviewedAt: null };
 
@@ -54,13 +58,14 @@ export type OfficialLookupStatus =
   | "no_verified_results"
   | "unavailable";
 
-export interface OfficialLookupSummary {
+export interface OfficialLookupSummary extends LookupContext {
   status: OfficialLookupStatus;
   reason: string;
   partial: boolean;
-  jurisdiction?: string;
-  serviceId?: string;
-  facetId?: string;
+  method?: "official_page" | "search" | "google_grounding";
+  searchSuggestionsHtml?: string;
+  fallbackReason?: string;
+  restrictedDownload?: boolean;
 }
 
 export type ChatStreamEvent =
@@ -121,6 +126,8 @@ export interface ChatMessage extends Partial<AssistantReply> {
   language?: "en" | "fr";
   lookup?: OfficialLookupSummary;
   incomplete?: boolean;
+  error?: "timeout" | "connection" | "not_configured" | "unavailable";
+  request?: Pick<ChatRequest, "message" | "intent" | "selectedFieldId" | "lookupContext" | "lookupChoice">;
 }
 
 export interface ChatHistoryMessage {
@@ -135,6 +142,8 @@ export interface ChatRequest {
   selectedFieldId?: string;
   history?: ChatHistoryMessage[];
   language?: "en" | "fr";
+  lookupContext?: LookupContext;
+  lookupChoice?: LookupChoice;
 }
 
 export interface ExplainRequest {

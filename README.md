@@ -42,7 +42,7 @@ shadcn/ui). See [docs/mvp-design.md](docs/mvp-design.md) and
 `predev` and `prebuild` copy the pdf.js worker into `web/public/` (it's
 gitignored). `npm test` uses Node's built-in runner and the existing TypeScript
 compiler to exercise chat validation, prompts, typed streaming, errors, timeouts,
-cancellation, URL policy, pinned transport, query privacy, and provenance using
+cancellation, URL policy, Google grounding metadata, query privacy, and provenance using
 isolated fakes, plus message/document identity across Fast Refresh; it needs no
 API key or network.
 
@@ -61,26 +61,88 @@ accessible with the configured account; older 2.5 models returned 404.
 See [decision 0004](docs/decisions/0004-gemini-streaming-chat.md).
 Field-panel explanations remain rule-based and work without a key.
 
-Current service navigation uses the server-side Brave Search API adapter and
-requires `BRAVE_SEARCH_API_KEY` for live results. Without that key, the app
-reports that current information could not be verified and does not answer
-current-policy questions from model memory or saved guidance. Only fixed,
-reviewed service/facet keywords and the selected federal/provincial/territorial
-jurisdiction are sent to Brave; chat history, filenames, PDF fields, field
-values and personal details are not part of the search request. Gemini still
-receives the current user request for service selection and answer synthesis.
-Search credentials, provider handling/costs and production access controls need
-deployment review. See [decision 0005](docs/decisions/0005-restricted-official-search.md).
+Service navigation uses **direct official-page lookup first**, with **Google
+Search grounding only as a fallback**. Recognized download questions fetch
+their registered official information page without a search key. Without a
+Brave key, mapped federal services and Saskatchewan Student Aid use their
+mapped official pages. An optional `BRAVE_SEARCH_API_KEY` enables broader
+candidate discovery, followed by the same direct verification. Successful
+direct lookups use freshly retrieved excerpts and normal Gemini synthesis;
+they never consume Google Search grounding quota.
 
-Live page retrieval is restricted in code to the user-approved 14 federal,
-provincial and territorial host roots and their dot-delimited subdomains. The
-fetcher validates every candidate and redirect, resolves public IP addresses
-and pins each HTTPS connection to a validated address. It uses no cookies,
-authentication, form submissions, scripts or subresources. The total chat
-deadline remains 30 seconds; retrieval has a 10-second sub-budget, with at
-most five candidates, three fetches, two concurrent requests and three
-redirects per page. Live retrieval timestamps are distinct from saved
-guidance; existing content has no recorded content-review date.
+If direct lookup fails or finds no usable evidence, it tries Google Search
+grounding through the existing `@google/genai` SDK and `GEMINI_API_KEY`.
+Clarification and user cancellation do not start a fallback. No Vercel AI SDK
+migration is needed. Search requests contain only fixed catalog service/facet
+keywords, the chosen jurisdiction, interface language and recognized public form
+references, not chat history, filenames, PDF fields, entered values or arbitrary
+user wording. Google generates its grounding queries from that public context.
+Service selection and ordinary chat still receive the bounded context described
+in the privacy notice.
+
+For the Google fallback, the app requires actual search/citation metadata, a complete response
+and the associated Search Suggestions. It displays the Google-grounded answer
+with numbered citations, without a second model synthesis or silent memory
+fallback. Sources are labeled **Google Search grounded**, not as pages fetched
+and checked directly by the app. Source language is not guessed from the answer
+language. Google Search Suggestions are displayed in a sandboxed, script-disabled
+frame beside the answer.
+Google retains grounding requests, context and responses for 30 days. Grounding
+can involve multiple provider-generated queries and separate charges. Review
+current Google pricing, data handling and service terms before deployment; see
+[decision 0006](docs/decisions/0006-google-search-grounding.md).
+
+Recognized form IDs and conversation-scoped service selections resolve questions
+such as "Where do I download this form?" and "What about the fees?". Federal
+programs do not require users to repeat "federal". When a service or region is
+missing, an inline selector asks only for the missing detail and resumes the
+original question. A typed, recognized form number also resumes the previous
+question, rather than restarting service selection. OAS/GIS and CPP have distinct
+service routing and saved links. Saskatchewan's 2026-27 full-time Student Aid
+application (public product `154091`) is recognized locally from its public
+first-page title, not its filename, and routes to Saskatchewan. Reopen an already
+loaded PDF after updating the app to rerun identification. Other years and
+part-time titles are not treated as this application.
+
+Every source must resolve to one of the user-approved 14 official content roots
+and the selected jurisdiction. Direct retrieval validates public DNS addresses,
+pins HTTPS connections to validated addresses and checks every redirect before
+following it. It fetches bounded HTML/plain text without scripts, subresources,
+credentials or cookies, rejects archived/irrelevant pages, and checks recognized
+form references. Excluded downloads are flagged without fetching or emitting
+their URLs. TLS verification remains enabled.
+
+A Google-grounded response citing excluded, sign-in or wrong-jurisdiction
+sources is rejected as a whole; its text is not selectively rewritten.
+Google-generated `site:` queries are a prompt constraint, not a
+provider-enforced allowlist. The application enforces source admission afterward.
+The Google fallback's only citation-resolution request is a manual HEAD request
+to Google's fixed `vertexaisearch.cloud.google.com/grounding-api-redirect/`
+endpoint. It checks the destination without following the redirect or contacting
+the government page, and preserves Google's citation link for the user.
+Google citation URLs are transport references, not additional approved content
+roots. Arbitrary redirects and excluded `.gc.ca` sources remain blocked.
+
+The total chat deadline remains 30 seconds. Direct lookup has a 10-second
+sub-budget, at most five candidates, three page requests, two concurrent requests
+and three redirects per page. Google fallback has a 20-second sub-budget under
+the same overall deadline, at most eight source entries and bounded
+answer/metadata sizes. Google-grounded pages do not receive independent archive
+or download checks, and Google may not have read their latest complete content.
+Source labels distinguish direct retrieval from Google grounding; fallback
+metadata preserves the original direct failure. Saved guidance stays separately
+labeled and never becomes live evidence.
+
+Switching to mobile data/hotspot may avoid a network's TLS-inspecting proxy.
+The application does not change networking or trust stores, and does not
+disable certificate verification. If direct retrieval still fails and Google's
+quota is exhausted, both attempts are reported as unavailable.
+Interrupted responses preserve partial text and sources, mark the answer
+incomplete, and provide retry; missing setup is not disguised as a retryable
+network problem. Suggestions and recovery controls follow the interface language.
+Starter suggestions yield space after the first question. Expandable AI/search
+privacy details and a scrollable panel preserve a readable mobile answer area;
+the personal-information warning remains visible.
 
 PDF bytes and entered field values stay in the browser. Chat shares bounded
 form and field metadata (including the filename), the selected field, and recent
@@ -112,9 +174,13 @@ only if you do not already have `.env.local`:
 cp -n .env.example .env.local
 ```
 
-Set `GEMINI_API_KEY` to a Google AI Studio key and `BRAVE_SEARCH_API_KEY` to
-your Brave Search API key in that ignored local file or in your deployment's
-server-side secret store. Leave the Brave key empty to disable live search.
+Set `GEMINI_API_KEY` to a Google AI Studio key in that ignored local file or in
+your deployment's server-side secret store. Successful direct-page lookup needs
+ordinary Gemini generation, not Google Search quota. For the Google fallback,
+the key's project must have grounding access and sufficient quota/billing.
+Ordinary Gemini generation working does not prove that search quota is
+available. `BRAVE_SEARCH_API_KEY` is optional for broader first-attempt
+discovery; mapped pages and recognized downloads work without it.
 `GEMINI_MODEL` optionally overrides
 `gemini-3.1-flash-lite`. Never prefix any key with `NEXT_PUBLIC_`.
 Next.js loads `.env.local`; restart the server after changing it. Never commit
@@ -123,8 +189,9 @@ workspace template, not the web app's configuration.
 
 Chat has a 30-second deadline. Missing `GEMINI_API_KEY` returns 503; a Gemini
 startup failure before streaming returns 502, and deadline expiry before
-streaming returns 504. A missing `BRAVE_SEARCH_API_KEY` produces an explicit
-unavailable lookup outcome in the stream. Search failures and post-start
+streaming returns 504. After a failed direct attempt, Google search quota
+exhaustion produces an explicit `grounding_quota` state with the original
+failure reason, not an ungrounded answer. Search failures and post-start
 generation failures are reported through typed SSE events, and any partial
 answer is marked incomplete. New session and document removal abort their
 pending chats. This hackathon endpoint still needs deployment-level

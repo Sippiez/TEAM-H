@@ -37,6 +37,8 @@ const hosts = loadModule("../src/lib/official/hosts.ts", {});
 const catalog = loadModule("../src/lib/official/catalog.ts", {
   "./hosts": hosts,
 });
+const resources = loadModule("../src/lib/catalog/resources.ts", {});
+const cancellation = loadModule("../src/lib/abortable.ts", {});
 const fetcher = loadModule("../src/lib/official/fetch.ts", {
   "server-only": {},
   "node:dns/promises": dns,
@@ -47,18 +49,21 @@ const fetcher = loadModule("../src/lib/official/fetch.ts", {
 const search = loadModule("../src/lib/official/search.ts", {
   "server-only": {},
   "./catalog": catalog,
+  "../catalog/resources": resources,
 }, {
   process,
   fetch: (...args) => globalThis.fetch(...args),
 });
-const lookup = loadModule("../src/lib/official/lookup.ts", {
+const lookupImports = {
   "server-only": {},
   "node:crypto": crypto,
   "./catalog": catalog,
   "./fetch": fetcher,
   "./hosts": hosts,
   "./search": search,
-});
+  "@/lib/abortable": cancellation,
+};
+const lookup = loadModule("../src/lib/official/lookup.ts", lookupImports);
 
 test("the approved registry contains exactly the fourteen jurisdiction roots", () => {
   assert.deepEqual(Array.from(hosts.ALLOWED_ROOTS), [
@@ -594,5 +599,127 @@ test("Brave adapter sends canonical catalog keywords, not user-supplied canaries
     globalThis.fetch = originalFetch;
     if (originalKey === undefined) delete process.env.BRAVE_SEARCH_API_KEY;
     else process.env.BRAVE_SEARCH_API_KEY = originalKey;
+  }
+});
+
+const studentSelection = {
+  serviceId: "student_aid", jurisdiction: "sk", facetId: "documents", language: "en", formId: "sk154091",
+};
+const studentPage = {
+  url: catalog.PUBLIC_FORMS.sk154091.url,
+  title: "2026-27 Full-Time Saskatchewan Student Aid forms",
+  text: "2026-27 Full-Time Saskatchewan Student Aid forms. Download the full-time application for this study year.",
+  language: "en-CA",
+};
+const quotaResult = {
+  outcome: { status: "unavailable", reason: "grounding_quota", partial: false, method: "google_grounding" },
+  sources: [],
+};
+
+test("registered Student Aid pages use direct verification before any search fallback", async () => {
+  const fetched = [];
+  const result = await lookup.lookupOfficialWithFallback(studentSelection, undefined,
+    async () => assert.fail("A verified direct result must not call Google"),
+    {
+      search: async () => assert.fail("A registered download has its own fixed page"),
+      fetchPage: async (url) => { fetched.push(url); return studentPage; },
+    },
+  );
+  assert.deepEqual(fetched, [studentPage.url]);
+  assert.equal(result.outcome.status, "verified");
+  assert.equal(result.outcome.method, "official_page");
+  assert.equal(result.outcome.fallbackReason, undefined);
+  assert.equal(result.sources[0].provenance.kind, "live_official");
+  assert.match(result.sources[0].evidence, /2026-27 Full-Time/);
+});
+
+test("failed direct fetch invokes Google once with the same public selection and retains the first failure", async () => {
+  const order = [];
+  const controller = new AbortController();
+  const result = await lookup.lookupOfficialWithFallback(studentSelection, controller.signal,
+    async (selection, signal) => {
+      order.push("google");
+      assert.equal(selection, studentSelection);
+      assert.equal(signal, controller.signal);
+      assert.equal(signal.aborted, false);
+      return quotaResult;
+    },
+    { fetchPage: async () => { order.push("direct"); throw new fetcher.OfficialFetchError("network_failed"); } },
+  );
+  assert.deepEqual(order, ["direct", "google"]);
+  assert.equal(result.outcome.reason, "grounding_quota");
+  assert.equal(result.outcome.fallbackReason, "fetch_failed");
+  assert.equal(result.sources.length, 0);
+});
+
+test("wrong study years, part-time forms and archived pages use fallback, never direct evidence", async () => {
+  for (const page of [
+    { ...studentPage, title: "2025-26 Full-Time Saskatchewan Student Aid", text: "2025-26 Full-Time Saskatchewan Student Aid forms." },
+    { ...studentPage, title: "2026-27 Part-Time Saskatchewan Student Aid", text: "2026-27 Part-Time Saskatchewan Student Aid forms." },
+    { ...studentPage, archived: true },
+  ]) {
+    let fallbacks = 0;
+    const result = await lookup.lookupOfficialWithFallback(studentSelection, undefined,
+      async () => { fallbacks += 1; return quotaResult; },
+      { fetchPage: async () => page },
+    );
+    assert.equal(fallbacks, 1);
+    assert.equal(result.outcome.fallbackReason, "no_relevant_pages");
+    assert.equal(result.sources.length, 0);
+  }
+});
+
+test("clarification and parent cancellation never start a Google fallback", async () => {
+  const fallback = async () => assert.fail("Do not search after clarification or cancellation");
+  const invalid = await lookup.lookupOfficialWithFallback({ ...studentSelection, query: "PRIVATE-CANARY" }, undefined, fallback);
+  assert.equal(invalid.outcome.status, "clarification_required");
+  const controller = new AbortController();
+  const cancelled = await lookup.lookupOfficialWithFallback(studentSelection, controller.signal, fallback, {
+    fetchPage: async () => { controller.abort(); throw new Error("cancelled"); },
+  });
+  assert.equal(cancelled.outcome.reason, "deadline");
+  assert.equal(cancelled.outcome.method, "official_page");
+});
+
+test("the direct sub-budget expires without aborting the parent's Google fallback signal", async () => {
+  const timed = loadModule("../src/lib/official/lookup.ts", lookupImports, {
+    setTimeout(callback, milliseconds) {
+      assert.equal(milliseconds, 10_000);
+      return setTimeout(callback, 10);
+    },
+  });
+  const parent = new AbortController();
+  let directSignal;
+  const result = await timed.lookupOfficialWithFallback(studentSelection, parent.signal,
+    async (_selection, signal) => {
+      assert.equal(signal, parent.signal);
+      assert.equal(signal.aborted, false);
+      assert.equal(directSignal.aborted, true);
+      return quotaResult;
+    },
+    { fetchPage: async (_url, signal) => { directSignal = signal; return new Promise(() => {}); } },
+  );
+  assert.equal(result.outcome.fallbackReason, "deadline");
+});
+
+test("mapped personal income tax lookup works without Brave or Google when direct fetch succeeds", async () => {
+  const previous = process.env.BRAVE_SEARCH_API_KEY;
+  delete process.env.BRAVE_SEARCH_API_KEY;
+  try {
+    const result = await lookup.lookupOfficialWithFallback(
+      { serviceId: "income_tax", jurisdiction: "federal", facetId: "overview", language: "en" },
+      undefined, async () => assert.fail("Mapped tax page must be tried and used first"),
+      { fetchPage: async (url) => ({
+        url, title: "Personal income tax",
+        text: "Personal income tax filing instructions and current official information.",
+        language: "en-CA",
+      }) },
+    );
+    assert.equal(result.outcome.method, "official_page");
+    assert.equal(result.outcome.status, "verified");
+    assert.match(result.sources[0].url, /personal-income-tax/);
+  } finally {
+    if (previous === undefined) delete process.env.BRAVE_SEARCH_API_KEY;
+    else process.env.BRAVE_SEARCH_API_KEY = previous;
   }
 });

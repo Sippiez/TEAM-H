@@ -1,8 +1,11 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
+import { abortable } from "@/lib/abortable";
 import {
   allowedRootForSelection,
+  PUBLIC_FORMS,
+  publicFormReference,
   serviceMatchesText,
   validateLookupSelection,
   type LookupSelection,
@@ -33,19 +36,25 @@ export type LookupReason =
   | "no_allowed_candidates"
   | "no_relevant_pages"
   | "fetch_failed"
+  | "grounding_quota"
+  | "grounding_failed"
+  | "no_grounding"
+  | "blocked_grounding_sources"
   | "deadline";
 
 export interface OfficialSource extends Resource {
-  language: "en-CA" | "fr-CA";
+  language?: "en-CA" | "fr-CA";
   jurisdiction: JurisdictionId;
   facetId: string;
-  provenance: Extract<SourceProvenance, { kind: "live_official" }>;
-  evidence: string;
+  provenance: Extract<SourceProvenance, { kind: "live_official" | "google_grounded" }>;
+  evidence?: string;
+  restrictedDownload?: boolean;
 }
 
 export interface OfficialLookupResult {
   outcome: OfficialLookupSummary & { reason: LookupReason };
   sources: OfficialSource[];
+  answer?: string;
 }
 
 export interface LookupDependencies {
@@ -55,6 +64,7 @@ export interface LookupDependencies {
   ) => Promise<{
     candidates: Array<{ url: string; sponsored: boolean }>;
     rejectedSponsored: number;
+    method?: "official_page" | "search";
   }>;
   fetchPage?: (
     url: string,
@@ -73,7 +83,9 @@ function isRelevantServicePage(
   selection: LookupSelection,
   page: { title: string; text: string },
 ): boolean {
-  return serviceMatchesText(`${page.title} ${page.text}`, selection.serviceId);
+  const content = `${page.title} ${page.text}`;
+  return serviceMatchesText(content, selection.serviceId) &&
+    (!selection.formId || selection.facetId !== "documents" || publicFormReference(selection.formId, content) !== null);
 }
 
 function failureReason(error: unknown): LookupReason {
@@ -93,6 +105,7 @@ function asSource(
     title: string;
     text: string;
     language: "en-CA" | "fr-CA";
+    hasBlockedDownloads?: boolean;
   },
   now: Date,
 ): OfficialSource {
@@ -103,6 +116,9 @@ function asSource(
   const retrievedAt = now.toISOString();
   const id = `live-${createHash("sha256").update(page.url).digest("hex").slice(0, 16)}`;
   const jurisdiction = JURISDICTIONS[parsed.jurisdiction];
+  const formMention = selection.formId && selection.facetId === "documents"
+    ? publicFormReference(selection.formId, page.text) : null;
+  const evidenceStart = formMention ? Math.max(0, formMention.index - 1_000) : 0;
   return {
     id,
     title: page.title.slice(0, 240),
@@ -114,7 +130,8 @@ function asSource(
     jurisdiction: parsed.jurisdiction,
     facetId: selection.facetId,
     provenance: { kind: "live_official", retrievedAt },
-    evidence: page.text.slice(0, MAX_EVIDENCE_CHARS),
+    evidence: page.text.slice(evidenceStart, evidenceStart + MAX_EVIDENCE_CHARS),
+    restrictedDownload: page.hasBlockedDownloads === true,
   };
 }
 
@@ -131,10 +148,12 @@ export async function lookupOfficialInformation(
     };
   }
   const jurisdiction = selection.jurisdiction;
-  const common = {
+  const common: Pick<OfficialLookupSummary, "jurisdiction" | "serviceId" | "facetId" | "formId" | "method"> = {
     jurisdiction,
     serviceId: selection.serviceId,
     facetId: selection.facetId,
+    ...(selection.formId ? { formId: selection.formId } : {}),
+    method: selection.formId && selection.facetId === "documents" ? "official_page" : "search",
   };
   if (signal?.aborted) {
     return {
@@ -153,7 +172,14 @@ export async function lookupOfficialInformation(
   let stage: "search" | "fetch" = "search";
 
   try {
-    const searchResult = await search(selection, controller.signal);
+    const searchResult = selection.formId && selection.facetId === "documents"
+      ? {
+          candidates: [{ url: PUBLIC_FORMS[selection.formId].url, sponsored: false }],
+          rejectedSponsored: 0,
+          method: "official_page" as const,
+        }
+      : await abortable(search(selection, controller.signal), controller.signal);
+    common.method = searchResult.method ?? common.method;
     stage = "fetch";
     const urls = [...new Set(searchResult.candidates
       .filter((candidate) => !candidate.sponsored)
@@ -182,7 +208,7 @@ export async function lookupOfficialInformation(
           continue;
         }
         try {
-          const page = await fetchPage(urls[index], controller.signal);
+          const page = await abortable(fetchPage(urls[index], controller.signal), controller.signal);
           if (isArchivedPage(page) || !isRelevantServicePage(selection, page)) {
             irrelevantPages += 1;
             continue;
@@ -211,10 +237,12 @@ export async function lookupOfficialInformation(
             urls.length > MAX_FETCHES ||
             searchResult.rejectedSponsored > 0,
           ...common,
+          restrictedDownload: sources.some((source) => source.restrictedDownload),
         },
         sources: sources.slice(0, MAX_FETCHES),
       };
     }
+
     return {
       outcome: {
         status: controller.signal.aborted || failedFetches > 0 ? "unavailable" : "no_verified_results",
@@ -248,4 +276,20 @@ export async function lookupOfficialInformation(
     clearTimeout(timeout);
     signal?.removeEventListener("abort", abortParent);
   }
+}
+
+export async function lookupOfficialWithFallback(
+  argumentsValue: unknown,
+  signal: AbortSignal | undefined,
+  fallback: (args: unknown, signal?: AbortSignal) => Promise<OfficialLookupResult>,
+  dependencies: LookupDependencies = {},
+): Promise<OfficialLookupResult> {
+  const direct = await lookupOfficialInformation(argumentsValue, signal, dependencies);
+  if (direct.outcome.status === "verified" ||
+    direct.outcome.status === "clarification_required" || signal?.aborted) return direct;
+  const grounded = await fallback(argumentsValue, signal);
+  return {
+    ...grounded,
+    outcome: { ...grounded.outcome, fallbackReason: direct.outcome.reason },
+  };
 }
