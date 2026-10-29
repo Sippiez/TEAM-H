@@ -101,12 +101,12 @@ export function ChatPanel({
               {m.overview ? (
                 <OverviewCard overview={m.overview} />
               ) : (
-                <div lang={en}>
+                <div lang={m.language ?? en}>
                   <RichText text={m.text} />
                 </div>
               )}
               {m.overview && m.text && !m.text.startsWith(m.overview.summary) && (
-                <div lang={en}>
+                <div lang={m.language ?? en}>
                   <RichText text={m.text} />
                 </div>
               )}

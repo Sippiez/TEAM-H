@@ -22,8 +22,10 @@
   --color-status-wash: #fffbe0;
   --color-pencil: #2556a6;
 
-  --shadow-sheet: 0 1px 2px rgb(34 38 43 / 0.1), 8px 14px 28px -10px rgb(34 38 43 / 0.3);
-  --shadow-card: 0 1px 1px rgb(34 38 43 / 0.08), 3px 5px 12px -6px rgb(34 38 43 / 0.3);
+  --shadow-sheet:
+    0 1px 2px rgb(34 38 43 / 0.1), 8px 14px 28px -10px rgb(34 38 43 / 0.3);
+  --shadow-card:
+    0 1px 1px rgb(34 38 43 / 0.08), 3px 5px 12px -6px rgb(34 38 43 / 0.3);
 
   --ease-route: cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -125,13 +127,530 @@
 }
 
 @layer components {
+  html:has(.pr-workspace),
+  body:has(.pr-workspace),
+  .pr-workspace,
+  .pr-workspace * {
+    scrollbar-width: none;
+  }
+
+  html:has(.pr-workspace)::-webkit-scrollbar,
+  body:has(.pr-workspace)::-webkit-scrollbar,
+  .pr-workspace::-webkit-scrollbar,
+  .pr-workspace *::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pr-workspace .pr-document-scroll {
+    scrollbar-width: auto;
+  }
+
+  .pr-workspace .pr-document-scroll::-webkit-scrollbar {
+    display: block;
+    width: 0;
+    height: 12px;
+  }
+
+  .pr-workspace .pr-document-scroll::-webkit-scrollbar-thumb {
+    border: 3px solid var(--color-desk);
+    border-radius: 999px;
+    background: var(--color-quiet-stroke);
+  }
+
+  .pr-workspace .pr-document-scroll::-webkit-scrollbar-track {
+    background: var(--color-desk);
+  }
+
   /* Highlighter mark behind a heading. */
   .pr-hl {
-    background: linear-gradient(transparent 56%, var(--color-highlighter) 56%, var(--color-highlighter) 94%, transparent 94%);
+    background: linear-gradient(
+      transparent 56%,
+      var(--color-highlighter) 56%,
+      var(--color-highlighter) 94%,
+      transparent 94%
+    );
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
     padding: 0 3px;
     margin: 0 -3px;
+  }
+
+  /* Concept 1's landing page; the document workspace keeps Paper Route. */
+  .marginalia-landing {
+    width: 100%;
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 36px 28px 120px;
+    overflow-x: clip;
+  }
+
+  .marginalia-landing-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(340px, 1fr);
+    gap: 56px;
+    align-items: start;
+  }
+
+  .marginalia-pitch {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .marginalia-sample {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .marginalia-desk {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 520px) minmax(240px, 300px);
+    gap: 64px;
+    align-items: start;
+  }
+
+  .marginalia-sheet {
+    position: relative;
+    min-width: 0;
+    --paper-back-rest: rotate(-2deg) translate(-12px, 10px);
+  }
+
+  .marginalia-sheet::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--color-paper);
+    border: 1px solid var(--color-rule-2);
+    box-shadow: var(--shadow-card);
+    transform: var(--paper-back-rest);
+  }
+
+  .marginalia-form {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    aspect-ratio: 8.5 / 11;
+    padding: 5.5% 6%;
+    background: var(--color-paper);
+    box-shadow: var(--shadow-sheet);
+    font-size: 10.5px;
+    line-height: 1.25;
+  }
+
+  .marginalia-form-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 12px;
+    border-bottom: 2px solid var(--color-ink);
+    padding-bottom: 8px;
+  }
+
+  .marginalia-form-head > span:first-child {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .marginalia-form-head em {
+    font-weight: 400;
+    font-style: normal;
+    color: var(--color-ink-2);
+  }
+
+  .marginalia-form-head > span:nth-child(2) {
+    color: var(--color-ink-2);
+  }
+
+  .marginalia-form-head h2 {
+    grid-column: 1 / -1;
+    font-size: 1.45em;
+    letter-spacing: 0.01em;
+  }
+
+  .marginalia-form-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+  }
+
+  .marginalia-form-bar {
+    margin-top: 4px;
+    padding: 4px 8px;
+    background: var(--color-ink);
+    color: var(--color-paper);
+    font-size: inherit;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.25;
+  }
+
+  .marginalia-form-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .marginalia-form-details {
+    grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  }
+
+  .marginalia-form-address {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .marginalia-field {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    min-height: 3.6em;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 4px 6px 5px;
+    border: 1px solid #5d6670;
+    border-radius: 2px;
+    font-size: inherit;
+    overflow-wrap: anywhere;
+  }
+
+  .marginalia-field > span:first-child,
+  .marginalia-static {
+    font-size: 0.92em;
+  }
+
+  .marginalia-field.is-selected {
+    background: var(--color-highlighter);
+    box-shadow: inset 0 0 0 2px var(--color-highlighter-ink);
+  }
+
+  .marginalia-field.is-visited::after {
+    content: "";
+    position: absolute;
+    top: 5px;
+    right: 8px;
+    width: 5px;
+    height: 10px;
+    border: solid var(--color-ink);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  .marginalia-field.is-visited > span:first-child {
+    padding-right: 12px;
+  }
+
+  .marginalia-boxes,
+  .marginalia-ticks {
+    display: flex;
+    gap: 4px;
+  }
+
+  .marginalia-boxes > span {
+    flex: 1;
+    min-height: 1.4em;
+    border-bottom: 1px solid #5d6670;
+    font-size: 0.78em;
+    color: var(--color-ink-2);
+  }
+
+  .marginalia-ticks {
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    font-size: 0.9em;
+  }
+
+  .marginalia-ticks > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .marginalia-ticks > span::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    flex: none;
+    border: 1px solid var(--color-ink);
+  }
+
+  .marginalia-static {
+    color: var(--color-ink-2);
+    border-color: var(--color-quiet-stroke);
+  }
+
+  .marginalia-notes {
+    position: relative;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .marginalia-note {
+    position: absolute;
+    right: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 17px;
+    line-height: 1.5;
+  }
+
+  .marginalia-note h3 {
+    font-size: 18px;
+    line-height: 1.5;
+  }
+
+  .marginalia-note a {
+    width: fit-content;
+    padding: 2px 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .marginalia-leaders {
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .marginalia-leader,
+  .marginalia-leader-halo {
+    fill: none;
+    stroke: var(--color-ink);
+    stroke-width: 1.5px;
+    stroke-linecap: round;
+  }
+
+  .marginalia-leader-halo {
+    stroke: var(--color-paper);
+    stroke-width: 5px;
+    opacity: 0.9;
+  }
+
+  .marginalia-leader-start {
+    fill: var(--color-highlighter);
+    stroke: var(--color-ink);
+    stroke-width: 1.5px;
+  }
+
+  .marginalia-leader-end {
+    fill: var(--color-ink);
+  }
+
+  .marginalia-service {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 56px;
+    margin-top: 96px;
+  }
+
+  .marginalia-service-index li {
+    border-bottom: 1px solid var(--color-rule-2);
+  }
+
+  .marginalia-service-index a {
+    display: flex;
+    min-height: 52px;
+    align-items: baseline;
+    gap: 10px;
+    padding: 12px 0;
+    color: var(--color-ink);
+    text-decoration: none;
+  }
+
+  .marginalia-service-name {
+    color: var(--color-pencil);
+    font-size: 19px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+  }
+
+  .marginalia-service-index a:hover .marginalia-service-name {
+    text-decoration-thickness: 2px;
+  }
+
+  .marginalia-service-leader {
+    min-width: 24px;
+    flex: 1;
+    border-bottom: 2px dotted var(--color-quiet-stroke);
+    transform: translateY(-5px);
+  }
+
+  .marginalia-service-department {
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  @media (max-width: 1180px) {
+    .marginalia-landing-grid {
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 40px;
+    }
+
+    .marginalia-desk {
+      grid-template-columns: minmax(0, 1fr) 230px;
+      gap: 40px;
+    }
+  }
+
+  @media (max-width: 1100px) {
+    .marginalia-landing-grid {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 48px;
+    }
+
+    .marginalia-pitch {
+      grid-column: auto;
+      grid-row: auto;
+    }
+
+    .marginalia-sample {
+      grid-column: auto;
+      grid-row: auto;
+    }
+  }
+
+  @media (max-width: 860px) {
+    .marginalia-landing {
+      padding: 24px 16px 120px;
+    }
+
+    .marginalia-desk {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 24px;
+    }
+
+    .marginalia-sheet::before {
+      --paper-back-rest: rotate(-1.5deg) translate(-4px, 6px);
+    }
+
+    .marginalia-form {
+      font-size: 8.5px;
+    }
+
+    .marginalia-notes {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .marginalia-note {
+      position: static;
+    }
+
+    .marginalia-leaders {
+      display: none;
+    }
+
+    .marginalia-service {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 20px;
+      margin-top: 64px;
+    }
+
+    .marginalia-service-index a {
+      min-height: 56px;
+    }
+
+    .marginalia-note a {
+      display: flex;
+      min-height: 44px;
+      align-items: center;
+    }
+  }
+
+  /* ---------- Marginalia landing-page upload sheet ---------- */
+  .marginalia-drop {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border: 1px solid var(--color-rule);
+    transition:
+      background-color 160ms ease-out,
+      box-shadow 160ms ease-out;
+  }
+
+  .marginalia-drop::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 10px;
+    border: 1.5px dashed var(--color-quiet-stroke);
+    pointer-events: none;
+    transition: border-color 160ms ease-out;
+  }
+
+  .marginalia-drop::after {
+    content: "";
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(
+      225deg,
+      var(--color-desk) 49%,
+      var(--color-rule) 50%,
+      #dfe4e9 53%
+    );
+    box-shadow: -2px 2px 3px -1px rgb(34 38 43 / 0.18);
+    pointer-events: none;
+  }
+
+  .marginalia-drop:hover::before,
+  .marginalia-drop-active::before {
+    border-color: var(--color-ink);
+  }
+
+  .marginalia-drop-active {
+    background: var(--color-status-wash);
+  }
+
+  .marginalia-drop-active::before {
+    border-style: solid;
+    border-width: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .marginalia-sheet::before {
+      animation: marginalia-paper-back 600ms var(--ease-route) backwards;
+    }
+
+    .marginalia-form {
+      animation: marginalia-paper-front 650ms var(--ease-route) backwards;
+    }
+
+    .marginalia-field.is-selected {
+      background-image: linear-gradient(var(--color-highlighter), var(--color-highlighter));
+      background-color: transparent;
+      background-repeat: no-repeat;
+      animation: fh-swipe 350ms 430ms var(--ease-route) backwards;
+    }
+
+    .marginalia-notes,
+    .marginalia-leaders {
+      animation: marginalia-ink-in 220ms 380ms ease-out backwards;
+    }
+
+    .marginalia-upload-icon {
+      transition: translate 180ms var(--ease-route);
+    }
+
+    .marginalia-drop:is(:hover, :focus-within, .marginalia-drop-active) .marginalia-upload-icon {
+      translate: 0 -3px;
+    }
+
+    .marginalia-navigator[open] > div {
+      animation: marginalia-ink-in 180ms ease-out;
+    }
   }
 
   /* ---------- Route of fields (signature) ---------- */
@@ -401,7 +920,10 @@
     z-index: 2;
     mix-blend-mode: multiply;
     background-color: transparent;
-    background-image: linear-gradient(var(--color-highlighter), var(--color-highlighter));
+    background-image: linear-gradient(
+      var(--color-highlighter),
+      var(--color-highlighter)
+    );
     background-repeat: no-repeat;
     background-position: left center;
     background-size: 100% 100%;
@@ -411,6 +933,14 @@
   .pr-ff.is-selected.is-arrived {
     animation: fh-arrive 650ms ease-out;
   }
+
+  .pr-hl-swipe {
+    background-repeat: no-repeat;
+    background-position: left center;
+    background-size: 100% 100%;
+    animation: fh-swipe 450ms var(--ease-route) both;
+  }
+
   .pr-ff.is-selected::before {
     content: "";
     position: absolute;
@@ -435,6 +965,7 @@
   }
 
   /* ---------- Service map (signature) ---------- */
+  /*
   .pr-map-link {
     position: absolute;
     width: 0;
@@ -536,6 +1067,8 @@
       inset 0 0 0 5px var(--color-ink);
   }
 }
+*/
+}
 
 /* Toasts: sonner injects unlayered CSS at runtime, so these overrides stay unlayered too. */
 [data-sonner-toast][data-styled="true"].pr-toast {
@@ -599,12 +1132,43 @@
   }
 }
 
+@keyframes marginalia-paper-back {
+  from {
+    transform: translate(-36px, 12px) rotate(-5deg);
+  }
+  to {
+    transform: var(--paper-back-rest);
+  }
+}
+
+@keyframes marginalia-paper-front {
+  from {
+    translate: 48px -12px;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+
+@keyframes marginalia-ink-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .marginalia-drop,
+  .marginalia-drop::before,
   .pr-yah,
   .pr-ff {
     transition: none;
   }
-  .pr-ff.is-selected {
+
+  .pr-ff.is-selected,
+  .pr-hl-swipe {
     animation: none;
   }
 }

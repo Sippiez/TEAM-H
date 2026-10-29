@@ -92,6 +92,12 @@ export interface ChatMessage extends Partial<AssistantReply> {
   id: string;
   role: "user" | "assistant";
   text: string;
+  language?: "en" | "fr";
+}
+
+export interface ChatHistoryMessage {
+  role: "user" | "assistant";
+  text: string;
 }
 
 export interface ChatRequest {
@@ -99,6 +105,8 @@ export interface ChatRequest {
   intent?: "overview";
   form?: FormContext;
   selectedFieldId?: string;
+  history?: ChatHistoryMessage[];
+  language?: "en" | "fr";
 }
 
 export interface ExplainRequest {

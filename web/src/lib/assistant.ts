@@ -1,6 +1,7 @@
 import { findKnownForm, resolveRule } from "@/lib/catalog/forms";
 import { getResources, RESOURCES } from "@/lib/catalog/resources";
 import { explainField } from "@/lib/explain";
+import { fieldSearchScore } from "@/lib/field-search";
 import { tokenize } from "@/lib/text";
 import type {
   AssistantReply,
@@ -73,20 +74,14 @@ export function searchResources(query: string, limit = 3): Resource[] {
 }
 
 function rankFields(query: string, form: FormContext): { field: FieldSummary; score: number }[] {
-  const tokens = new Set(tokenize(query));
   const known = findKnownForm(form.formNumber);
   return form.fields
     .map((field) => {
       const rule = resolveRule(known, field.path);
-      const label = new Set(tokenize(field.label));
-      const keywords = new Set((rule?.keywords ?? []).flatMap((k) => tokenize(k)));
-      const section = new Set(tokenize(field.section));
-      let score = 0;
-      for (const t of tokens) {
-        if (label.has(t)) score += 3;
-        if (keywords.has(t)) score += 2;
-        if (section.has(t)) score += 1;
-      }
+      const score =
+        fieldSearchScore(query, [field.label]) * 3 +
+        fieldSearchScore(query, rule?.keywords ?? []) * 2 +
+        fieldSearchScore(query, [field.section]);
       return { field, score };
     })
     .filter((x) => x.score >= 3)
@@ -160,6 +155,19 @@ export function reply(req: ChatRequest): AssistantReply {
   const fieldMatches = form ? rankFields(message, form) : [];
   const resources = searchResources(message);
   const wantsField = FIND_FIELD.test(message);
+  const nameSearchTerms = new Set(["name", "given", "first", "last", "surname", "family", "nom", "prenom"]);
+  const queryTokens = tokenize(message);
+
+  if (
+    fieldMatches.length > 1 &&
+    queryTokens.length === 1 &&
+    nameSearchTerms.has(queryTokens[0])
+  ) {
+    return {
+      text: "I found several name fields. Choose the one you mean:",
+      fieldRefs: fieldMatches.slice(0, 4).map(({ field }) => fieldReference(field, form)),
+    };
+  }
 
   if (fieldMatches.length && (wantsField || fieldMatches[0].score >= (resources.length ? 6 : 3))) {
     const [best, ...rest] = fieldMatches;

@@ -111,13 +111,19 @@ components:
 
 # Design System: Form Helper
 
-The reference implementation is
+The workspace reference implementation is
 [design-explorations/06-paper-route.html](design-explorations/06-paper-route.html),
 chosen in [decision 0003](docs/decisions/0003-paper-route-design-direction.md).
 The production implementation is in [web/](web/): tokens and `.pr-*`
 component classes in `web/src/app/globals.css`, and components in
 `web/src/components/form-helper/`. When this file and the prototype or app
 disagree, this file wins. Update it when the direction changes.
+
+The landing page follows **direction 1, Marginalia**:
+`design-explorations/01-marginalia.html`. Its scoped `.marginalia-*` classes,
+`landing.tsx`, and `marginalia-preview.tsx` use the same paper, graphite,
+highlighter and typography family as the workspace. The landing-specific
+composition below takes precedence over the original Paper Route landing.
 
 ## Overview
 
@@ -225,12 +231,44 @@ counts and example values.
   language toggle (left of New session, showing the other language's name
   with a matching `lang`). Below 640px, New session is icon-only, so the
   brand, toggle and button fit on one row.
-- **Landing:** a maximum width of 1360px in a 5fr / 7fr grid with a 40px gap.
-  The left column holds the hero and the "Start here" upload card. The right
-  column holds the service map and "Try a sample form". The grid collapses to
-  one column at 1100px or below.
-- **Workspace at 1081px and above:** a height-locked
-  `300px | minmax(0, 1fr) | 456px` grid. Each column scrolls independently.
+- **Landing (Marginalia):** a maximum width of 1440px in a 2fr / 1fr grid
+  with a 56px gap. An illustrative passport sheet and three margin notes
+  sit on the left; the hero, folded-paper upload control, working sample
+  and privacy notes sit on the right. Leader lines attach to the measured
+  field edges and note headings, not fixed SVG coordinates. Only date of
+  birth is selected; the three explained fields carry visited checks.
+  At 1180px, the right column is 340px and the gaps narrow. At 1100px or
+  below, the upload column comes first, followed by the study copy.
+  At 860px or below, notes stack below the paper and connectors disappear.
+  The service directory uses pencil-blue links, dotted leaders and department
+  abbreviations, with keyword search. The existing service navigator remains
+  available in an expandable section below it.
+- **Landing facsimile:** 10.5px type (8.5px on phones), 1.45em title and
+  `#5d6670` form rules reproduce concept 1's document, not interactive form
+  controls. Margin-note headings use 18px; source links and department labels
+  use 16px. The upload title is 22px and its folded corner uses `#dfe4e9`.
+  The landing display uses `clamp(2.1rem, 2.9vw, 2.85rem)` and the directory
+  heading uses 28px (24px on phones).
+  These are scoped reference-design exceptions, not workspace token changes.
+  The two preview sheets slide past one another once on landing-page mount
+  (600–650ms, route easing), settling into their unchanged resting positions.
+  Margin notes and connectors resolve together over 220ms, and the selected
+  date-of-birth field gets a 350ms highlighter swipe; the sequence finishes
+  within 800ms. The hero and upload remain available throughout. Supporting
+  motion is limited to 150ms control-colour feedback, a 3px upload-icon nudge
+  on hover/focus/drag, and a 180ms fade when opening the service navigator.
+  There are no decorative loops or scroll reveals. Reduced motion skips
+  the entrance, swipe and supporting transitions.
+  Unlike the prototype, production offers only the bundled English PPTC 153
+  and retains the actual 10 MB limit, local-PDF privacy statement and
+  rule-based assistant disclosure. It does not claim the French sample or
+  AI integration exists.
+- **Workspace at 1081px and above:** height-locked resizable columns, initially
+  `300px | remaining space | 456px`, with two 8px drag dividers. Each column
+  scrolls independently. The fields panel has a 220px minimum and a 35% maximum;
+  the details panel has a 300px minimum and a 50% maximum. The document keeps
+  at least 280px. Dividers support dragging, keyboard arrow keys, and
+  double-click to restore the adjacent panel's default size.
   - Left: the vertical route of fields, grouped by form section.
   - Centre: a sticky document bar, then the form sheet, at most 780px wide.
     The bar is one card with two rows: document tabs, then "N of 5
@@ -240,8 +278,24 @@ counts and example values.
     the tabs.
   - Zoom and Outline fields live in a small paper toolbar (card border,
     sheet shadow) that floats at the bottom of the sheet and stays in view
-    while it scrolls. It comes before the sheet in focus order.
-  - Right: Field and Ask tabs.
+    while it scrolls, with an 8px sticky inset and 12px bottom padding. The sheet
+    ends with an 8px gap before the toolbar and no extra spacer below it.
+    Workspace scrollbars are hidden without disabling scrolling, except for
+    the document's horizontal scrollbar so zoomed pages can be panned by dragging.
+    Its paper background is
+    80% opaque at rest and becomes solid on hover or focus within, over 150ms.
+    Text and icons stay fully opaque. Reduced motion removes the transition.
+    It comes before the sheet in focus order.
+    The tabs/pages bar uses the same translucent paper and hover/focus treatment.
+    Zoom preserves the document point at the centre of the visible reading area
+    instead of anchoring to a corner or repeating a previous field-navigation scroll.
+    Horizontal document panning keeps the zoom toolbar centred in the visible
+    panel, rather than scrolling it out of reach with the sheet.
+  - Right: Field and Ask tabs. The heading's highlighter mark sweeps left to
+    right over 450ms when the selected field changes, without hiding or moving
+    the text. Reduced motion shows the complete mark immediately. The Next
+    button keeps its label on one line and ellipsizes when needed; its full
+    label remains available to assistive technology and in its hover title.
 - **1080px and below:** the columns stack. The route becomes a horizontally
   scrolling line of 136px stations above the document.
 - **640px and below:** phone padding (14–16px), the notice wraps under the
