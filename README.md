@@ -34,7 +34,7 @@ shadcn/ui). See [docs/mvp-design.md](docs/mvp-design.md) and
   version managed by nvm in WSL Ubuntu 24.04).
 - **Install:** `cd web && npm install`
 - **Run locally:** `npm run dev`, then open <http://localhost:3000>. Choose
-  **Open sample** on the sample-forms board to use the bundled adult passport
+  **Adult passport application** under **Try a sample form** to use the bundled adult passport
   application (PPTC 153).
 - **Checks:** `npm run typecheck`, `npm run lint` and `npm run build`.
 - **Deployment:** TODO.
@@ -58,6 +58,13 @@ another, and each tab has its own close button. The button to the left of
 choice is saved in the browser. Only interface text is translated.
 Explanations, assistant replies and linked resources stay in English. The
 French copy is a draft and needs review by a fluent speaker.
+
+The landing page carries over **design concept 1 (Marginalia)**: a blank study
+copy with field-linked margin notes, a folded-paper upload area, and a searchable
+directory of official services. **Ask the service navigator** expands the
+existing question-and-answer tool. The document workspace keeps the Paper Route
+layout. The preview is illustrative, not an editable form; the working sample
+opens the bundled English PPTC 153.
 
 ### Environment configuration
 
@@ -132,9 +139,11 @@ The script includes tracked text files only, skips binary and ignored files, and
 - [docs/decisions/](docs/decisions/): decision records.
 - [docs/research/](docs/research/): research notes and sources.
 - [web/](web/): Next.js app for the Form Helper MVP.
-- [DESIGN.md](DESIGN.md): the chosen visual system (Paper Route, decision 0003).
+- [DESIGN.md](DESIGN.md): the visual system (Paper Route workspace, decision 0003,
+  and the concept 1 Marginalia landing page).
 - [design-explorations/](design-explorations/): six static UI direction
-  prototypes. Direction 6, `06-paper-route.html`, is the chosen reference.
+  prototypes. Direction 1, `01-marginalia.html`, is the landing-page reference;
+  direction 6, `06-paper-route.html`, is the workspace reference.
   Open `index.html` through a local static
   server, for example `python3 -m http.server --directory design-explorations`.
 - [.agents/skills/](.agents/skills/): existing reusable agent workflows.

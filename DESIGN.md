@@ -111,13 +111,19 @@ components:
 
 # Design System: Form Helper
 
-The reference implementation is
+The workspace reference implementation is
 [design-explorations/06-paper-route.html](design-explorations/06-paper-route.html),
 chosen in [decision 0003](docs/decisions/0003-paper-route-design-direction.md).
 The production implementation is in [web/](web/): tokens and `.pr-*`
 component classes in `web/src/app/globals.css`, and components in
 `web/src/components/form-helper/`. When this file and the prototype or app
 disagree, this file wins. Update it when the direction changes.
+
+The landing page follows **direction 1, Marginalia**:
+`design-explorations/01-marginalia.html`. Its scoped `.marginalia-*` classes,
+`landing.tsx`, and `marginalia-preview.tsx` use the same paper, graphite,
+highlighter and typography family as the workspace. The landing-specific
+composition below takes precedence over the original Paper Route landing.
 
 ## Overview
 
@@ -225,10 +231,29 @@ counts and example values.
   language toggle (left of New session, showing the other language's name
   with a matching `lang`). Below 640px, New session is icon-only, so the
   brand, toggle and button fit on one row.
-- **Landing:** a maximum width of 1360px in a 5fr / 7fr grid with a 40px gap.
-  The left column holds the hero and the "Start here" upload card. The right
-  column holds the service map and "Try a sample form". The grid collapses to
-  one column at 1100px or below.
+- **Landing (Marginalia):** a maximum width of 1440px in a 2fr / 1fr grid
+  with a 56px gap. An illustrative passport sheet and three margin notes
+  sit on the left; the hero, folded-paper upload control, working sample
+  and privacy notes sit on the right. Leader lines attach to the measured
+  field edges and note headings, not fixed SVG coordinates. Only date of
+  birth is selected; the three explained fields carry visited checks.
+  At 1180px, the right column is 340px and the gaps narrow. At 1100px or
+  below, the upload column comes first, followed by the study copy.
+  At 860px or below, notes stack below the paper and connectors disappear.
+  The service directory uses pencil-blue links, dotted leaders and department
+  abbreviations, with keyword search. The existing service navigator remains
+  available in an expandable section below it.
+- **Landing facsimile:** 10.5px type (8.5px on phones), 1.45em title and
+  `#5d6670` form rules reproduce concept 1's document, not interactive form
+  controls. Margin-note headings use 18px; source links and department labels
+  use 16px. The upload title is 22px and its folded corner uses `#dfe4e9`.
+  The landing display uses `clamp(2.1rem, 2.9vw, 2.85rem)` and the directory
+  heading uses 28px (24px on phones).
+  These are scoped reference-design exceptions, not workspace token changes.
+  Unlike the prototype, production offers only the bundled English PPTC 153
+  and retains the actual 10 MB limit, local-PDF privacy statement and
+  rule-based assistant disclosure. It does not claim the French sample or
+  AI integration exists.
 - **Workspace at 1081px and above:** a height-locked
   `300px | minmax(0, 1fr) | 456px` grid. Each column scrolls independently.
   - Left: the vertical route of fields, grouped by form section.
