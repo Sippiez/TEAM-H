@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import { cn } from "cn";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { loadForm, type LoadedForm } from "@/lib/pdf/extract";
-import type { ChatMessage, FieldExplanation, FormContext, FormField } from "@/lib/types";
+import { readChatEvents } from "@/lib/chat-stream";
+import type { ChatMessage, ChatStreamEvent, FieldExplanation, FormContext, FormField } from "@/lib/types";
 
 import { ChatPanel } from "./chat-panel";
 import { FieldPanel } from "./field-panel";
@@ -22,9 +23,9 @@ const MAX_DOCS = 5;
 const SAMPLE = { url: "/forms/pptc153.pdf", name: "pptc153.pdf" };
 
 const NAVIGATOR_SUGGESTIONS = [
-  "How do I renew my passport?",
-  "I lost my job. What can I apply for?",
-  "Sign in to my CRA account",
+  "How do I renew a passport for the Canada federal government?",
+  "I lost my job. What federal Employment Insurance can I apply for?",
+  "What are the steps to get a federal Social Insurance Number in Canada?",
 ];
 
 /** Where a selection came from. Clicks on the sheet itself never scroll the sheet. */
@@ -207,7 +208,7 @@ export function FormHelperApp() {
 
       const updateMessage = (
         messageId: string,
-        text: string,
+        patch: Partial<ChatMessage>,
       ) => {
         if (!isCurrent()) return;
         return target
@@ -215,14 +216,14 @@ export function FormHelperApp() {
               ...doc,
               messages: doc.messages.map((message) =>
                 message.id === messageId
-                  ? { ...message, text }
+                  ? { ...message, ...patch }
                   : message,
               ),
             }))
           : setNavMessages((messages) =>
               messages.map((message) =>
                 message.id === messageId
-                  ? { ...message, text }
+                  ? { ...message, ...patch }
                   : message,
               ),
             );
@@ -325,34 +326,42 @@ export function FormHelperApp() {
           );
         }
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let completeText = "";
-
-        while (true) {
-          const { value, done } = await reader.read();
-
-          if (done) break;
-
-          completeText += decoder.decode(value, {
-            stream: true,
-          });
-
-          updateMessage(
-            assistantMessageId,
-            completeText,
-          );
+        if (!res.headers.get("content-type")?.startsWith("text/event-stream")) {
+          throw new Error("The server returned an unsupported response stream");
         }
 
-        completeText += decoder.decode();
+        let completeText = "";
+        let completed = false;
+        let lookupReceived = false;
 
-        if (!completeText.trim()) {
+        const applyEvent = (event: ChatStreamEvent) => {
+          if (event.type === "delta") {
+            completeText += event.text;
+            updateMessage(assistantMessageId, { text: completeText });
+          } else if (event.type === "lookup") {
+            lookupReceived = true;
+            updateMessage(assistantMessageId, {
+              lookup: event.outcome,
+              resources: event.sources,
+            });
+          } else if (event.type === "error") {
+            updateMessage(assistantMessageId, { incomplete: true });
+          } else if (event.type === "complete") {
+            completed = true;
+            updateMessage(assistantMessageId, { incomplete: !event.complete });
+          }
+        };
+
+        for await (const event of readChatEvents(res.body)) applyEvent(event);
+        if (!completed) throw new Error("The assistant stream did not complete");
+
+        if (!completeText.trim() && !lookupReceived) {
           throw new Error(
             "The AI returned an empty response",
           );
         }
 
-        updateMessage(assistantMessageId, completeText);
+        updateMessage(assistantMessageId, { text: completeText });
       } catch (error) {
         if (!isCurrent()) return;
         removeMessage(assistantMessageId);

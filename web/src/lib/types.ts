@@ -38,7 +38,36 @@ export interface Resource {
   department: string;
   description: string;
   tags: string[];
+  language?: "en-CA" | "fr-CA";
+  jurisdiction?: string;
+  provenance?: SourceProvenance;
 }
+
+export type SourceProvenance =
+  | { kind: "live_official"; retrievedAt: string }
+  | { kind: "reviewed_snapshot"; reviewedAt: string }
+  | { kind: "saved_guidance"; reviewedAt: null };
+
+export type OfficialLookupStatus =
+  | "verified"
+  | "clarification_required"
+  | "no_verified_results"
+  | "unavailable";
+
+export interface OfficialLookupSummary {
+  status: OfficialLookupStatus;
+  reason: string;
+  partial: boolean;
+  jurisdiction?: string;
+  serviceId?: string;
+  facetId?: string;
+}
+
+export type ChatStreamEvent =
+  | { version: 1; type: "lookup"; outcome: OfficialLookupSummary; sources: Resource[] }
+  | { version: 1; type: "delta"; text: string }
+  | { version: 1; type: "error"; code: "interrupted" | "unavailable" }
+  | { version: 1; type: "complete"; complete: boolean };
 
 export interface KeyPoints {
   title: string;
@@ -90,6 +119,8 @@ export interface ChatMessage extends Partial<AssistantReply> {
   role: "user" | "assistant";
   text: string;
   language?: "en" | "fr";
+  lookup?: OfficialLookupSummary;
+  incomplete?: boolean;
 }
 
 export interface ChatHistoryMessage {

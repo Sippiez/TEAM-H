@@ -4,7 +4,10 @@ const PASSPORTS =
   "https://www.canada.ca/en/immigration-refugees-citizenship/services/canadian-passports";
 const PASSPORT_PROGRAM = "IRCC – Passport Program";
 
-/** Curated Government of Canada services. URLs verified 2026-10-28. */
+/**
+ * Curated official federal services. URL verification on 2026-10-28 did not
+ * record a content-review date; these remain saved guidance, not live sources.
+ */
 export const RESOURCES: Resource[] = [
   {
     id: "passports",

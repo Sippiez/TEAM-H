@@ -41,9 +41,10 @@ shadcn/ui). See [docs/mvp-design.md](docs/mvp-design.md) and
 
 `predev` and `prebuild` copy the pdf.js worker into `web/public/` (it's
 gitignored). `npm test` uses Node's built-in runner and the existing TypeScript
-compiler to exercise chat validation, prompts, streaming, errors, timeouts and
-cancellation with an isolated fake provider, plus message/document identity
-across Fast Refresh; it needs no API key or network.
+compiler to exercise chat validation, prompts, typed streaming, errors, timeouts,
+cancellation, URL policy, pinned transport, query privacy, and provenance using
+isolated fakes, plus message/document identity across Fast Refresh; it needs no
+API key or network.
 
 If you're behind a TLS-inspecting proxy, `next/font` and npm can fail to
 download. Point Node at your organisation's root CA instead of disabling TLS
@@ -60,11 +61,32 @@ accessible with the configured account; older 2.5 models returned 404.
 See [decision 0004](docs/decisions/0004-gemini-streaming-chat.md).
 Field-panel explanations remain rule-based and work without a key.
 
+Current service navigation uses the server-side Brave Search API adapter and
+requires `BRAVE_SEARCH_API_KEY` for live results. Without that key, the app
+reports that current information could not be verified and does not answer
+current-policy questions from model memory or saved guidance. Only fixed,
+reviewed service/facet keywords and the selected federal/provincial/territorial
+jurisdiction are sent to Brave; chat history, filenames, PDF fields, field
+values and personal details are not part of the search request. Gemini still
+receives the current user request for service selection and answer synthesis.
+Search credentials, provider handling/costs and production access controls need
+deployment review. See [decision 0005](docs/decisions/0005-restricted-official-search.md).
+
+Live page retrieval is restricted in code to the user-approved 14 federal,
+provincial and territorial host roots and their dot-delimited subdomains. The
+fetcher validates every candidate and redirect, resolves public IP addresses
+and pins each HTTPS connection to a validated address. It uses no cookies,
+authentication, form submissions, scripts or subresources. The total chat
+deadline remains 30 seconds; retrieval has a 10-second sub-budget, with at
+most five candidates, three fetches, two concurrent requests and three
+redirects per page. Live retrieval timestamps are distinct from saved
+guidance; existing content has no recorded content-review date.
+
 PDF bytes and entered field values stay in the browser. Chat shares bounded
 form and field metadata (including the filename), the selected field, and recent
 messages with the external AI provider. Do not include personal information in
 chat, filenames or field labels. Responses are not official guidance and can be
-wrong; verify government requirements using the official guide.
+wrong; verify government requirements using the linked official guide.
 
 You can keep up to five PDFs open as document tabs. **Add PDF** opens
 another, and each tab has its own close button. The button to the left of
@@ -90,18 +112,22 @@ only if you do not already have `.env.local`:
 cp -n .env.example .env.local
 ```
 
-Set `GEMINI_API_KEY` to a Google AI Studio key in that ignored local file or in
-your deployment's server-side secret store. `GEMINI_MODEL` optionally overrides
-`gemini-3.1-flash-lite`. Never prefix either variable with `NEXT_PUBLIC_`.
+Set `GEMINI_API_KEY` to a Google AI Studio key and `BRAVE_SEARCH_API_KEY` to
+your Brave Search API key in that ignored local file or in your deployment's
+server-side secret store. Leave the Brave key empty to disable live search.
+`GEMINI_MODEL` optionally overrides
+`gemini-3.1-flash-lite`. Never prefix any key with `NEXT_PUBLIC_`.
 Next.js loads `.env.local`; restart the server after changing it. Never commit
 actual credentials. The root [.env.example](.env.example) remains a generic
 workspace template, not the web app's configuration.
 
-Chat has a 30-second deadline. Missing configuration returns 503; provider
-startup failures return 502 and deadline expiry returns 504. After text has
-started streaming, failures interrupt the body and the client shows a retryable
-error instead of keeping a partial answer. New session and document removal
-abort their pending chats. This hackathon endpoint still needs deployment-level
+Chat has a 30-second deadline. Missing `GEMINI_API_KEY` returns 503; a Gemini
+startup failure before streaming returns 502, and deadline expiry before
+streaming returns 504. A missing `BRAVE_SEARCH_API_KEY` produces an explicit
+unavailable lookup outcome in the stream. Search failures and post-start
+generation failures are reported through typed SSE events, and any partial
+answer is marked incomplete. New session and document removal abort their
+pending chats. This hackathon endpoint still needs deployment-level
 access controls and rate limits before public exposure.
 
 ## Collaboration

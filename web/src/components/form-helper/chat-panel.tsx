@@ -110,6 +110,16 @@ export function ChatPanel({
                   <RichText text={m.text} />
                 </div>
               )}
+              {m.lookup && (
+                <p role="status" className="text-[15px] text-ink-2">
+                  {t.lookupStatus(m.lookup)}
+                </p>
+              )}
+              {m.incomplete && (
+                <p role="alert" className="text-[15px] font-semibold text-ink">
+                  {t.incompleteAnswer}
+                </p>
+              )}
               {m.fieldRefs && m.fieldRefs.length > 0 && onFieldRef && (
                 <div className="flex flex-wrap gap-1.5">
                   {m.fieldRefs.map((f) => (

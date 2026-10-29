@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { streamGeminiChat } from "@/lib/ai/gemini";
 import type {
+  ChatStreamEvent,
   ChatHistoryMessage,
   ChatRequest,
   FieldSummary,
@@ -232,34 +233,41 @@ export async function POST(request: Request) {
     }), timeoutController.signal);
 
     const iterator = geminiStream[Symbol.asyncIterator]();
-    const nextText = async () => {
+    const nextEvent = async (): Promise<ChatStreamEvent | null> => {
       while (true) {
         timeoutController.signal.throwIfAborted();
         const chunk = await abortable(iterator.next(), timeoutController.signal);
         if (chunk.done) return null;
-        if (chunk.value.text) return chunk.value.text;
+        return chunk.value;
       }
     };
 
     // The SDK may defer upstream failures until the first iterator read.
-    const firstText = await nextText();
-    if (firstText === null) throw new Error("The AI returned an empty response");
+    const firstEvent = await nextEvent();
+    if (firstEvent === null) throw new Error("The AI returned an empty response");
     const encoder = new TextEncoder();
     let cancelled = false;
+    const frame = (event: ChatStreamEvent) =>
+      encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
 
     const bodyStream = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(encoder.encode(firstText));
+        controller.enqueue(frame(firstEvent));
       },
       async pull(controller) {
         try {
-          const text = await nextText();
+          const event = await nextEvent();
           if (cancelled) return;
-          if (text === null) {
+          if (event === null) {
             cleanup();
+            controller.enqueue(frame({
+              version: 1,
+              type: "complete",
+              complete: true,
+            }));
             controller.close();
           } else {
-            controller.enqueue(encoder.encode(text));
+            controller.enqueue(frame(event));
           }
         } catch (error) {
           cleanup();
@@ -271,7 +279,17 @@ export async function POST(request: Request) {
                 : "UnknownError",
           });
 
-          controller.error(new Error("The AI response was interrupted"));
+          controller.enqueue(frame({
+            version: 1,
+            type: "error",
+            code: timeoutController.signal.aborted ? "unavailable" : "interrupted",
+          }));
+          controller.enqueue(frame({
+            version: 1,
+            type: "complete",
+            complete: false,
+          }));
+          controller.close();
         }
       },
       cancel() {
@@ -284,9 +302,10 @@ export async function POST(request: Request) {
     return new Response(bodyStream, {
       status: 200,
       headers: {
-        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-store, no-cache, must-revalidate",
         "X-Content-Type-Options": "nosniff",
+        Connection: "keep-alive",
       },
     });
   } catch (error) {
