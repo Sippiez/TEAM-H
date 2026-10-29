@@ -91,11 +91,18 @@ export interface ChatMessage extends Partial<AssistantReply> {
   text: string;
 }
 
+export interface ChatHistoryMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
 export interface ChatRequest {
   message?: string;
   intent?: "overview";
   form?: FormContext;
   selectedFieldId?: string;
+  history?: ChatHistoryMessage[];
+  language?: "en" | "fr";
 }
 
 export interface ExplainRequest {
