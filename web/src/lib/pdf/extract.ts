@@ -15,6 +15,7 @@ interface WidgetAnnotation {
   pushButton?: boolean;
   readOnly?: boolean;
   hidden?: boolean;
+  required?: boolean;
   buttonValue?: string;
   options?: { exportValue?: string; displayValue?: string }[];
 }
@@ -58,6 +59,7 @@ async function readFields(doc: PDFDocumentProxy): Promise<RawField[]> {
       const existing = byName.get(a.fieldName);
       if (existing) {
         existing.rects.push(a.rect);
+        existing.required = existing.required || Boolean(a.required);
         if (type === "radio" && a.buttonValue && !existing.options?.includes(a.buttonValue)) {
           existing.options = [...(existing.options ?? []), a.buttonValue];
         }
@@ -81,6 +83,7 @@ async function readFields(doc: PDFDocumentProxy): Promise<RawField[]> {
         type,
         tooltip: a.alternativeText?.trim() || undefined,
         options,
+        required: Boolean(a.required),
       });
     }
     page.cleanup();

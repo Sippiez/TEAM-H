@@ -117,10 +117,14 @@ export function ChatPanel({
                       key={f.id}
                       type="button"
                       onClick={() => onFieldRef(f.id)}
+                      aria-label={t.showFieldReference(f.document, f.page, f.label)}
                       className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border-[1.5px] border-ink bg-paper py-1 pr-3 pl-2.5 text-left text-[15px] font-semibold hover:bg-highlighter"
                     >
                       <span aria-hidden="true" className="size-3 flex-none rounded-full border-2 border-ink bg-paper" />
                       {f.label}
+                      <span className="text-[13px] font-normal text-ink-2">
+                        {f.document} · {t.page(f.page)}
+                      </span>
                       <span className="sr-only">{t.showFieldSr}</span>
                     </button>
                   ))}

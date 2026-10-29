@@ -105,6 +105,11 @@ export function FieldPanel({
           <span key={selected.id} className="pr-hl pr-hl-swipe">
             {selected.label}
           </span>
+          {selected.required && (
+            <span className="ml-2 inline-flex align-middle rounded-sm border border-ink px-2 py-0.5 text-[13px] font-bold tracking-normal">
+              {t.required}
+            </span>
+          )}
         </h2>
         {selected.tooltip && selected.tooltip !== selected.label && (
           <p className="text-[15px] text-ink-2">

@@ -111,6 +111,10 @@ export function PdfPage({
     lastScroll.current = { doc, key: scrollKey };
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center", inline: "nearest" });
+    el.classList.remove("is-arrived");
+    if (!el || reduce) return;
+    const timer = window.setTimeout(() => el.classList.add("is-arrived"), 300);
+    return () => window.clearTimeout(timer);
   }, [doc, scrollKey, selectedId, viewport]);
 
   return (
