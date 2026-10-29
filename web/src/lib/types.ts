@@ -135,4 +135,5 @@ export interface ChatRequest {
 export interface ExplainRequest {
   field: FieldSummary;
   formNumber?: string;
+  language?: "en" | "fr";
 }

@@ -139,6 +139,7 @@ export function FormHelperApp() {
           body: JSON.stringify({
             field: summarizeField(field),
             formNumber,
+            language: lang,
           }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -151,7 +152,7 @@ export function FormHelperApp() {
           ? d : ({ ...d, explainErrors: new Set(d.explainErrors).add(field.id) }));
       }
     },
-    [updateDoc],
+    [updateDoc, lang],
   );
 
   const identifyContext = useCallback(async (key: string, fieldId: string) => {
