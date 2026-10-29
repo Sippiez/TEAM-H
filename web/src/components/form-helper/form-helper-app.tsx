@@ -1,6 +1,6 @@
 "use client";
 
-import { InfoIcon, RotateCcwIcon } from "lucide-react";
+import { InfoIcon, LockIcon, RotateCcwIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 
@@ -565,9 +565,9 @@ export function FormHelperApp() {
         <span className="underline-offset-[0.2em] group-hover:underline">{t.brand}</span>
         <span className="sr-only">{t.brandHome}</span>
       </button>
-      <p className="flex items-center gap-2 text-[15px] text-ink-2 max-sm:order-3 max-sm:w-full sm:mr-auto">
-        <InfoIcon className="size-5 flex-none text-ink" strokeWidth={2.25} aria-hidden />
-        {t.notOfficial}
+      <p className="flex min-w-0 items-start gap-2 text-[13px] leading-[1.4] text-ink-2 max-sm:order-3 max-sm:w-full sm:mr-auto sm:flex-1">
+        <LockIcon className="mt-0.5 size-3.5 flex-none text-ink" strokeWidth={2.25} aria-hidden />
+        <span>{t.labelsOnly}</span>
       </p>
       <div className="flex items-center gap-2 sm:gap-3">
         <button

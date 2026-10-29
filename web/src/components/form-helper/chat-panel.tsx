@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRightIcon, CpuIcon, LanguagesIcon, LockIcon } from "lucide-react";
+import { ArrowRightIcon, CpuIcon, LanguagesIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { cn } from "cn";
@@ -264,10 +264,6 @@ export function ChatPanel({
               {t.askInEnglish}
             </p>
           )}
-          <p className="flex items-start gap-2">
-            <LockIcon className="mt-[0.15em] size-4 flex-none text-ink" strokeWidth={2.25} aria-hidden />
-            {t.labelsOnly}
-          </p>
           <details>
             <summary className="min-h-11 cursor-pointer py-2.5 font-semibold text-ink">
               <CpuIcon className="mr-1.5 inline size-4 align-text-bottom" strokeWidth={2.25} aria-hidden />

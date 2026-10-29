@@ -142,7 +142,8 @@ incomplete, and provide retry; missing setup is not disguised as a retryable
 network problem. Suggestions and recovery controls follow the interface language.
 Starter suggestions yield space after the first question. Expandable AI/search
 privacy details and a scrollable panel preserve a readable mobile answer area;
-the personal-information warning remains visible.
+the personal-information warning remains visible in the shared header, rather
+than repeated beneath each chat input.
 
 PDF bytes and entered field values stay in the browser. Chat shares bounded
 form and field metadata (including the filename), the selected field, and recent

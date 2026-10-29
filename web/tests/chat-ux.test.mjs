@@ -184,6 +184,7 @@ test("starter suggestions yield space to answers while privacy details remain ac
   assert.match(initial, /Download this form/);
   assert.match(initial, /<summary[^>]*>.*AI and search privacy<\/summary>/);
   assert.match(initial, /Chat uses Google Gemini/);
+  assert.doesNotMatch(initial, /Chat shares form metadata/);
   assert.doesNotMatch(initial, /<details[^>]*\bopen/);
 
   const conversation = render({}, "fr", {
@@ -195,5 +196,6 @@ test("starter suggestions yield space to answers while privacy details remain ac
   });
   assert.doesNotMatch(conversation, /Download this form/);
   assert.match(conversation, /Confidentialité : IA et recherche/);
-  assert.match(conversation, /N&#x27;incluez pas de renseignements personnels/);
+  assert.match(conversation, /Le clavardage utilise Google Gemini/);
+  assert.doesNotMatch(conversation, /Le clavardage partage les métadonnées/);
 });
