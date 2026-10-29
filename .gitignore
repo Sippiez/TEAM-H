@@ -16,3 +16,4 @@ Thumbs.db
 Desktop.ini
 
 # Add stack-specific dependency, cache, and build paths after stack selection.
+codebase-context.txt

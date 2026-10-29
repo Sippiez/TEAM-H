@@ -106,9 +106,25 @@ or a PR that is already open, copy the template into the description manually.
 Adding the template does not update existing PR descriptions or enforce its
 checklist; required reviews and checks are configured separately in GitHub.
 
+## Generate Codebase Context
+When GitHub Copilot is unavailable, use this script to combine selected files into a single text file:
+
+```bash
+# Make sure that you give the bash script execution perms first
+chmod u+x copy-codebase.sh
+```
+```bash
+# Usage example
+./copy-codebase.sh web
+```
+
+The script includes tracked text files only, skips binary and ignored files, and labels each file with its repository-relative path.
+
+
 ## Repository layout
 
 - [AGENTS.md](AGENTS.md): guidance for coding assistants.
+- [copy-codebase](copy-codebase.sh): use this for chatting with copilot chat online
 - [.github/pull_request_template.md](.github/pull_request_template.md): shared
   pull request description and checklist.
 - [.gitignore](.gitignore): generic local-file and secret exclusions.
