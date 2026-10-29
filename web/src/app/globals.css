@@ -141,6 +141,26 @@
     display: none;
   }
 
+  .pr-workspace .pr-document-scroll {
+    scrollbar-width: auto;
+  }
+
+  .pr-workspace .pr-document-scroll::-webkit-scrollbar {
+    display: block;
+    width: 0;
+    height: 12px;
+  }
+
+  .pr-workspace .pr-document-scroll::-webkit-scrollbar-thumb {
+    border: 3px solid var(--color-desk);
+    border-radius: 999px;
+    background: var(--color-quiet-stroke);
+  }
+
+  .pr-workspace .pr-document-scroll::-webkit-scrollbar-track {
+    background: var(--color-desk);
+  }
+
   /* Highlighter mark behind a heading. */
   .pr-hl {
     background: linear-gradient(

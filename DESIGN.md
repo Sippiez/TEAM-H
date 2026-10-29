@@ -269,13 +269,19 @@ counts and example values.
     the tabs.
   - Zoom and Outline fields live in a small paper toolbar (card border,
     sheet shadow) that floats at the bottom of the sheet and stays in view
-    while it scrolls, flush to the scrollport's bottom padding (4px). The sheet
+    while it scrolls, with an 8px sticky inset and 12px bottom padding. The sheet
     ends with an 8px gap before the toolbar and no extra spacer below it.
-    Workspace scrollbars are hidden without disabling scrolling.
+    Workspace scrollbars are hidden without disabling scrolling, except for
+    the document's horizontal scrollbar so zoomed pages can be panned by dragging.
     Its paper background is
     80% opaque at rest and becomes solid on hover or focus within, over 150ms.
     Text and icons stay fully opaque. Reduced motion removes the transition.
     It comes before the sheet in focus order.
+    The tabs/pages bar uses the same translucent paper and hover/focus treatment.
+    Zoom preserves the document point at the centre of the visible reading area
+    instead of anchoring to a corner or repeating a previous field-navigation scroll.
+    Horizontal document panning keeps the zoom toolbar centred in the visible
+    panel, rather than scrolling it out of reach with the sheet.
   - Right: Field and Ask tabs. The heading's highlighter mark sweeps left to
     right over 450ms when the selected field changes, without hiding or moving
     the text. Reduced motion shows the complete mark immediately. The Next

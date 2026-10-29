@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeftIcon, ArrowRightIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "cn";
 import type { PDFDocumentProxy } from "@/lib/pdf/pdfjs";
@@ -76,20 +76,79 @@ export function FormViewer({
   const [zoomIndex, setZoomIndex] = useState(1);
   const [showFields, setShowFields] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
+  const viewerRef = useRef<HTMLElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const toolsRef = useRef<HTMLDivElement>(null);
+  const zoomAnchor = useRef<{
+    x: number;
+    y: number;
+    pageX: number;
+    pageY: number;
+    horizontal: HTMLElement;
+    vertical: Element;
+  } | null>(null);
   const pageFields = useMemo(() => fields.filter((f) => f.page === page), [fields, page]);
   const pagesWithFields = useMemo(() => new Set(fields.map((f) => f.page)), [fields]);
   const active = docs.find((d) => d.key === activeKey);
   const full = docs.length >= maxDocs;
 
+  const syncToolsPosition = useCallback(() => {
+    if (toolsRef.current && viewerRef.current) {
+      toolsRef.current.style.translate = `${viewerRef.current.scrollLeft}px 0`;
+    }
+  }, []);
+
+  function changeZoom(nextIndex: number) {
+    if (nextIndex === zoomIndex) return;
+    const viewer = viewerRef.current;
+    const sheet = sheetRef.current;
+    const canvas = sheet?.querySelector("canvas");
+    if (viewer && sheet && canvas) {
+      const desktop = window.matchMedia("(min-width: 1081px)").matches;
+      const horizontal = desktop ? viewer : sheet;
+      const vertical = desktop ? viewer : document.scrollingElement;
+      const pageRect = canvas.getBoundingClientRect();
+      const bounds = horizontal.getBoundingClientRect();
+      const top = Math.max(0, pageRect.top, headerRef.current?.getBoundingClientRect().bottom ?? 0);
+      const bottom = Math.min(window.innerHeight, viewer.getBoundingClientRect().bottom, pageRect.bottom);
+      const x = (Math.max(0, bounds.left, pageRect.left) + Math.min(window.innerWidth, bounds.right, pageRect.right)) / 2;
+      const y = (top + Math.min(bottom, Math.max(top, toolsRef.current?.getBoundingClientRect().top ?? bottom))) / 2;
+      if (vertical && pageRect.width > 0 && pageRect.height > 0) {
+        zoomAnchor.current = {
+          x, y,
+          pageX: (x - pageRect.left) / pageRect.width,
+          pageY: (y - pageRect.top) / pageRect.height,
+          horizontal, vertical,
+        };
+      }
+    }
+    setZoomIndex(nextIndex);
+  }
+
+  useLayoutEffect(() => {
+    const anchor = zoomAnchor.current;
+    const canvas = sheetRef.current?.querySelector("canvas");
+    zoomAnchor.current = null;
+    if (anchor && canvas) {
+      const rect = canvas.getBoundingClientRect();
+      anchor.horizontal.scrollLeft += rect.left + anchor.pageX * rect.width - anchor.x;
+      anchor.vertical.scrollTop += rect.top + anchor.pageY * rect.height - anchor.y;
+    }
+    syncToolsPosition();
+  }, [syncToolsPosition, zoomIndex]);
+
   return (
     <section
+      ref={viewerRef}
+      onScroll={syncToolsPosition}
       aria-labelledby="doc-title"
-      className="relative min-w-0 bg-desk px-3 pt-3 pb-1 desk:overflow-auto desk:px-8 desk:pt-[18px]"
+      className="pr-document-scroll relative min-w-0 bg-desk px-3 pt-3 pb-3 [overflow-anchor:none] desk:overflow-auto desk:px-8 desk:pt-[18px]"
     >
       <h2 id="doc-title" className="sr-only">
         {active ? (active.formNumber ? `${active.formNumber} ? ${active.fileName}` : active.fileName) : ""}
       </h2>
-      <div className="@container z-10 mx-auto flex max-w-[780px] flex-col gap-2.5 rounded-md bg-paper px-3.5 pt-3 pb-3 shadow-card desk:sticky desk:top-0">
+      <div ref={headerRef} className="@container z-10 mx-auto flex max-w-[780px] flex-col gap-2.5 rounded-md bg-paper/80 px-3.5 pt-3 pb-3 shadow-card transition-colors duration-150 hover:bg-paper focus-within:bg-paper motion-reduce:transition-none desk:sticky desk:top-0">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 @min-[34rem]:flex-nowrap">
           <ul
             aria-label={t.docTabsLabel}
@@ -219,23 +278,24 @@ export function FormViewer({
       {/* The view toolbar comes before the sheet in focus order but floats at the bottom of it. */}
       <div className="mx-auto mt-[22px] flex max-w-[780px] flex-col">
         <div
+          ref={toolsRef}
           role="group"
           aria-label={t.viewTools}
-          className="sticky bottom-0 z-10 order-last mt-2 flex items-center gap-0.5 self-center rounded-md border border-rule bg-paper/80 p-1 shadow-sheet transition-colors duration-150 hover:bg-paper focus-within:bg-paper motion-reduce:transition-none"
+          className="sticky bottom-2 z-10 order-last mt-4 flex items-center gap-0.5 self-center rounded-md border border-rule bg-paper/80 p-1 shadow-sheet transition-colors duration-150 hover:bg-paper focus-within:bg-paper motion-reduce:transition-none"
         >
           <button
             type="button"
             className={ghost}
             aria-label={t.zoomOut}
             disabled={zoomIndex <= 0}
-            onClick={() => setZoomIndex((z) => z - 1)}
+            onClick={() => changeZoom(zoomIndex - 1)}
           >
             <MinusIcon className="size-[18px]" strokeWidth={2.25} aria-hidden />
           </button>
           <button
             type="button"
             className="min-h-11 min-w-[4.25rem] cursor-pointer rounded-sm px-1 text-[15px] font-bold tabular-nums hover:bg-hover-wash"
-            onClick={() => setZoomIndex(1)}
+            onClick={() => changeZoom(1)}
             aria-label={t.zoomReset(Math.round(ZOOMS[zoomIndex] * 100))}
           >
             {Math.round(ZOOMS[zoomIndex] * 100)}%
@@ -245,7 +305,7 @@ export function FormViewer({
             className={ghost}
             aria-label={t.zoomIn}
             disabled={zoomIndex >= ZOOMS.length - 1}
-            onClick={() => setZoomIndex((z) => z + 1)}
+            onClick={() => changeZoom(zoomIndex + 1)}
           >
             <PlusIcon className="size-[18px]" strokeWidth={2.25} aria-hidden />
           </button>
@@ -269,7 +329,7 @@ export function FormViewer({
             {t.outlineFields}
           </button>
         </div>
-        <div className="w-full overflow-x-auto desk:overflow-visible">
+        <div ref={sheetRef} className="pr-document-scroll w-full overflow-x-auto desk:overflow-visible">
           <PdfPage
             doc={doc}
             pageNumber={page}
