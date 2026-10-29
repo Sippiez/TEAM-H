@@ -84,7 +84,7 @@ export function FormViewer({
   return (
     <section
       aria-labelledby="doc-title"
-      className="relative min-w-0 bg-desk px-3 pt-3 pb-6 desk:overflow-auto desk:px-8 desk:pt-[18px] desk:pb-10"
+      className="relative min-w-0 bg-desk px-3 pt-3 pb-1 desk:overflow-auto desk:px-8 desk:pt-[18px]"
     >
       <h2 id="doc-title" className="sr-only">
         {active ? (active.formNumber ? `${active.formNumber} ? ${active.fileName}` : active.fileName) : ""}
@@ -221,7 +221,7 @@ export function FormViewer({
         <div
           role="group"
           aria-label={t.viewTools}
-          className="sticky bottom-3 z-10 order-last mt-4 flex items-center gap-0.5 self-center rounded-md border border-rule bg-paper p-1 shadow-sheet desk:bottom-5"
+          className="sticky bottom-0 z-10 order-last mt-2 flex items-center gap-0.5 self-center rounded-md border border-rule bg-paper/80 p-1 shadow-sheet transition-colors duration-150 hover:bg-paper focus-within:bg-paper motion-reduce:transition-none"
         >
           <button
             type="button"
@@ -269,7 +269,7 @@ export function FormViewer({
             {t.outlineFields}
           </button>
         </div>
-        <div className="w-full overflow-x-auto pb-2 desk:overflow-visible">
+        <div className="w-full overflow-x-auto desk:overflow-visible">
           <PdfPage
             doc={doc}
             pageNumber={page}

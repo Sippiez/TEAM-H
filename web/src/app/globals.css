@@ -127,6 +127,20 @@
 }
 
 @layer components {
+  html:has(.pr-workspace),
+  body:has(.pr-workspace),
+  .pr-workspace,
+  .pr-workspace * {
+    scrollbar-width: none;
+  }
+
+  html:has(.pr-workspace)::-webkit-scrollbar,
+  body:has(.pr-workspace)::-webkit-scrollbar,
+  .pr-workspace::-webkit-scrollbar,
+  .pr-workspace *::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Highlighter mark behind a heading. */
   .pr-hl {
     background: linear-gradient(

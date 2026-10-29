@@ -534,18 +534,11 @@ export function FormHelperApp() {
         onClick={reset}
         className="group inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-[19px] font-extrabold tracking-[-0.01em] whitespace-nowrap max-sm:mr-auto"
       >
-        {active ? (
-          <svg width="34" height="20" viewBox="0 0 34 20" aria-hidden="true" focusable="false">
-            <path d="M3 10h28" className="stroke-ink" strokeWidth="2" strokeLinecap="round" />
-            <circle cx="17" cy="10" r="6" className="fill-highlighter stroke-ink" strokeWidth="2.5" />
-          </svg>
-        ) : (
-          <svg width="24" height="28" viewBox="0 0 28 32" aria-hidden="true" focusable="false">
-            <rect x="3" y="2" width="22" height="28" rx="2" className="fill-paper stroke-ink" strokeWidth="1.6" />
-            <rect x="6" y="11.5" width="16" height="6" className="fill-highlighter" />
-            <path d="M8 8h12M8 14.5h10M8 21h12M8 25h8" className="stroke-ink" strokeWidth="1.4" />
-          </svg>
-        )}
+        <svg width="24" height="28" viewBox="0 0 28 32" aria-hidden="true" focusable="false">
+          <rect x="3" y="2" width="22" height="28" rx="2" className="fill-paper stroke-ink" strokeWidth="1.6" />
+          <rect x="6" y="11.5" width="16" height="6" className="fill-highlighter" />
+          <path d="M8 8h12M8 14.5h10M8 21h12M8 25h8" className="stroke-ink" strokeWidth="1.4" />
+        </svg>
         <span className="underline-offset-[0.2em] group-hover:underline">{t.brand}</span>
         <span className="sr-only">{t.brandHome}</span>
       </button>
@@ -603,7 +596,7 @@ export function FormHelperApp() {
   return (
     <div className="flex min-h-dvh flex-col desk:h-dvh desk:overflow-hidden">
       {header}
-      <main className="flex min-h-0 flex-1 flex-col">
+      <main className="pr-workspace flex min-h-0 flex-1 flex-col">
         <h1 className="sr-only">
           {t.brand}: {form.formNumber ?? form.fileName}
         </h1>
