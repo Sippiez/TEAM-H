@@ -30,6 +30,7 @@ function setupRoute(streamGeminiChat, env = { GEMINI_API_KEY: "test-only" }) {
   const route = loadModule("../src/app/api/chat/route.ts", {
     "next/server": { NextResponse: Response },
     "@/lib/ai/gemini": { streamGeminiChat },
+    "@/lib/field-context": loadModule("../src/lib/field-context.ts", {}),
   }, {
     process: { env },
     console: { error: (...args) => logs.push(args) },
@@ -69,6 +70,8 @@ test("malformed requests fail before contacting the provider", async (t) => {
     { ...message, selectedFieldId: "missing" },
     { ...message, form: { ...form, fields: [{ ...field, page: 2 }] } },
     { ...message, form: { ...form, fields: [{ ...field, type: "unknown" }] } },
+    { ...message, form: { ...form, fields: [{ ...field, context: { status: "resolved", source: "layout", instructions: [] } }] } },
+    { ...message, form: { ...form, fields: [{ ...field, context: { status: "ambiguous", source: "layout", instructions: [42] } }] } },
   ];
   for (const body of invalid) {
     await t.test(JSON.stringify(body), async () => {
@@ -278,4 +281,28 @@ test("a Gemini 2.5 override uses its supported nonzero thinking budget", async (
   await streamGeminiChat({ message: "Help", language: "en" });
   assert.equal(calls[0].config.thinkingConfig.thinkingBudget, 512);
   assert.equal(calls[0].config.thinkingConfig.thinkingLevel, undefined);
+});
+
+test("full structured context is kept for the selected field without multiplying instructions across the catalogue", async () => {
+  const { streamGeminiChat, calls } = setupGemini();
+  const detailed = {
+    ...field,
+    context: {
+      status: "resolved", source: "layout",
+      question: "Question ".repeat(100),
+      instructions: ["A printed conditional instruction."],
+      fieldValue: "private-answer",
+    },
+    contextCandidates: { blocks: [{ text: "private-candidate-not-for-chat" }] },
+  };
+  await streamGeminiChat({
+    message: "Explain", language: "en", selectedFieldId: field.id,
+    form: { ...form, fields: [detailed, { ...detailed, id: "other" }] },
+  });
+  const context = JSON.parse(calls[0].contents.split("FORM_CONTEXT:\n")[1].split("\n\nRECENT_CONVERSATION:")[0]);
+  assert.equal(context.selectedField.context.question, detailed.context.question.trim());
+  assert.deepEqual(context.selectedField.context.instructions, detailed.context.instructions);
+  assert.equal(context.fields[1].context.question.length, 200);
+  assert.deepEqual(context.fields[1].context.instructions, []);
+  assert.doesNotMatch(calls[0].contents, /private-answer|private-candidate-not-for-chat/);
 });

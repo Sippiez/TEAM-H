@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { streamGeminiChat } from "@/lib/ai/gemini";
+import { isFieldSummary } from "@/lib/field-context";
 import type {
   ChatHistoryMessage,
   ChatRequest,
-  FieldSummary,
   FormContext,
 } from "@/lib/types";
 
@@ -13,30 +13,6 @@ const MAX_FIELDS = 2_000;
 const MAX_HISTORY = 12;
 const MAX_HISTORY_TEXT = 1_000;
 const REQUEST_TIMEOUT_MS = 30_000;
-
-function isFieldSummary(value: unknown): value is FieldSummary {
-  if (!value || typeof value !== "object") return false;
-
-  const field = value as Partial<FieldSummary>;
-
-  return (
-    typeof field.id === "string" &&
-    typeof field.path === "string" &&
-    typeof field.page === "number" &&
-    Number.isInteger(field.page) &&
-    field.page > 0 &&
-    (field.type === "text" ||
-      field.type === "checkbox" ||
-      field.type === "radio" ||
-      field.type === "choice" ||
-      field.type === "signature") &&
-    typeof field.label === "string" &&
-    typeof field.section === "string" &&
-    (field.options === undefined ||
-      (Array.isArray(field.options) &&
-        field.options.every((option) => typeof option === "string")))
-  );
-}
 
 function isFormContext(value: unknown): value is FormContext {
   if (!value || typeof value !== "object") return false;

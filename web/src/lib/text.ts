@@ -41,6 +41,10 @@ export function cleanWhitespace(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+export function cleanPdfText(text: string): string {
+  return cleanWhitespace(text.replace(/_{3,}/g, " "));
+}
+
 /** Only official Government of Canada hosts may be linked. */
 export function isAllowedGovUrl(url: string): boolean {
   try {
