@@ -89,16 +89,21 @@ to the landing page.
 
 The landing page carries over **design concept 1 (Marginalia)**: a blank study
 copy with field-linked margin notes, a folded-paper upload area, and a searchable
-directory of official services. **Ask the service navigator** expands the
-existing question-and-answer tool. The document workspace keeps the Paper Route
-layout. The preview is illustrative, not an editable form; the working sample
-opens the bundled English PPTC 153.
+directory of official services. **Start with just chat** opens the question-and-answer
+tool for government-service questions, with or without a form. The document
+workspace keeps the Paper Route layout. The preview is illustrative, not an
+editable form; the working sample opens the bundled English PPTC 153.
 
 On landing-page load, the two preview sheets slide over one another and settle
-into the existing paper stack, followed by a brief highlighter swipe. Controls
-use short colour transitions, the upload icon nudges on hover or keyboard focus,
-and the service navigator fades in when opened. Nothing loops; reduced-motion
-preferences show the final composition immediately and remove these transitions.
+into the existing paper stack, followed by a brief highlighter swipe.
+The surname, date-of-birth and travel-date notes fade in with a subtle 8px
+left-to-right slide and a short stagger, paired with their connector lines. They stay
+hidden until fonts have loaded and the paper entrance has settled, then appear
+after a brief pause, sliding only the final few pixels into place. With JavaScript
+disabled, the notes remain readable as a spaced list.
+Controls use short colour transitions and the upload icon nudges on hover or
+keyboard focus. Nothing loops; reduced-motion
+preferences skip the pause and fades and show the final notes once layout is ready.
 
 On desktop, drag either divider beside the document to resize the fields and
 details panels. You can also focus a divider and use the arrow keys, or

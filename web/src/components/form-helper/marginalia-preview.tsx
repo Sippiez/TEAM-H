@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { getResources } from "@/lib/catalog/resources";
 
@@ -56,7 +56,7 @@ export function MarginaliaPreview() {
   const deskRef = useRef<HTMLDivElement>(null);
   const [leaders, setLeaders] = useState<Leader[]>([]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const desk = deskRef.current;
     if (!desk) return;
 
@@ -66,7 +66,9 @@ export function MarginaliaPreview() {
     if (!sheet || !form || !list) return;
 
     const narrow = window.matchMedia("(max-width: 860px)");
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0;
+    let revealTimer = 0;
     let disposed = false;
 
     function layout() {
@@ -74,12 +76,14 @@ export function MarginaliaPreview() {
 
       const notes = Array.from(list.querySelectorAll<HTMLElement>("[data-preview-note]"));
       if (narrow.matches) {
+        list.dataset.layout = "stacked";
         list.style.height = "";
         notes.forEach((note) => { note.style.top = ""; });
         setLeaders([]);
         return;
       }
 
+      list.dataset.layout = "positioned";
       const listRect = list.getBoundingClientRect();
       const deskRect = desk.getBoundingClientRect();
       const sheetRect = sheet.getBoundingClientRect();
@@ -103,7 +107,8 @@ export function MarginaliaPreview() {
         const titleRect = title.getBoundingClientRect();
         const startX = fieldRect.right - formRect.left + sheetRect.left - deskRect.left;
         const startY = fieldY - deskRect.top;
-        const endX = titleRect.left - deskRect.left - 10;
+        // Anchor to the resting heading, not its animated horizontal position.
+        const endX = listRect.left + note.offsetLeft + title.offsetLeft - deskRect.left - 10;
         const endY = titleRect.top + titleRect.height / 2 - deskRect.top;
         const middleX = startX + (endX - startX) * 0.55;
 
@@ -131,12 +136,28 @@ export function MarginaliaPreview() {
     observer.observe(sheet);
     list.querySelectorAll("li").forEach((note) => observer.observe(note));
     narrow.addEventListener("change", schedule);
-    void document.fonts.ready.then(() => { if (!disposed) schedule(); });
-    schedule();
+    layout();
+
+    const paperSettled = Promise.allSettled(
+      sheet.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    );
+    void Promise.all([document.fonts.ready, paperSettled]).then(() => {
+      if (disposed) return;
+
+      function reveal() {
+        if (disposed || !list) return;
+        layout();
+        list.dataset.ready = "";
+      }
+
+      if (reducedMotion.matches) reveal();
+      else revealTimer = window.setTimeout(reveal, 120);
+    });
 
     return () => {
       disposed = true;
       cancelAnimationFrame(frame);
+      clearTimeout(revealTimer);
       observer.disconnect();
       narrow.removeEventListener("change", schedule);
     };
@@ -171,6 +192,9 @@ export function MarginaliaPreview() {
 
   return (
     <div ref={deskRef} className="marginalia-desk">
+      <noscript>
+        <style>{".marginalia-notes { visibility: visible !important; }"}</style>
+      </noscript>
       <div className="marginalia-sheet" aria-hidden="true">
         <article className="marginalia-form">
           <header className="marginalia-form-head">

@@ -382,20 +382,46 @@
 
   .marginalia-notes {
     position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .marginalia-note {
-    position: absolute;
-    right: 0;
-    left: 0;
     display: flex;
     flex-direction: column;
     gap: 6px;
     font-size: 17px;
     line-height: 1.5;
+  }
+
+  .marginalia-notes[data-layout="positioned"] > .marginalia-note {
+    position: absolute;
+    right: 0;
+    left: 0;
+  }
+
+  .marginalia-notes:not([data-ready]),
+  .marginalia-notes:not([data-ready]) ~ .marginalia-leaders {
+    visibility: hidden;
+  }
+
+  .marginalia-note,
+  .marginalia-leaders > g {
+    --note-delay: 0ms;
+  }
+
+  .marginalia-note:nth-child(2),
+  .marginalia-leaders > g:nth-child(2) {
+    --note-delay: 90ms;
+  }
+
+  .marginalia-note:nth-child(3),
+  .marginalia-leaders > g:nth-child(3) {
+    --note-delay: 180ms;
   }
 
   .marginalia-note h3 {
@@ -542,7 +568,7 @@
       gap: 22px;
     }
 
-    .marginalia-note {
+    .marginalia-notes[data-layout="positioned"] > .marginalia-note {
       position: static;
     }
 
@@ -635,9 +661,12 @@
       animation: fh-swipe 350ms 430ms var(--ease-route) backwards;
     }
 
-    .marginalia-notes,
-    .marginalia-leaders {
-      animation: marginalia-ink-in 220ms 380ms ease-out backwards;
+    .marginalia-notes[data-ready] > .marginalia-note {
+      animation: marginalia-note-in 320ms var(--note-delay) var(--ease-route) backwards;
+    }
+
+    .marginalia-notes[data-ready] ~ .marginalia-leaders > g {
+      animation: marginalia-ink-in 240ms var(--note-delay) var(--ease-route) backwards;
     }
 
     .marginalia-upload-icon {
@@ -648,9 +677,6 @@
       translate: 0 -3px;
     }
 
-    .marginalia-navigator[open] > div {
-      animation: marginalia-ink-in 180ms ease-out;
-    }
   }
 
   /* ---------- Route of fields (signature) ---------- */
@@ -1146,6 +1172,17 @@
     translate: 48px -12px;
   }
   to {
+    translate: 0 0;
+  }
+}
+
+@keyframes marginalia-note-in {
+  from {
+    opacity: 0;
+    translate: -8px 0;
+  }
+  to {
+    opacity: 1;
     translate: 0 0;
   }
 }

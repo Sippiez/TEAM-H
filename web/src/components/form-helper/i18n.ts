@@ -23,7 +23,7 @@ const en = {
   // Landing
   heroTitle: "Understand government forms, one field at a time.",
   heroSub:
-    "Upload a Government of Canada form and click any field for a plain-language explanation. Or ask the service navigator to find the right Canada.ca page.",
+    "Upload a Government of Canada form and click any field for a plain-language explanation. Or start a chat to ask about government services.",
   startHere: "Start here",
   startChat: "Start with just chat",
   chatOnlyHint: "No PDF needed. Add one anytime to open the form preview.",
@@ -82,9 +82,8 @@ const en = {
   searchServices: "Search",
   serviceSearchPlaceholder: "What do you need to do? For example, renew my passport",
   findServices: "Find services",
-  noServiceMatch: "No services match. Try passport, benefits or tax, or ask the service navigator below.",
+  noServiceMatch: "No services match. Try passport, benefits or tax.",
   serviceResults: (n: number) => `${n} service${n === 1 ? "" : "s"} found`,
-  askServiceNavigator: "Ask the service navigator",
   serviceIndex: {
     passports: "Get or renew a passport",
     sin: "Apply for a Social Insurance Number",
@@ -258,7 +257,7 @@ const fr: Dict = {
 
   heroTitle: "Comprenez les formulaires gouvernementaux, un champ à la fois.",
   heroSub:
-    "Téléversez un formulaire du gouvernement du Canada et cliquez sur un champ pour obtenir une explication en langage clair. Ou demandez au navigateur de services de trouver la bonne page de Canada.ca.",
+    "Téléversez un formulaire du gouvernement du Canada et cliquez sur un champ pour obtenir une explication en langage clair. Vous pouvez aussi démarrer une conversation sur les services gouvernementaux.",
   startHere: "Commencez ici",
   startChat: "Commencer par le clavardage",
   chatOnlyHint: "Aucun PDF requis. Ajoutez-en un pour ouvrir l'aperçu du formulaire.",
@@ -317,9 +316,8 @@ const fr: Dict = {
   searchServices: "Recherche",
   serviceSearchPlaceholder: "Que devez-vous faire? Par exemple, renouveler mon passeport",
   findServices: "Trouver des services",
-  noServiceMatch: "Aucun service correspondant. Essayez passeport, prestations ou impôt, ou posez votre question au navigateur ci-dessous.",
+  noServiceMatch: "Aucun service correspondant. Essayez passeport, prestations ou impôt.",
   serviceResults: (n) => `${n} service${n === 1 ? "" : "s"} trouvé${n === 1 ? "" : "s"}`,
-  askServiceNavigator: "Poser une question au navigateur de services",
   serviceIndex: {
     passports: "Obtenir ou renouveler un passeport",
     sin: "Demander un numéro d'assurance sociale",

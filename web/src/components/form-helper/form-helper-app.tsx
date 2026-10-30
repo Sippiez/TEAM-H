@@ -726,18 +726,6 @@ export function FormHelperApp() {
               requestAnimationFrame(() => document.getElementById("chat-only-title")?.focus());
             }}
             mapHighlight={mapHighlight}
-            navigator={
-              <ChatPanel
-                id="navigator"
-                className="h-full"
-                messages={navMessages}
-                pending={navPending}
-                onSend={(text) => void sendChat(text, null, null)}
-                suggestions={NAVIGATOR_SUGGESTIONS}
-                placeholder={t.navPlaceholder}
-                inputLabel={t.navInputLabel}
-              />
-            }
           />
         </div>
       </div>

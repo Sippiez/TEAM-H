@@ -9,7 +9,7 @@ import {
   MessageCircleIcon,
   PencilIcon,
 } from "lucide-react";
-import { useState, type DragEvent, type ReactNode } from "react";
+import { useState, type DragEvent } from "react";
 
 import { cn } from "cn";
 
@@ -26,7 +26,6 @@ interface LandingProps {
   onSample: () => void;
   onStartChat: () => void;
   mapHighlight?: readonly string[];
-  navigator: ReactNode;
 }
 
 const noticeIcon = "mt-0.5 size-5 flex-none text-ink";
@@ -47,7 +46,6 @@ export function Landing({
   onSample,
   onStartChat,
   mapHighlight,
-  navigator,
 }: LandingProps) {
   const [dragging, setDragging] = useState(false);
   const [query, setQuery] = useState("");
@@ -349,15 +347,6 @@ export function Landing({
           </p>
         </nav>
       </section>
-
-      <details className="marginalia-navigator mt-8 border-t border-rule pt-5">
-        <summary className="min-h-11 cursor-pointer py-2 text-[19px] font-bold">
-          {t.askServiceNavigator}
-        </summary>
-        <div className="mt-4 flex h-[min(620px,85dvh)] min-h-[440px] flex-col overflow-hidden bg-paper shadow-card">
-          {navigator}
-        </div>
-      </details>
 
       <footer className="mt-14">
         <p className="flex max-w-[80ch] items-start gap-2.5 text-[15.5px] text-ink-2">
