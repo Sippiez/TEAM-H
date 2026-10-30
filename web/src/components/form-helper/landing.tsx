@@ -242,6 +242,14 @@ export function Landing({
               {t.supported}
             </p>
           </section>
+
+          <details className="marginalia-data-details">
+            <summary>{t.dataDetails}</summary>
+            <div>
+              <p>{t.privacyRest}</p>
+              <p>{t.rulesNotAi}</p>
+            </div>
+          </details>
         </div>
 
         <figure className="marginalia-sample min-w-0">
@@ -275,13 +283,6 @@ export function Landing({
                 );
               })}
             </ul>
-            <details className="marginalia-data-details">
-              <summary>{t.dataDetails}</summary>
-              <div>
-                <p>{t.privacyRest}</p>
-                <p>{t.rulesNotAi}</p>
-              </div>
-            </details>
         </section>
       </div>
 
