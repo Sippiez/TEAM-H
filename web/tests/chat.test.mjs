@@ -354,6 +354,54 @@ async function collect(stream) {
   return events;
 }
 
+test("a misspelled new region asks for clarification instead of streaming previous-region evidence", async () => {
+  const { streamGeminiChat, calls } = setupGemini();
+  const lookups = [];
+  const lookup = async (args) => {
+    lookups.push(args);
+    return {
+      outcome: { ...args, status: "unavailable", reason: "fetch_failed", partial: false },
+      sources: [],
+    };
+  };
+  const events = await collect(await streamGeminiChat({
+    message: "student aid from mainotba",
+    history: [
+      { role: "user", text: "How do I get a Social Insurance Number?" },
+      { role: "assistant", text: "SIN information." },
+      { role: "user", text: "Student aid form for saskatchewan" },
+      { role: "assistant", text: "Saskatchewan printable forms." },
+    ],
+    lookupContext: { serviceId: "student_aid", jurisdiction: "sk", facetId: "documents" },
+    language: "en", lookup,
+  }));
+  assert.equal(lookups.length, 0, "Do not fetch stale Saskatchewan evidence");
+  assert.equal(calls.length, 0, "Do not generate an answer from the previous province");
+  assert.equal(events.length, 1);
+  assert.equal(events[0].outcome.status, "clarification_required");
+  assert.equal(events[0].outcome.reason, "missing_jurisdiction");
+  assert.equal(events[0].outcome.jurisdiction, undefined);
+  await collect(await streamGeminiChat({
+    message: "Manitoba",
+    lookupContext: {
+      serviceId: events[0].outcome.serviceId,
+      facetId: events[0].outcome.facetId,
+    },
+    language: "en", lookup,
+  }));
+  assert.equal(lookups.length, 1);
+  assert.equal(lookups[0].jurisdiction, "mb");
+  assert.equal(lookups[0].serviceId, "student_aid");
+  await collect(await streamGeminiChat({
+    message: "student aid from mainotba",
+    lookupContext: { serviceId: "student_aid", jurisdiction: "sk", facetId: "documents" },
+    lookupChoice: { jurisdiction: "mb" },
+    language: "en", lookup,
+  }));
+  assert.equal(lookups.length, 2);
+  assert.equal(lookups[1].jurisdiction, "mb", "The region selector must override stale scope");
+});
+
 test("citizenship certificate download uses the open CIT 0001 form without asking which service", async () => {
   const { streamGeminiChat, calls } = setupGemini({
     functionArgs: { serviceId: "unknown", jurisdiction: "unknown", facetId: "documents", language: "en" },

@@ -137,6 +137,10 @@ filename. Matching results from multiple jurisdictions still ask which governmen
 issued the form; known provincial services retain their region selector. If no
 public form can be identified, the assistant explicitly asks for a blank
 text-based PDF or its public title/number, rather than presenting a catalog menu.
+Repeating a provincial service name in a new standalone question does not confirm
+the previous province. If the region is missing or unrecognized (including a
+misspelling), chat asks for the region instead of reusing the previous province's
+sources. Explicit follow-ups such as "What about the fees?" retain their scope.
 A typed public form number or application title can resume the previous question.
 OAS/GIS and CPP have distinct
 service routing and saved links. Saskatchewan's 2026-27 full-time Student Aid

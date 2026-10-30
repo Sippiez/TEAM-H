@@ -51,6 +51,22 @@ suggestions, quota, cancellation and admission requirements. Its prompt may now
 include the bounded public form title/number. No SDK or model migration is part
 of this decision.
 
+## Conversation-scope correction (2026-10-30)
+
+A reported three-turn conversation switched from SIN to Saskatchewan student aid,
+then asked for "student aid from mainotba". Exact jurisdiction matching did not
+recognize the misspelling, while repeating the service implicitly retained
+Saskatchewan. This dispatched Saskatchewan evidence for a new-region question;
+it was not a three-turn context-window limit.
+
+Repeating a provincial service alone no longer confirms the prior jurisdiction.
+Without an explicit region, recognized form scope, or a reference back such as
+"What about the fees?", request jurisdiction clarification instead of silently
+reusing stale sources. Do not guess or autocorrect a government jurisdiction.
+An explicit region or recovery choice resumes lookup for that region. Regression
+tests cover the reported sequence, the minimal stale-scope case, bilingual
+follow-ups, and clarification followed by Manitoba.
+
 ## Consequences
 
 - A new identifiable form does not need a new catalog service or form entry.

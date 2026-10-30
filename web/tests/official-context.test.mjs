@@ -31,6 +31,53 @@ const forms = load("../src/lib/catalog/forms.ts", {
 });
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
+test("a new student-aid region with a typo does not reuse Saskatchewan on the third turn", () => {
+  const history = [];
+  let lookupContext;
+  for (const [message, jurisdiction] of [
+    ["How do I get a Social Insurance Number?", "federal"],
+    ["Student aid form for saskatchewan", "sk"],
+    ["student aid from mainotba", undefined],
+  ]) {
+    const result = resolveLookupContext({ message, history, lookupContext, language: "en" });
+    assert.equal(result.context.jurisdiction, jurisdiction, message);
+    if (jurisdiction) {
+      assert.equal(result.selection?.jurisdiction, jurisdiction);
+    } else {
+      assert.equal(result.selection, null);
+      assert.equal(result.reason, "missing_jurisdiction");
+      assert.equal(result.context.serviceId, "student_aid");
+    }
+    history.push({ role: "user", text: message });
+    lookupContext = result.context;
+  }
+});
+
+test("repeating a provincial service alone does not confirm the previous jurisdiction", () => {
+  const result = resolveLookupContext({
+    message: "student aid from mainotba",
+    lookupContext: { serviceId: "student_aid", jurisdiction: "sk" },
+    language: "en",
+  });
+  assert.equal(result.selection, null);
+  assert.equal(result.reason, "missing_jurisdiction");
+  assert.equal(result.context.jurisdiction, undefined);
+});
+
+test("explicit region changes override earlier student-aid scope while follow-ups retain it", () => {
+  const lookupContext = { serviceId: "student_aid", jurisdiction: "sk", facetId: "documents" };
+  for (const [message, language, jurisdiction] of [
+    ["student aid from Manitoba", "en", "mb"],
+    ["Aide aux étudiants au Manitoba", "fr", "mb"],
+    ["What about the fees?", "en", "sk"],
+    ["Quels sont les frais ?", "fr", "sk"],
+  ]) {
+    const result = resolveLookupContext({ message, lookupContext, language });
+    assert.equal(result.selection?.jurisdiction, jurisdiction, message);
+    assert.equal(result.selection?.serviceId, "student_aid", message);
+  }
+});
+
 test("uncatalogued public form identities bypass service planning and survive follow-ups", () => {
   const first = resolveLookupContext({
     message: "Where do I download this form?",

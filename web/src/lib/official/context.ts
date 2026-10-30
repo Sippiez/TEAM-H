@@ -131,14 +131,13 @@ export function resolveLookupContext(input: {
     : services.length === 0
       ? followupService ?? form?.serviceId ?? input.serviceHint
       : undefined);
-  const sameService = serviceId === prior.serviceId;
   const jurisdiction = serviceId && FEDERAL_SERVICES.has(serviceId)
     ? "federal"
     : choice?.jurisdiction ?? (jurisdictions.length === 1
       ? jurisdictions[0]
       : refersToOpenForm && form && form.serviceId === serviceId
         ? form.jurisdiction
-        : ((refersBack || jurisdictionReply || sameService) ? prior.jurisdiction : undefined) ??
+        : ((refersBack || jurisdictionReply) ? prior.jurisdiction : undefined) ??
           (form && form.serviceId === serviceId ? form.jurisdiction : undefined));
   const facetId = jurisdictionReply || (formReply && question === input.message)
     ? prior.facetId ?? "overview"
