@@ -165,6 +165,21 @@ test("an interrupted answer keeps its text and source with a retry action", () =
   assert.match(html, /Live official source/);
 });
 
+test("Serper failures name the provider in both languages without suggesting Gemini billing", () => {
+  for (const language of ["en", "fr"]) {
+    for (const reason of ["search_quota", "search_auth", "search_failed"]) {
+      const html = render({ lookup: {
+        status: "unavailable", reason, partial: false, method: "search",
+        serviceId: "student_aid", jurisdiction: "sk", facetId: "documents",
+      } }, language);
+      assert.match(html, /Serper/);
+      assert.match(html, /printable-applications-and-forms/);
+      assert.doesNotMatch(html, /Gemini billing|Live official source|Source officielle en direct/);
+      if (reason === "search_auth") assert.doesNotMatch(html, /Try again|Réessayer/);
+    }
+  }
+});
+
 test("Google quota failures explain billing and preserve Saskatchewan navigation without live claims", () => {
   const html = render({ lookup: {
     status: "unavailable", reason: "grounding_quota", partial: false, method: "google_grounding",
@@ -235,6 +250,9 @@ test("starter suggestions yield space to answers while privacy details remain ac
   assert.match(initial, /Download this form/);
   assert.match(initial, /<summary[^>]*>.*AI and search privacy<\/summary>/);
   assert.match(initial, /Chat uses Google Gemini/);
+  assert.match(initial, /Serper/);
+  assert.match(initial, /Search snippets are not evidence/);
+  assert.doesNotMatch(initial, /using Brave|Google Search grounding is the fallback/);
   assert.doesNotMatch(initial, /Chat shares form metadata/);
   assert.doesNotMatch(initial, /<details[^>]*\bopen/);
 
@@ -248,5 +266,6 @@ test("starter suggestions yield space to answers while privacy details remain ac
   assert.doesNotMatch(conversation, /Download this form/);
   assert.match(conversation, /Confidentialité : IA et recherche/);
   assert.match(conversation, /Le clavardage utilise Google Gemini/);
+  assert.match(conversation, /Serper/);
   assert.doesNotMatch(conversation, /Le clavardage partage les métadonnées/);
 });

@@ -23,7 +23,7 @@ import {
   parseAllowedOfficialUrl,
   type JurisdictionId,
 } from "./hosts";
-import { searchOfficialCandidates } from "./search";
+import { searchOfficialCandidates, searchSerperCandidates } from "./search";
 import type {
   OfficialLookupSummary,
   Resource,
@@ -36,6 +36,8 @@ export type LookupReason =
   | "missing_jurisdiction"
   | "provider_not_configured"
   | "search_failed"
+  | "search_quota"
+  | "search_auth"
   | "no_allowed_candidates"
   | "no_relevant_pages"
   | "fetch_failed"
@@ -61,6 +63,7 @@ export interface OfficialLookupResult {
 }
 
 export interface LookupDependencies {
+  discoverRegisteredForms?: boolean;
   search?: (
     selection: LookupSelection,
     signal: AbortSignal,
@@ -93,8 +96,10 @@ function isRelevantServicePage(
 }
 
 function failureReason(error: unknown): LookupReason {
-  if (error instanceof Error && error.message === "provider_not_configured") {
-    return "provider_not_configured";
+  if (error instanceof Error) {
+    if (error.message === "provider_not_configured") return "provider_not_configured";
+    if (error.message === "search_quota") return "search_quota";
+    if (error.message === "search_auth") return "search_auth";
   }
   if (error instanceof OfficialFetchError && error.reason === "deadline") {
     return "deadline";
@@ -179,7 +184,7 @@ export async function lookupOfficialInformation(
   let stage: "search" | "fetch" = "search";
 
   try {
-    const searchResult = selection.formId && selection.facetId === "documents"
+    const searchResult = selection.formId && selection.facetId === "documents" && !dependencies.discoverRegisteredForms
       ? {
           candidates: [{ url: PUBLIC_FORMS[selection.formId].url, sponsored: false }],
           rejectedSponsored: 0,
@@ -296,8 +301,8 @@ export async function lookupOfficialInformation(
         reason: controller.signal.aborted
           ? "deadline"
           : stage === "search"
-            ? failureReason(error) === "provider_not_configured"
-              ? "provider_not_configured"
+            ? ["provider_not_configured", "search_quota", "search_auth"].includes(failureReason(error))
+              ? failureReason(error)
               : "search_failed"
             : failureReason(error),
         partial: false,
@@ -309,6 +314,26 @@ export async function lookupOfficialInformation(
     clearTimeout(timeout);
     signal?.removeEventListener("abort", abortParent);
   }
+}
+
+export async function lookupOfficialWithSerper(
+  argumentsValue: unknown,
+  signal?: AbortSignal,
+  dependencies: LookupDependencies = {},
+): Promise<OfficialLookupResult> {
+  const direct = await lookupOfficialInformation(argumentsValue, signal, dependencies);
+  if (direct.outcome.status === "verified" ||
+    direct.outcome.status === "clarification_required" ||
+    direct.outcome.method === "search" || signal?.aborted) return direct;
+  const discovered = await lookupOfficialInformation(argumentsValue, signal, {
+    ...dependencies,
+    discoverRegisteredForms: true,
+    search: searchSerperCandidates,
+  });
+  return {
+    ...discovered,
+    outcome: { ...discovered.outcome, method: "search", fallbackReason: direct.outcome.reason },
+  };
 }
 
 export async function lookupOfficialWithFallback(

@@ -50,7 +50,7 @@ an explicit Arial/sans-serif fallback; automatic fallback-metric adjustment is
 disabled because Next.js has no override metrics for this font.
 `npm test` uses Node's built-in runner and the existing TypeScript
 compiler to exercise chat validation, prompts, typed streaming, errors, timeouts,
-cancellation, URL policy, Google grounding metadata, query privacy, and provenance using
+cancellation, URL policy, Serper requests/errors, query privacy, and provenance using
 isolated fakes, chat-only/PDF transitions, plus message/document identity across
 Fast Refresh; it needs no API key or network.
 
@@ -68,8 +68,9 @@ requests, streaming responses, completion/errors, and official-information tool
 execution. Logs include the model, enabled tools, validated public lookup
 selections, source counts, token usage when provided, and elapsed time. They
 exclude prompts, answer text, PDF context, API keys, and raw error messages.
-`form-discovery` identifies an ordinary Gemini request for unverified candidate
-page URLs, not a Google Search call. Invalid planner calls now show allowlisted
+Official lookup completion logs include the retrieval method; Serper search is
+server-side and never enables Gemini's built-in Google Search tool.
+Invalid planner calls show allowlisted
 argument values (including `unknown`) and an argument-validation status rather
 than only `selection: null`. Unregistered form labels are redacted from logs.
 These logs are disabled outside development.
@@ -82,50 +83,49 @@ selected field's printed question and instructions, plus curated guidance when
 available. PDF loading and local field-context extraction do not require a key;
 ambiguous contexts can be associated on demand using Gemini.
 
-Service navigation uses **direct official-page lookup first**, with **Google
-Search grounding only as a fallback**. Recognized download questions fetch
-their registered official information page without a search key. Without a
-Brave key, mapped federal services and Saskatchewan Student Aid use their
-mapped official pages. An optional `BRAVE_SEARCH_API_KEY` enables broader
-candidate discovery, followed by the same direct verification. Successful
-direct lookups use freshly retrieved excerpts and normal Gemini synthesis;
-they never consume Google Search grounding quota.
+Service navigation uses **direct official-page lookup first**, with **Serper
+for web search**. Recognized download questions, mapped services and known
+IRCC form-directory entries try their official pages without spending search
+credits. If a mapped page cannot be verified, or no mapping exists, the server
+uses `SERPER_API_KEY` to discover candidate pages. It fetches and verifies each
+admitted candidate before ordinary Gemini synthesizes an answer from excerpts.
+Neither Gemini's built-in Google Search tool nor Brave is used. No new SDK or
+dependency is needed.
 
 Forms no longer have to belong to the service catalog. The browser also extracts
 a bounded public title from prominent printed heading text, excluding widget
 text; the server can discover official pages from this title and/or a public
-form number. Without Brave, `CIT` and `IMM` numbers first try IRCC's standard
-form-information directory. Other forms use ordinary Gemini to suggest up to
-two unverified official-page candidates. No claim or URL suggestion becomes
-evidence until its page is fetched and checked. Matching information-page links
+form number. `CIT` and `IMM` numbers first try IRCC's standard form-information
+directory. Other forms use Serper, not model-generated URL guesses.
+No search result becomes evidence until its page is fetched and checked.
+Matching information-page links
 can be followed within the existing five-candidate, three-fetch budget.
 Download pages must identify the exact supplied form number, or match the
 distinctive title terms when no number is available.
 
-If direct lookup fails or finds no usable evidence, it tries Google Search
-grounding through the existing `@google/genai` SDK and `GEMINI_API_KEY`.
-Clarification and user cancellation do not start a fallback. No Vercel AI SDK
-migration is needed. Discovery and search requests contain catalog keywords or
+If a mapped lookup fails or finds no usable evidence, it tries Serper once.
+A lookup that already used Serper is not repeated. Clarification and user
+cancellation do not start a fallback. Discovery and search requests contain catalog keywords or
 the public title (up to 200 characters) and number (up to 32 characters) from a
 blank form, plus the information facet, interface language and jurisdiction when
 known, not chat history, filenames, PDF fields, entered values or arbitrary
 question text. Use blank forms only: printed text in a personalized or flattened
 document may itself contain personal information.
-Google generates its grounding queries from that public context.
+The server builds the query deterministically from that public context and
+the approved `site:` roots, with Canadian search localization and English/French
+interface language. Serper receives the query, not the conversation.
 Service selection and ordinary chat still receive the bounded context described
 in the privacy notice.
 
-For the Google fallback, the app requires actual search/citation metadata, a complete response
-and the associated Search Suggestions. It displays the Google-grounded answer
-with numbered citations, without a second model synthesis or silent memory
-fallback. Sources are labeled **Google Search grounded**, not as pages fetched
-and checked directly by the app. Source language is not guessed from the answer
-language. Google Search Suggestions are displayed in a sandboxed, script-disabled
-frame beside the answer.
-Google retains grounding requests, context and responses for 30 days. Grounding
-can involve multiple provider-generated queries and separate charges. Review
-current Google pricing, data handling and service terms before deployment; see
-[decision 0006](docs/decisions/0006-google-search-grounding.md).
+Serper's organic result URLs are discovery hints only. Ads, snippets, answer
+boxes and generated summaries never become answer evidence. Sources are labeled
+**Live official source** only after successful page retrieval and checks.
+Unavailable search, missing/invalid credentials, exhausted credits/rate limits,
+and failed page verification return explicit lookup states, not answers from
+model memory. Existing Google-grounded messages keep their legacy provenance
+and suggestions display, but new requests do not use that provider.
+Review Serper's credits, limits and data handling before deployment; see
+[decision 0008](docs/decisions/0008-serper-web-search.md).
 
 Recognized form IDs and conversation-scoped service selections resolve questions
 such as "Where do I download this form?" and "What about the fees?". Federal
@@ -153,31 +153,24 @@ credentials or cookies, rejects archived/irrelevant pages, and checks recognized
 form references. Excluded downloads are flagged without fetching or emitting
 their URLs. TLS verification remains enabled.
 
-A Google-grounded response citing excluded, sign-in or wrong-jurisdiction
-sources is rejected as a whole; its text is not selectively rewritten.
-Google-generated `site:` queries are a prompt constraint, not a
-provider-enforced allowlist. The application enforces source admission afterward.
-The Google fallback's only citation-resolution request is a manual HEAD request
-to Google's fixed `vertexaisearch.cloud.google.com/grounding-api-redirect/`
-endpoint. It checks the destination without following the redirect or contacting
-the government page, and preserves Google's citation link for the user.
-Google citation URLs are transport references, not additional approved content
-roots. Arbitrary redirects and excluded `.gc.ca` sources remain blocked.
+Serper's `site:` query is a search hint, not a provider-enforced allowlist.
+The application admits only approved URLs and the requested jurisdiction before
+fetching. Sign-in pages, arbitrary redirects and excluded `.gc.ca` sources
+remain blocked.
 
 The total chat deadline remains 30 seconds. Direct lookup has a 10-second
 sub-budget, at most five candidates, three page requests, two concurrent requests
-and three redirects per page. Google fallback has a 20-second sub-budget under
-the same overall deadline, at most eight source entries and bounded
-answer/metadata sizes. Google-grounded pages do not receive independent archive
-or download checks, and Google may not have read their latest complete content.
-Source labels distinguish direct retrieval from Google grounding; fallback
-metadata preserves the original direct failure. Saved guidance stays separately
-labeled and never becomes live evidence.
+and three redirects per page. A Serper fallback gets a separate 10-second
+search-and-verification budget under the same overall deadline. There is at most
+one Serper request per lookup; its JSON body is limited to 256 KB and five
+organic candidates. Fallback metadata preserves the original direct failure.
+Saved guidance stays separately labeled and never becomes live evidence.
 
 Switching to mobile data/hotspot may avoid a network's TLS-inspecting proxy.
 The application does not change networking or trust stores, and does not
-disable certificate verification. If direct retrieval still fails and Google's
-quota is exhausted, both attempts are reported as unavailable.
+disable certificate verification. Serper does not repair government-page TLS
+failures: if discovered pages also cannot be verified, the lookup reports that
+failure instead of answering from search snippets.
 Interrupted responses preserve partial text and sources, mark the answer
 incomplete, and provide retry; missing setup is not disguised as a retryable
 network problem. Suggestions and recovery controls follow the interface language.
@@ -262,17 +255,18 @@ cp -n .env.example .env.local
 ```
 
 Set `GEMINI_API_KEY` to a Google AI Studio key in that ignored local file or in
-your deployment's server-side secret store. Successful direct-page lookup needs
-ordinary Gemini generation, not Google Search quota. For the Google fallback,
-the key's project must have grounding access and sufficient quota/billing.
-Ordinary Gemini generation working does not prove that search quota is
-available. `BRAVE_SEARCH_API_KEY` is optional for broader first-attempt
-discovery; mapped pages and recognized downloads work without it.
+your deployment's server-side secret store. Set `SERPER_API_KEY` to your Serper
+key for search discovery and failed mapped-page lookups. Mapped pages and
+recognized downloads work without a search key if direct verification succeeds.
+`web/.env` is also supported; keep existing secrets there if already configured.
+Search now consumes Serper credits rather than Gemini grounding quota; ordinary
+Gemini generation quotas still apply to planning and answers.
 `GEMINI_MODEL` optionally overrides
 `gemini-3.1-flash-lite`. Never prefix any key with `NEXT_PUBLIC_`.
-Next.js loads `.env.local`; restart the server after changing it. Never commit
-actual credentials. The root [.env.example](.env.example) remains a generic
-workspace template, not the web app's configuration.
+Next.js loads `.env*` from `web/`, with `.env.local` taking precedence over
+`.env`; restart the server after changing configuration. Never commit actual
+credentials. The root [.env.example](.env.example) lists the same variable names
+for reference; the running app does not load environment files from the root.
 
 Chat has a 30-second deadline. Missing `GEMINI_API_KEY` returns 503; a Gemini
 startup failure before streaming returns 502, and deadline expiry before

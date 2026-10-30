@@ -185,6 +185,7 @@ export function ChatPanel({
               )}
               {m.id === messages.at(-1)?.id && m.request && onRetry && m.error !== "not_configured" &&
                 m.lookup?.reason !== "provider_not_configured" &&
+                m.lookup?.reason !== "search_auth" &&
                 (m.incomplete || m.error || m.lookup?.status === "unavailable" || m.lookup?.status === "no_verified_results") && (
                   <button
                     type="button"

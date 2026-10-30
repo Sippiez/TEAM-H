@@ -18,7 +18,7 @@ function loadModule(path, imports, globals = {}) {
       assert.ok(Object.hasOwn(imports, name), `Unexpected import: ${name}`);
       return imports[name];
     },
-    Error, DOMException, AbortController, ReadableStream, TextEncoder, URL,
+    Error, DOMException, AbortController, ReadableStream, TextEncoder, TextDecoder, URL,
     Response, setTimeout, clearTimeout,
     ...globals,
   }, { filename: path });
@@ -268,15 +268,16 @@ function setupGemini({
   functionArgs = null,
   functionCalls = null,
   finalChunks = [{ text: "verified [source:live-source-id]" }],
-  groundedLookup = async () => assert.fail("Injected lookup must be used"),
   directPage,
   generationError,
   streamError,
-  discoveryUrls = [],
+  searchUrls = [],
+  searchStatus = 200,
 } = {}) {
   const calls = [];
   const logs = [];
   const directAttempts = [];
+  const searchRequests = [];
   const officialHosts = loadModule("../src/lib/official/hosts.ts", {});
   const officialCatalog = loadModule("../src/lib/official/catalog.ts", {
     "./hosts": officialHosts,
@@ -285,14 +286,25 @@ function setupGemini({
     "./catalog": officialCatalog,
     "./hosts": officialHosts,
   });
+  const officialSearch = loadModule("../src/lib/official/search.ts", {
+    "server-only": {}, "./catalog": officialCatalog,
+    "../catalog/resources": loadModule("../src/lib/catalog/resources.ts", {}),
+  }, {
+    process: { env },
+    fetch: async (url, init) => {
+      searchRequests.push({ url, ...init });
+      return new Response(JSON.stringify({ organic: searchUrls.map((link) => ({ link })) }), { status: searchStatus });
+    },
+  });
   const officialLookup = loadModule("../src/lib/official/lookup.ts", {
     "server-only": {}, "node:crypto": crypto,
     "@/lib/abortable": loadModule("../src/lib/abortable.ts", {}),
     "./catalog": officialCatalog, "./hosts": officialHosts,
-    "./search": { searchOfficialCandidates: async () => ({ candidates: [], rejectedSponsored: 0 }) },
+    "./search": officialSearch,
     "./fetch": {
       fetchOfficialPage: async (url) => {
         directAttempts.push(url);
+        if (typeof directPage === "function") return directPage(url);
         if (directPage) return { url, language: "en-CA", ...directPage };
         throw new Error("direct-fetch-test-failure");
       },
@@ -311,7 +323,7 @@ function setupGemini({
             calls.push({ kind: "planner", ...input });
             if (generationError) throw generationError;
             if (input.config.responseMimeType === "application/json") {
-              return { text: JSON.stringify({ urls: discoveryUrls }) };
+              assert.fail("Discovery must use Serper, not model-generated URLs");
             }
             return functionCalls !== null
               ? { functionCalls }
@@ -332,9 +344,8 @@ function setupGemini({
     "@/lib/official/catalog": officialCatalog,
     "@/lib/official/context": officialContext,
     "@/lib/official/lookup": officialLookup,
-    "@/lib/official/grounding": { lookupGoogleGrounding: groundedLookup },
   }, { process: { env }, console: { info: (...args) => logs.push(args) } });
-  return { streamGeminiChat, calls, directAttempts, logs };
+  return { streamGeminiChat, calls, directAttempts, searchRequests, logs };
 }
 
 async function collect(stream) {
@@ -368,17 +379,10 @@ test("citizenship certificate download uses the open CIT 0001 form without askin
   assert.ok(events.every((event) => event.outcome?.reason !== "missing_service"));
 });
 
-test("uncatalogued forms discover from their public title without sending private context to search", async () => {
-  const { streamGeminiChat, calls } = setupGemini({
-    groundedLookup: async (selection, signal, dependencies) => {
-      assert.equal(selection.publicForm.title, "Application for accessibility assistance");
-      assert.equal(selection.jurisdiction, undefined);
-      await dependencies.generate("PUBLIC-DISCOVERY", signal);
-      return {
-        outcome: { ...selection, status: "unavailable", reason: "grounding_quota", partial: false },
-        sources: [],
-      };
-    },
+test("uncatalogued forms search Serper with their public title without private context or Gemini grounding", async () => {
+  const { streamGeminiChat, calls, searchRequests } = setupGemini({
+    env: { GEMINI_API_KEY: "test-only", SERPER_API_KEY: "test-only" },
+    searchStatus: 429,
   });
   const events = await collect(await streamGeminiChat({
     message: "Where do I download this form? PRIVATE-QUESTION",
@@ -386,18 +390,18 @@ test("uncatalogued forms discover from their public title without sending privat
     history: [{ role: "user", text: "PRIVATE-HISTORY" }],
     language: "en",
   }));
-  assert.equal(calls.length, 2);
-  assert.equal(calls[0].config.responseMimeType, "application/json");
-  assert.deepEqual(JSON.parse(JSON.stringify(calls[1].config.tools)), [{ googleSearch: {} }]);
-  assert.doesNotMatch(JSON.stringify(calls), /PRIVATE-/);
-  assert.equal(events[0].outcome.reason, "grounding_quota");
+  assert.equal(calls.length, 0);
+  assert.equal(searchRequests.length, 1);
+  assert.match(searchRequests[0].body, /Application for accessibility assistance/);
+  assert.doesNotMatch(JSON.stringify(searchRequests), /PRIVATE-/);
+  assert.equal(events[0].outcome.reason, "search_quota");
 });
 
 test("automatic form discovery verifies suggested pages live before synthesizing an answer", async () => {
   const url = "https://www.canada.ca/en/accessibility-application";
-  const { streamGeminiChat, calls, directAttempts, logs } = setupGemini({
-    env: { GEMINI_API_KEY: "test-only", NODE_ENV: "development" },
-    discoveryUrls: [url],
+  const { streamGeminiChat, calls, directAttempts, logs, searchRequests } = setupGemini({
+    env: { GEMINI_API_KEY: "test-only", SERPER_API_KEY: "test-only", NODE_ENV: "development" },
+    searchUrls: [url],
     directPage: { title: "Accessibility assistance ABC 123", text: "Download ABC 123 from this official accessibility assistance application page." },
   });
   const events = await collect(await streamGeminiChat({
@@ -410,29 +414,27 @@ test("automatic form discovery verifies suggested pages live before synthesizing
     history: [{ role: "user", text: "PRIVATE-HISTORY" }], language: "en",
   }));
   assert.deepEqual(directAttempts, [url]);
-  assert.equal(calls.length, 2);
-  assert.equal(calls[0].config.responseMimeType, "application/json");
-  assert.doesNotMatch(calls[0].contents, /PRIVATE-/);
-  assert.match(calls[1].contents, /Download ABC 123 from this official/);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].kind, "stream");
+  assert.doesNotMatch(searchRequests[0].body, /PRIVATE-/);
+  assert.match(calls[0].contents, /Download ABC 123 from this official/);
   assert.equal(events[0].outcome.status, "verified");
   assert.equal(events[0].outcome.jurisdiction, "federal");
   assert.equal(events[0].sources[0].provenance.kind, "live_official");
-  assert.ok(logs.some(([, event]) => event.operation === "form-discovery"));
+  assert.ok(logs.some(([, event]) => event.operation === "lookup_official_information"));
   assert.doesNotMatch(JSON.stringify(logs), /Application for accessibility|PRIVATE-/);
 });
 
 test("untrusted page suggestions cannot bypass the government URL policy", async () => {
   const { streamGeminiChat, directAttempts } = setupGemini({
-    discoveryUrls: ["https://evil.test/info", "https://www.canada.ca/en/sign-in"],
-    groundedLookup: async () => ({
-      outcome: { status: "unavailable", reason: "grounding_quota", partial: false }, sources: [],
-    }),
+    env: { GEMINI_API_KEY: "test-only", SERPER_API_KEY: "test-only" },
+    searchUrls: ["https://evil.test/info", "https://www.canada.ca/en/sign-in"],
   });
   const events = await collect(await streamGeminiChat({
     message: "Where do I download this form?", form: { ...form, formNumber: "ABC 123" }, language: "en",
   }));
   assert.equal(directAttempts.length, 0);
-  assert.equal(events[0].outcome.fallbackReason, "no_allowed_candidates");
+  assert.equal(events[0].outcome.reason, "no_allowed_candidates");
 });
 
 test("IRCC form numbers use the official form directory without a catalog entry or model URL guess", async () => {
@@ -546,20 +548,16 @@ test("Gemini request and tool logging is disabled outside development", async ()
   }
 });
 
-test("the default lookup falls back to Google Search after a failed direct fetch without a second synthesis", async () => {
-  const { streamGeminiChat, calls, directAttempts } = setupGemini({
-    groundedLookup: async (selection, signal, dependencies) => {
-      assert.equal(selection.serviceId, "student_aid");
-      assert.equal(selection.jurisdiction, "sk");
-      await dependencies.generate("CANONICAL-PUBLIC-QUERY", signal);
+test("the default lookup falls back to Serper after a failed direct fetch and synthesizes only verified text", async () => {
+  const alternate = "https://www.saskatchewan.ca/forms";
+  const { streamGeminiChat, calls, directAttempts, searchRequests } = setupGemini({
+    env: { GEMINI_API_KEY: "test-only", SERPER_API_KEY: "test-only" },
+    searchUrls: [alternate],
+    directPage: async (url) => {
+      if (url !== alternate) throw new Error("direct-fetch-test-failure");
       return {
-        outcome: { ...selection, status: "verified", reason: "none", partial: false, method: "google_grounding" },
-        answer: "Use the official student aid forms page. [1]",
-        sources: [{
-          id: "google-source", url: "https://www.saskatchewan.ca/forms",
-          title: "Student Aid forms", department: "Saskatchewan", description: "", tags: [],
-          provenance: { kind: "google_grounded", searchedAt: "2026-10-29T20:00:00Z" },
-        }],
+        url, language: "en-CA", title: "2026-27 Full-Time Saskatchewan Student Aid forms",
+        text: "Download the 2026-27 Full-Time Saskatchewan Student Aid application.",
       };
     },
   });
@@ -569,12 +567,14 @@ test("the default lookup falls back to Google Search after a failed direct fetch
     history: [{ role: "user", text: "PRIVATE-HISTORY-CANARY" }], language: "en",
   }));
   assert.equal(calls.length, 1);
-  assert.equal(directAttempts.length, 1);
+  assert.equal(directAttempts.length, 2);
+  assert.equal(searchRequests.length, 1);
   assert.equal(events[0].outcome.fallbackReason, "fetch_failed");
-  assert.deepEqual(JSON.parse(JSON.stringify(calls[0].config.tools)), [{ googleSearch: {} }]);
-  assert.equal(calls[0].contents, "CANONICAL-PUBLIC-QUERY");
-  assert.doesNotMatch(JSON.stringify(calls), /PRIVATE-/);
-  assert.equal(events.filter((event) => event.type === "delta").map((event) => event.text).join(""), "Use the official student aid forms page. [1]");
+  assert.equal(events[0].outcome.method, "search");
+  assert.equal(calls[0].config.tools, undefined);
+  assert.match(calls[0].contents, /Download the 2026-27 Full-Time/);
+  assert.doesNotMatch(JSON.stringify(searchRequests), /PRIVATE-/);
+  assert.ok(events.some((event) => event.type === "delta"));
 });
 
 test("a successful default direct lookup synthesizes verified excerpts without calling Google Search", async () => {

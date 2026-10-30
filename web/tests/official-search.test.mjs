@@ -612,8 +612,8 @@ test("archived pages are not current evidence and fetch budgets disclose partial
 });
 
 test("missing provider credential is an explicit unavailable outcome", async () => {
-  const previous = process.env.BRAVE_SEARCH_API_KEY;
-  delete process.env.BRAVE_SEARCH_API_KEY;
+  const previous = process.env.SERPER_API_KEY;
+  delete process.env.SERPER_API_KEY;
   try {
     const result = await lookup.lookupOfficialInformation(
       { serviceId: "health_card", jurisdiction: "on", facetId: "overview", language: "en" },
@@ -623,26 +623,24 @@ test("missing provider credential is an explicit unavailable outcome", async () 
     assert.equal(result.outcome.reason, "provider_not_configured");
     assert.equal(result.sources.length, 0);
   } finally {
-    if (previous === undefined) delete process.env.BRAVE_SEARCH_API_KEY;
-    else process.env.BRAVE_SEARCH_API_KEY = previous;
+    if (previous === undefined) delete process.env.SERPER_API_KEY;
+    else process.env.SERPER_API_KEY = previous;
   }
 });
 
-test("Brave adapter sends canonical catalog keywords, not user-supplied canaries", async () => {
+test("Serper adapter sends canonical catalog keywords, not user-supplied canaries", async () => {
   const calls = [];
   const originalFetch = globalThis.fetch;
-  const originalKey = process.env.BRAVE_SEARCH_API_KEY;
-  process.env.BRAVE_SEARCH_API_KEY = "test-only";
+  const originalKey = process.env.SERPER_API_KEY;
+  process.env.SERPER_API_KEY = "test-only";
   globalThis.fetch = async (input, init) => {
     calls.push({ url: new URL(input), init });
     return new Response(JSON.stringify({
-      web: {
-        results: [
-          { url: "https://www.ontario.ca/page", is_sponsored: true },
-          { url: "https://www.ontario.ca/info", is_sponsored: false },
-          { url: "https://evil.test/summary", is_sponsored: false },
-        ],
-      },
+      organic: [
+        { link: "https://www.ontario.ca/page", is_sponsored: true },
+        { link: "https://www.ontario.ca/info", is_sponsored: false },
+        { link: "https://evil.test/summary", is_sponsored: false },
+      ],
       summary: { text: "AI answer must not be used" },
     }), { status: 200, headers: { "content-type": "application/json" } });
   };
@@ -652,8 +650,8 @@ test("Brave adapter sends canonical catalog keywords, not user-supplied canaries
       new AbortController().signal,
     );
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].url.origin, "https://api.search.brave.com");
-    const query = calls[0].url.searchParams.get("q");
+    assert.equal(calls[0].url.origin, "https://google.serper.dev");
+    const query = JSON.parse(calls[0].init.body).q;
     assert.match(query, /^site:ontario\.ca Ontario health card health coverage how to apply application steps$/);
     assert.doesNotMatch(query, /PERSONAL-CANARY|file\.pdf|chat-history/);
     assert.equal(calls[0].init.cache, "no-store");
@@ -665,8 +663,8 @@ test("Brave adapter sends canonical catalog keywords, not user-supplied canaries
     ]);
   } finally {
     globalThis.fetch = originalFetch;
-    if (originalKey === undefined) delete process.env.BRAVE_SEARCH_API_KEY;
-    else process.env.BRAVE_SEARCH_API_KEY = originalKey;
+    if (originalKey === undefined) delete process.env.SERPER_API_KEY;
+    else process.env.SERPER_API_KEY = originalKey;
   }
 });
 
@@ -770,9 +768,9 @@ test("the direct sub-budget expires without aborting the parent's Google fallbac
   assert.equal(result.outcome.fallbackReason, "deadline");
 });
 
-test("mapped personal income tax lookup works without Brave or Google when direct fetch succeeds", async () => {
-  const previous = process.env.BRAVE_SEARCH_API_KEY;
-  delete process.env.BRAVE_SEARCH_API_KEY;
+test("mapped personal income tax lookup works without a search key when direct fetch succeeds", async () => {
+  const previous = process.env.SERPER_API_KEY;
+  delete process.env.SERPER_API_KEY;
   try {
     const result = await lookup.lookupOfficialWithFallback(
       { serviceId: "income_tax", jurisdiction: "federal", facetId: "overview", language: "en" },
@@ -787,7 +785,7 @@ test("mapped personal income tax lookup works without Brave or Google when direc
     assert.equal(result.outcome.status, "verified");
     assert.match(result.sources[0].url, /personal-income-tax/);
   } finally {
-    if (previous === undefined) delete process.env.BRAVE_SEARCH_API_KEY;
-    else process.env.BRAVE_SEARCH_API_KEY = previous;
+    if (previous === undefined) delete process.env.SERPER_API_KEY;
+    else process.env.SERPER_API_KEY = previous;
   }
 });

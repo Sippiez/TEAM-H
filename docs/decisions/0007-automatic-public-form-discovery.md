@@ -2,6 +2,7 @@
 
 - Date: 2026-10-29
 - Status: Accepted
+- Search-provider decision superseded by [0008](0008-serper-web-search.md).
 - Amends: [0006](0006-google-search-grounding.md)
 
 ## Context

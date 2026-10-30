@@ -1,6 +1,7 @@
 # 0006: Google Search grounding
 
 - Status: Accepted; direct-first lookup with Google fallback, with successful live grounding blocked by project quota
+- Search-provider decision superseded by [0008](0008-serper-web-search.md).
 - Supersedes: [0005](0005-restricted-official-search.md)
 - Amended by: [0007](0007-automatic-public-form-discovery.md) for unregistered
   public-form discovery and removal of the service dropdown.
