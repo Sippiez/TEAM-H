@@ -1,6 +1,6 @@
 "use client";
 
-import { InfoIcon, RotateCcwIcon } from "lucide-react";
+import { FileUpIcon, InfoIcon, RotateCcwIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 
@@ -75,6 +75,8 @@ export function FormHelperApp() {
   const [scrollKey, setScrollKey] = useState(0);
   const [navMessages, setNavMessages] = useState<ChatMessage[]>([]);
   const [navPending, setNavPending] = useState(false);
+  const [chatOnly, setChatOnly] = useState(false);
+  const navigatorDocKey = useRef<string | null>(null);
   const activeRef = useRef<string | null>(null);
   const requested = useRef(new Set<string>());
   const sideRef = useRef<HTMLElement>(null);
@@ -236,7 +238,7 @@ export function FormHelperApp() {
     [isDesktop, loadExplanation, revealSide, updateDoc],
   );
 
-  /** Posts to the assistant. A null target is the landing page's service navigator. */
+  /** A null target uses the general chat, including requests migrated into a PDF. */
   const sendChat = useCallback(
     async (
       text: string | null,
@@ -256,8 +258,9 @@ export function FormHelperApp() {
       const push = (message: ChatMessage) => {
         if (!isCurrent()) return;
         const msg = { ...message, language: lang };
-        return target
-          ? updateDoc(target.key, (doc) => ({
+        const key = target?.key ?? navigatorDocKey.current;
+        return key
+          ? updateDoc(key, (doc) => ({
               ...doc,
               messages: [...doc.messages, msg],
             }))
@@ -272,8 +275,9 @@ export function FormHelperApp() {
         text: string,
       ) => {
         if (!isCurrent()) return;
-        return target
-          ? updateDoc(target.key, (doc) => ({
+        const key = target?.key ?? navigatorDocKey.current;
+        return key
+          ? updateDoc(key, (doc) => ({
               ...doc,
               messages: doc.messages.map((message) =>
                 message.id === messageId
@@ -292,8 +296,9 @@ export function FormHelperApp() {
 
       const removeMessage = (messageId: string) => {
         if (!isCurrent()) return;
-        return target
-          ? updateDoc(target.key, (doc) => ({
+        const key = target?.key ?? navigatorDocKey.current;
+        return key
+          ? updateDoc(key, (doc) => ({
               ...doc,
               messages: doc.messages.filter(
                 (message) => message.id !== messageId,
@@ -306,13 +311,15 @@ export function FormHelperApp() {
             );
       };
 
-      const setPending = (pending: boolean) =>
-        target
-          ? updateDoc(target.key, (doc) => ({
+      const setPending = (pending: boolean) => {
+        const key = target?.key ?? navigatorDocKey.current;
+        return key
+          ? updateDoc(key, (doc) => ({
               ...doc,
               pending,
             }))
           : setNavPending(pending);
+      };
 
       const history = currentMessages
         .filter(
@@ -464,29 +471,34 @@ export function FormHelperApp() {
     try {
       const loaded = await loadForm(data, fileName);
       const key = `d-${crypto.randomUUID()}`;
-      setDocs((ds) => [
-        ...ds,
-        {
-          key,
-          form: loaded,
-          size,
-          page: 1,
-          selectedId: null,
-          visited: new Set(),
-          explanations: {},
-          explainErrors: new Set(),
-          contextPending: new Set(),
-          contextErrors: {},
-          messages: [],
-          pending: false,
-          ctxCleared: false,
-          tab: "field",
-        },
-      ]);
+      const fromChat = chatOnly && docs.length === 0;
+      const migratingRequest = fromChat && chatRequests.current.has("navigator");
+      const session: DocSession = {
+        key,
+        form: loaded,
+        size,
+        page: 1,
+        selectedId: null,
+        visited: new Set(),
+        explanations: {},
+        explainErrors: new Set(),
+        contextPending: new Set(),
+        contextErrors: {},
+        messages: fromChat ? navMessagesRef.current : [],
+        pending: migratingRequest,
+        ctxCleared: false,
+        tab: fromChat ? "ask" : "field",
+      };
+      if (fromChat) {
+        navigatorDocKey.current = key;
+        setNavPending(false);
+      }
+      docsRef.current = [...docsRef.current, session];
+      setDocs((ds) => [...ds, session]);
       activate(key);
       window.scrollTo({ top: 0 });
       if (loaded.fields.length === 0) toast.warning(t.noFieldsTitle, { description: t.noFieldsBody });
-      void sendChat(null, { key, form: loaded }, null, "overview");
+      if (!migratingRequest) void sendChat(null, { key, form: loaded }, null, "overview");
     } catch (err) {
       console.error(err);
       toast.error(t.openFailTitle, { description: t.openFailBody });
@@ -529,6 +541,12 @@ export function FormHelperApp() {
     const controller = chatRequests.current.get(key);
     chatRequests.current.delete(key);
     controller?.abort();
+    if (navigatorDocKey.current === key) {
+      const navigatorRequest = chatRequests.current.get("navigator");
+      chatRequests.current.delete("navigator");
+      navigatorRequest?.abort();
+      navigatorDocKey.current = null;
+    }
     for (const [requestKey, request] of contextRequests.current) {
       if (requestKey.startsWith(`${key}:`)) {
         contextRequests.current.delete(requestKey);
@@ -539,12 +557,20 @@ export function FormHelperApp() {
     forget(key);
     const rest = docs.filter((d) => d.key !== key);
     const neighbour = rest[Math.min(idx, rest.length - 1)];
+    if (rest.length === 0 && chatOnly) {
+      const messages = docs[idx].pending
+        ? docs[idx].messages.filter((message, index, all) => index !== all.length - 1 || message.role !== "assistant")
+        : docs[idx].messages;
+      navMessagesRef.current = messages;
+      setNavMessages(messages);
+      setNavPending(false);
+    }
     setDocs(rest);
     if (activeKey === key) activate(neighbour?.key ?? null);
     requestAnimationFrame(() => {
       const next = neighbour
         ? document.querySelector<HTMLElement>(`[data-doc-tab="${neighbour.key}"]`)
-        : document.getElementById("hero-title");
+        : document.getElementById(chatOnly ? "chat-only-title" : "hero-title");
       next?.focus();
     });
   };
@@ -557,6 +583,8 @@ export function FormHelperApp() {
     navMessagesRef.current = [];
     setNavMessages([]);
     setNavPending(false);
+    navigatorDocKey.current = null;
+    setChatOnly(false);
     for (const d of docs) void d.form.doc.loadingTask.destroy();
     requested.current = new Set();
     setDocs([]);
@@ -628,7 +656,7 @@ export function FormHelperApp() {
         >
           {t.otherLangName}
         </button>
-        {docs.length > 0 && (
+        {(docs.length > 0 || chatOnly) && (
           <button type="button" onClick={reset} className={cn(btnSecondary, "min-h-11 max-sm:min-w-11 max-sm:px-0")}>
             <RotateCcwIcon className="size-[18px]" strokeWidth={2.25} aria-hidden />
             <span className="max-sm:sr-only">{t.newSession}</span>
@@ -639,6 +667,51 @@ export function FormHelperApp() {
   );
 
   if (!active || !form || !target) {
+    if (chatOnly) {
+      return (
+        <div className="flex min-h-dvh flex-col desk:h-dvh desk:overflow-hidden">
+          {header}
+          <main className="flex min-h-0 flex-1 flex-col bg-desk px-3 py-4 sm:px-7 sm:py-6">
+            <section aria-labelledby="chat-only-title" className="mx-auto flex min-h-0 w-full max-w-[860px] flex-1 flex-col rounded-md border border-rule bg-paper shadow-card">
+              <div className="flex flex-none flex-wrap items-center justify-between gap-3 border-b border-rule-2 px-4 py-4 sm:px-5">
+                <div>
+                  <h1 id="chat-only-title" tabIndex={-1} className="text-[27px] leading-tight font-extrabold">{t.chatTitle}</h1>
+                  <p className="mt-1 text-[17px] text-ink-2">{t.chatSub}</p>
+                </div>
+                <label className={cn(btnSecondary, "focus-within:outline-3 focus-within:outline-offset-3 focus-within:outline-ink", loading && "cursor-progress opacity-45")}>
+                  <FileUpIcon className="size-5" aria-hidden />
+                  {loading ? t.opening : t.addPdf}
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    aria-label={t.addPdf}
+                    disabled={loading}
+                    className="sr-only"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void onFile(file);
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+              <p className="sr-only" role="status">{loading ? t.reading : ""}</p>
+              <ChatPanel
+                id="chat-only"
+                className="min-h-0 flex-1"
+                logClassName="min-h-48 max-h-[60dvh] desk:min-h-0 desk:max-h-none"
+                messages={navMessages}
+                pending={navPending}
+                onSend={(text) => void sendChat(text, null, null)}
+                suggestions={NAVIGATOR_SUGGESTIONS}
+                placeholder={t.navPlaceholder}
+                inputLabel={t.navInputLabel}
+              />
+            </section>
+          </main>
+        </div>
+      );
+    }
     return (
       <div className="flex min-h-dvh flex-col">
         {header}
@@ -647,6 +720,11 @@ export function FormHelperApp() {
             loading={loading}
             onFile={onFile}
             onSample={onSample}
+            onStartChat={() => {
+              setChatOnly(true);
+              window.scrollTo({ top: 0 });
+              requestAnimationFrame(() => document.getElementById("chat-only-title")?.focus());
+            }}
             mapHighlight={mapHighlight}
             navigator={
               <ChatPanel
