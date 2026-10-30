@@ -17,6 +17,10 @@ function compile(path) {
 }
 
 const source = compile("../src/components/form-helper/form-helper-app.tsx");
+const chatStream = {};
+vm.runInNewContext(compile("../src/lib/chat-stream.ts"), {
+  exports: chatStream, require: () => ({}), TextDecoder,
+});
 const translations = {};
 vm.runInNewContext(compile("../src/components/form-helper/i18n.ts") + "\nexports.dicts = DICTS;", {
   exports: translations, require: () => ({}),
@@ -54,11 +58,12 @@ function mount({ language = "en", failPdf = false } = {}) {
   const imports = {
     react,
     "react/jsx-runtime": jsx,
-    "lucide-react": { FileUpIcon: "FileUpIcon", InfoIcon: "InfoIcon", RotateCcwIcon: "RotateCcwIcon" },
+    "lucide-react": { FileUpIcon: "FileUpIcon", InfoIcon: "InfoIcon", LockIcon: "LockIcon", RotateCcwIcon: "RotateCcwIcon" },
     sonner: { toast: { info() {}, warning() {}, error: (...args) => errors.push(args) } },
     cn: { cn: (...classes) => classes.filter(Boolean).join(" ") },
     "@/hooks/use-media-query": { useMediaQuery: () => true },
     "@/lib/context-association": {},
+    "@/lib/chat-stream": chatStream,
     "@/lib/field-context": { summarizeField: (field) => field },
     "@/lib/pdf/extract": { loadForm: async (_data, fileName) => {
       if (failPdf) throw new Error("Unreadable PDF");
@@ -83,11 +88,17 @@ function mount({ language = "en", failPdf = false } = {}) {
       let controller;
       const body = new ReadableStream({ start(value) { controller = value; } });
       options.signal.addEventListener("abort", () => controller.error(new DOMException("Aborted", "AbortError")));
+      const frame = (event) => controller.enqueue(
+        new TextEncoder().encode(`data: ${JSON.stringify({ version: 1, ...event })}\n\n`),
+      );
       streams.push({
-        write: (text) => controller.enqueue(new TextEncoder().encode(text)),
-        end: () => controller.close(),
+        write: (text) => frame({ type: "delta", text }),
+        end: () => {
+          frame({ type: "complete", complete: true });
+          controller.close();
+        },
       });
-      return { ok: true, body };
+      return { ok: true, body, headers: new Map([["content-type", "text/event-stream"]]) };
     },
     require(name) {
       assert.ok(Object.hasOwn(imports, name), `Unexpected import: ${name}`);

@@ -39,11 +39,17 @@ shadcn/ui). See [docs/mvp-design.md](docs/mvp-design.md) and
 - **Checks:** `npm test`, `npm run typecheck`, `npm run lint` and `npm run build`.
 - **Deployment:** TODO.
 
-`predev` and `prebuild` copy the pdf.js worker into `web/public/` (it's
-gitignored). `npm test` uses Node's built-in runner and the existing TypeScript
-compiler to exercise chat validation, prompts, streaming, errors, timeouts and
-cancellation with an isolated fake provider, chat-only/PDF transitions, plus
-message/document identity across Fast Refresh; it needs no API key or network.
+`predev` and `prebuild` copy the matching pdf.js worker and standard fonts
+(including their licenses) into `web/public/`; these generated assets are
+gitignored. PDF rendering uses the bundled fonts rather than relying on system
+fonts such as ZapfDingbats. The interface keeps Atkinson Hyperlegible Next with
+an explicit Arial/sans-serif fallback; automatic fallback-metric adjustment is
+disabled because Next.js has no override metrics for this font.
+`npm test` uses Node's built-in runner and the existing TypeScript
+compiler to exercise chat validation, prompts, typed streaming, errors, timeouts,
+cancellation, URL policy, Google grounding metadata, query privacy, and provenance using
+isolated fakes, chat-only/PDF transitions, plus message/document identity across
+Fast Refresh; it needs no API key or network.
 
 If you're behind a TLS-inspecting proxy, `next/font` and npm can fail to
 download. Point Node at your organisation's root CA instead of disabling TLS
@@ -54,17 +60,136 @@ export NODE_EXTRA_CA_CERTS=/path/to/your-root-ca.pem
 ```
 
 Chat uses server-side Gemini streaming and needs `GEMINI_API_KEY` (see below).
+During `npm run dev`, the server terminal prints `[gemini]` events for API
+requests, streaming responses, completion/errors, and official-information tool
+execution. Logs include the model, enabled tools, validated public lookup
+selections, source counts, token usage when provided, and elapsed time. They
+exclude prompts, answer text, PDF context, API keys, and raw error messages.
+`form-discovery` identifies an ordinary Gemini request for unverified candidate
+page URLs, not a Google Search call. Invalid planner calls now show allowlisted
+argument values (including `unknown`) and an argument-validation status rather
+than only `selection: null`. Unregistered form labels are redacted from logs.
+These logs are disabled outside development.
 The default is the stable `gemini-3.1-flash-lite`, with low reasoning effort
 to limit cost and latency. It is the cheapest stable thinking model verified
 accessible with the configured account; older 2.5 models returned 404.
 See [decision 0004](docs/decisions/0004-gemini-streaming-chat.md).
-Field-panel explanations remain rule-based and work without a key.
+Field-panel explanations also use Gemini and require a key. They use the
+selected field's printed question and instructions, plus curated guidance when
+available. PDF loading and local field-context extraction do not require a key;
+ambiguous contexts can be associated on demand using Gemini.
+
+Service navigation uses **direct official-page lookup first**, with **Google
+Search grounding only as a fallback**. Recognized download questions fetch
+their registered official information page without a search key. Without a
+Brave key, mapped federal services and Saskatchewan Student Aid use their
+mapped official pages. An optional `BRAVE_SEARCH_API_KEY` enables broader
+candidate discovery, followed by the same direct verification. Successful
+direct lookups use freshly retrieved excerpts and normal Gemini synthesis;
+they never consume Google Search grounding quota.
+
+Forms no longer have to belong to the service catalog. The browser also extracts
+a bounded public title from prominent printed heading text, excluding widget
+text; the server can discover official pages from this title and/or a public
+form number. Without Brave, `CIT` and `IMM` numbers first try IRCC's standard
+form-information directory. Other forms use ordinary Gemini to suggest up to
+two unverified official-page candidates. No claim or URL suggestion becomes
+evidence until its page is fetched and checked. Matching information-page links
+can be followed within the existing five-candidate, three-fetch budget.
+Download pages must identify the exact supplied form number, or match the
+distinctive title terms when no number is available.
+
+If direct lookup fails or finds no usable evidence, it tries Google Search
+grounding through the existing `@google/genai` SDK and `GEMINI_API_KEY`.
+Clarification and user cancellation do not start a fallback. No Vercel AI SDK
+migration is needed. Discovery and search requests contain catalog keywords or
+the public title (up to 200 characters) and number (up to 32 characters) from a
+blank form, plus the information facet, interface language and jurisdiction when
+known, not chat history, filenames, PDF fields, entered values or arbitrary
+question text. Use blank forms only: printed text in a personalized or flattened
+document may itself contain personal information.
+Google generates its grounding queries from that public context.
+Service selection and ordinary chat still receive the bounded context described
+in the privacy notice.
+
+For the Google fallback, the app requires actual search/citation metadata, a complete response
+and the associated Search Suggestions. It displays the Google-grounded answer
+with numbered citations, without a second model synthesis or silent memory
+fallback. Sources are labeled **Google Search grounded**, not as pages fetched
+and checked directly by the app. Source language is not guessed from the answer
+language. Google Search Suggestions are displayed in a sandboxed, script-disabled
+frame beside the answer.
+Google retains grounding requests, context and responses for 30 days. Grounding
+can involve multiple provider-generated queries and separate charges. Review
+current Google pricing, data handling and service terms before deployment; see
+[decision 0006](docs/decisions/0006-google-search-grounding.md).
+
+Recognized form IDs and conversation-scoped service selections resolve questions
+such as "Where do I download this form?" and "What about the fees?". Federal
+programs do not require users to repeat "federal". The service dropdown has been
+removed. An identifiable unregistered form starts discovery automatically,
+searching only the fourteen approved roots when its jurisdiction is unknown.
+Jurisdiction is established from admitted source URLs, not guessed from a
+filename. Matching results from multiple jurisdictions still ask which government
+issued the form; known provincial services retain their region selector. If no
+public form can be identified, the assistant explicitly asks for a blank
+text-based PDF or its public title/number, rather than presenting a catalog menu.
+A typed public form number or application title can resume the previous question.
+OAS/GIS and CPP have distinct
+service routing and saved links. Saskatchewan's 2026-27 full-time Student Aid
+application (public product `154091`) is recognized locally from its public
+first-page title, not its filename, and routes to Saskatchewan. Reopen an already
+loaded PDF after updating the app to rerun identification. Other years and
+part-time titles are not treated as this application.
+
+Every source must resolve to one of the user-approved 14 official content roots
+and the selected jurisdiction. Direct retrieval validates public DNS addresses,
+pins HTTPS connections to validated addresses and checks every redirect before
+following it. It fetches bounded HTML/plain text without scripts, subresources,
+credentials or cookies, rejects archived/irrelevant pages, and checks recognized
+form references. Excluded downloads are flagged without fetching or emitting
+their URLs. TLS verification remains enabled.
+
+A Google-grounded response citing excluded, sign-in or wrong-jurisdiction
+sources is rejected as a whole; its text is not selectively rewritten.
+Google-generated `site:` queries are a prompt constraint, not a
+provider-enforced allowlist. The application enforces source admission afterward.
+The Google fallback's only citation-resolution request is a manual HEAD request
+to Google's fixed `vertexaisearch.cloud.google.com/grounding-api-redirect/`
+endpoint. It checks the destination without following the redirect or contacting
+the government page, and preserves Google's citation link for the user.
+Google citation URLs are transport references, not additional approved content
+roots. Arbitrary redirects and excluded `.gc.ca` sources remain blocked.
+
+The total chat deadline remains 30 seconds. Direct lookup has a 10-second
+sub-budget, at most five candidates, three page requests, two concurrent requests
+and three redirects per page. Google fallback has a 20-second sub-budget under
+the same overall deadline, at most eight source entries and bounded
+answer/metadata sizes. Google-grounded pages do not receive independent archive
+or download checks, and Google may not have read their latest complete content.
+Source labels distinguish direct retrieval from Google grounding; fallback
+metadata preserves the original direct failure. Saved guidance stays separately
+labeled and never becomes live evidence.
+
+Switching to mobile data/hotspot may avoid a network's TLS-inspecting proxy.
+The application does not change networking or trust stores, and does not
+disable certificate verification. If direct retrieval still fails and Google's
+quota is exhausted, both attempts are reported as unavailable.
+Interrupted responses preserve partial text and sources, mark the answer
+incomplete, and provide retry; missing setup is not disguised as a retryable
+network problem. Suggestions and recovery controls follow the interface language.
+Starter suggestions yield space after the first question. Expandable AI/search
+privacy details and a scrollable panel preserve a readable mobile answer area;
+the personal-information warning remains visible in the shared header, rather
+than repeated beneath each chat input.
 
 PDF bytes and entered field values stay in the browser. Chat shares bounded
 form and field metadata (including the filename), the selected field, and recent
-messages with the external AI provider. Do not include personal information in
-chat, filenames or field labels. Responses are not official guidance and can be
-wrong; verify government requirements using the official guide.
+messages with the external AI provider. Field explanations share bounded field
+context; on-demand context association shares candidate printed text and layout
+coordinates, not PDF bytes or entered values. Do not include personal information
+in chat, filenames or field labels. Responses are not official guidance and can
+be wrong; verify government requirements using the linked official guide.
 
 **Ask about this field** sends only the selected field's metadata and document
 identity (form number, filename and page count), without other fields or earlier
@@ -75,8 +200,9 @@ You can keep up to five PDFs open as document tabs. **Add PDF** opens
 another, and each tab has its own close button. The button to the left of
 **New session** switches the interface between English and French, and the
 choice is saved in the browser. New chat answers use the interface language at
-request time; existing answers are not retranslated. Curated field explanations
-and linked resources stay in English. The
+request time; existing answers are not retranslated. New field explanations also
+use the selected language; curated source material and linked resources retain
+their original language. The
 French copy is a draft and needs review by a fluent speaker.
 
 Choose **Start with just chat** on the landing page to ask questions without a
@@ -108,8 +234,10 @@ preferences skip the pause and fades and show the final notes once layout is rea
 On desktop, drag either divider beside the document to resize the fields and
 details panels. You can also focus a divider and use the arrow keys, or
 double-click it to restore its adjacent panel's default width. On smaller
-screens the workspace stays stacked. Selecting a field sweeps its heading's
-highlight from left to right (unless reduced motion is enabled); long Next
+screens the workspace stays stacked. The button at the top-right of the fields
+sidebar collapses it to a narrow rail; the same button expands it back to its
+previous width, keeping its search and filters. Selecting a field sweeps its
+heading's highlight from left to right (unless reduced motion is enabled); long Next
 labels truncate instead of wrapping.
 
 ### Environment configuration
@@ -122,17 +250,26 @@ cp -n .env.example .env.local
 ```
 
 Set `GEMINI_API_KEY` to a Google AI Studio key in that ignored local file or in
-your deployment's server-side secret store. `GEMINI_MODEL` optionally overrides
-`gemini-3.1-flash-lite`. Never prefix either variable with `NEXT_PUBLIC_`.
+your deployment's server-side secret store. Successful direct-page lookup needs
+ordinary Gemini generation, not Google Search quota. For the Google fallback,
+the key's project must have grounding access and sufficient quota/billing.
+Ordinary Gemini generation working does not prove that search quota is
+available. `BRAVE_SEARCH_API_KEY` is optional for broader first-attempt
+discovery; mapped pages and recognized downloads work without it.
+`GEMINI_MODEL` optionally overrides
+`gemini-3.1-flash-lite`. Never prefix any key with `NEXT_PUBLIC_`.
 Next.js loads `.env.local`; restart the server after changing it. Never commit
 actual credentials. The root [.env.example](.env.example) remains a generic
 workspace template, not the web app's configuration.
 
-Chat has a 30-second deadline. Missing configuration returns 503; provider
-startup failures return 502 and deadline expiry returns 504. After text has
-started streaming, failures interrupt the body and the client shows a retryable
-error instead of keeping a partial answer. New session and document removal
-abort their pending chats. This hackathon endpoint still needs deployment-level
+Chat has a 30-second deadline. Missing `GEMINI_API_KEY` returns 503; a Gemini
+startup failure before streaming returns 502, and deadline expiry before
+streaming returns 504. After a failed direct attempt, Google search quota
+exhaustion produces an explicit `grounding_quota` state with the original
+failure reason, not an ungrounded answer. Search failures and post-start
+generation failures are reported through typed SSE events, and any partial
+answer is marked incomplete. New session and document removal abort their
+pending chats. This hackathon endpoint still needs deployment-level
 access controls and rate limits before public exposure.
 
 ## Collaboration

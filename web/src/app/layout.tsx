@@ -9,6 +9,8 @@ const atkinson = Atkinson_Hyperlegible_Next({
   variable: "--font-sans",
   subsets: ["latin"],
   weight: ["400", "600", "700", "800"],
+  adjustFontFallback: false,
+  fallback: ["Arial", "sans-serif"],
 });
 
 export const metadata: Metadata = {

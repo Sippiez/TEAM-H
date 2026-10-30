@@ -404,7 +404,8 @@ official pages. Lines are told apart only by dash pattern, with a legend.
   form facsimile.
 - **Do** honour `prefers-reduced-motion`: there is no marker travel and no
   highlighter swipe.
-- **Do** label official sources and keep the independence notice in the header.
+- **Do** label official sources and keep the privacy notice in the header in
+  13px supporting text, rather than repeating it beneath chat inputs.
 
 ### Don't:
 

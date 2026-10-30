@@ -179,6 +179,12 @@ test("AI sees bounded block evidence, not PDF bytes, entered values or arbitrary
   let call;
   const { associateFieldContext } = loadModule("../src/lib/ai/gemini.ts", {
     "server-only": {},
+    "@/lib/official/catalog": loadModule("../src/lib/official/catalog.ts", {
+      "./hosts": loadModule("../src/lib/official/hosts.ts", {}),
+    }),
+    "@/lib/official/context": {},
+    "@/lib/official/lookup": {},
+    "@/lib/official/grounding": {},
     "@google/genai": {
       ThinkingLevel: { LOW: "LOW" },
       GoogleGenAI: class {

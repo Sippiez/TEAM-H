@@ -131,6 +131,12 @@ test("Gemini explanation uses structured JSON, safe context, and selected langua
   const calls = [];
   const { generateGeminiFieldExplanation } = loadModule("../src/lib/ai/gemini.ts", {
     "server-only": {},
+    "@/lib/official/catalog": loadModule("../src/lib/official/catalog.ts", {
+      "./hosts": loadModule("../src/lib/official/hosts.ts", {}),
+    }),
+    "@/lib/official/context": {},
+    "@/lib/official/lookup": {},
+    "@/lib/official/grounding": {},
     "@google/genai": {
       ThinkingLevel: { LOW: "LOW" },
       GoogleGenAI: class {

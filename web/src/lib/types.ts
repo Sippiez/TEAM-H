@@ -1,3 +1,5 @@
+import type { LookupChoice, LookupContext } from "./official/catalog";
+
 /** PDF user-space rectangle: [x1, y1, x2, y2]. */
 export type PdfRect = [number, number, number, number];
 
@@ -36,11 +38,11 @@ export interface FormField {
   tooltip?: string;
   options?: string[];
   section: string;
+  /** Present only when the PDF marks the field as required. */
+  required?: boolean;
   context?: FieldContext;
   /** Browser-only evidence for on-demand association; never includes field values. */
   contextCandidates?: FieldContextCandidates;
-  /** Present only when the PDF marks the field as required. */
-  required?: boolean;
 }
 
 export type FieldSummary = Pick<
@@ -51,6 +53,7 @@ export type FieldSummary = Pick<
 /** What the client sends to the server about the open form. Never includes field values. */
 export interface FormContext {
   formNumber?: string;
+  formTitle?: string;
   fileName?: string;
   pageCount: number;
   fields: FieldSummary[];
@@ -63,7 +66,39 @@ export interface Resource {
   department: string;
   description: string;
   tags: string[];
+  language?: "en-CA" | "fr-CA";
+  jurisdiction?: string;
+  provenance?: SourceProvenance;
+  citationUrl?: string;
 }
+
+export type SourceProvenance =
+  | { kind: "live_official"; retrievedAt: string }
+  | { kind: "google_grounded"; searchedAt: string }
+  | { kind: "reviewed_snapshot"; reviewedAt: string }
+  | { kind: "saved_guidance"; reviewedAt: null };
+
+export type OfficialLookupStatus =
+  | "verified"
+  | "clarification_required"
+  | "no_verified_results"
+  | "unavailable";
+
+export interface OfficialLookupSummary extends LookupContext {
+  status: OfficialLookupStatus;
+  reason: string;
+  partial: boolean;
+  method?: "official_page" | "search" | "google_grounding";
+  searchSuggestionsHtml?: string;
+  fallbackReason?: string;
+  restrictedDownload?: boolean;
+}
+
+export type ChatStreamEvent =
+  | { version: 1; type: "lookup"; outcome: OfficialLookupSummary; sources: Resource[] }
+  | { version: 1; type: "delta"; text: string }
+  | { version: 1; type: "error"; code: "interrupted" | "unavailable" }
+  | { version: 1; type: "complete"; complete: boolean };
 
 export interface KeyPoints {
   title: string;
@@ -116,6 +151,10 @@ export interface ChatMessage extends Partial<AssistantReply> {
   role: "user" | "assistant";
   text: string;
   language?: "en" | "fr";
+  lookup?: OfficialLookupSummary;
+  incomplete?: boolean;
+  error?: "timeout" | "connection" | "not_configured" | "unavailable";
+  request?: Pick<ChatRequest, "message" | "intent" | "selectedFieldId" | "lookupContext" | "lookupChoice">;
 }
 
 export interface ChatHistoryMessage {
@@ -130,6 +169,8 @@ export interface ChatRequest {
   selectedFieldId?: string;
   history?: ChatHistoryMessage[];
   language?: "en" | "fr";
+  lookupContext?: LookupContext;
+  lookupChoice?: LookupChoice;
 }
 
 export interface ExplainRequest {

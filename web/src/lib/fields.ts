@@ -14,10 +14,10 @@ export interface RawField {
   label?: string;
   /** Radio export values or choice display values. */
   options?: string[];
+  required?: boolean;
   optionLabels?: Record<string, string>;
   context?: FieldContext;
   contextCandidates?: FieldContextCandidates;
-  required?: boolean;
 }
 
 /** "PPTC_153[0].Page1[0].#subform[2].Name[0]" -> "PPTC_153.Page1.Name" */
@@ -73,9 +73,9 @@ export function enrichFields(raw: RawField[], formNumber?: string): FormField[] 
       tooltip: f.tooltip ? cleanPdfText(f.tooltip) || undefined : undefined,
       options,
       section: rule?.section ?? genericSection(f.path, f.page),
+      required: f.required,
       context,
       contextCandidates: f.contextCandidates,
-      required: f.required,
     };
   });
 }

@@ -1,3 +1,5 @@
+import { parseAllowedOfficialUrl } from "@/lib/official/hosts";
+
 const STOPWORDS = new Set(
   (
     "a an the i im my me mine is are am was be been do does did to of in on at for and or but " +
@@ -45,15 +47,7 @@ export function cleanPdfText(text: string): string {
   return cleanWhitespace(text.replace(/_{3,}/g, " "));
 }
 
-/** Only official Government of Canada hosts may be linked. */
+/** The shared user-approved official-host and public-page URL policy. */
 export function isAllowedGovUrl(url: string): boolean {
-  try {
-    const { protocol, hostname } = new URL(url);
-    return (
-      protocol === "https:" &&
-      (hostname === "canada.ca" || hostname.endsWith(".canada.ca") || hostname.endsWith(".gc.ca"))
-    );
-  } catch {
-    return false;
-  }
+  return parseAllowedOfficialUrl(url) !== null;
 }

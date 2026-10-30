@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import vm from "node:vm";
@@ -10,6 +11,7 @@ const modules = new Map();
 const tasks = [];
 let fixture;
 let chatCall;
+let documentOptions;
 function loadModule(path) {
   if (modules.has(path)) return modules.get(path);
   const source = readFileSync(new URL(`../src/${path}.ts`, import.meta.url), "utf8");
@@ -20,18 +22,31 @@ function loadModule(path) {
   modules.set(path, exports);
   vm.runInNewContext(outputText, {
     exports,
+    URL,
     process: { env: { GEMINI_API_KEY: "test-only" } },
     require(name) {
       if (name === "server-only") return {};
       if (name === "@google/genai") return {
         ThinkingLevel: { LOW: "LOW" },
         GoogleGenAI: class {
-          models = { generateContentStream: async (call) => { chatCall = call; } };
+          models = {
+            generateContentStream: async (call) => {
+              chatCall = call;
+              return (async function* () { yield { text: "Field explanation." }; })();
+            },
+          };
         },
+      };
+      if (name === "@/lib/official/lookup") return {
+        lookupOfficialWithFallback: () => assert.fail("Field-context chat must not perform an official lookup"),
+      };
+      if (name === "@/lib/official/grounding") return {
+        lookupGoogleGrounding: () => assert.fail("Field-context chat must not perform a web search"),
       };
       if (name === "@/lib/pdf/pdfjs") return {
         getPdfjs: async () => ({
           getDocument(options) {
+            documentOptions = options;
             if (fixture) return { promise: Promise.resolve(fixture) };
             const task = pdfjs.getDocument({
               ...options,
@@ -42,12 +57,46 @@ function loadModule(path) {
           },
         }),
       };
+      if (name.startsWith(".")) return loadModule(posix.join(posix.dirname(path), name));
       assert.ok(name.startsWith("@/"), `Unexpected import: ${name}`);
       return loadModule(name.slice(2));
     },
   }, { filename: path });
   return exports;
 }
+
+async function explainInChat(input) {
+  chatCall = undefined;
+  const stream = await loadModule("lib/ai/gemini").streamGeminiChat(input);
+  for await (const event of stream) assert.equal(event.type, "delta");
+  assert.ok(chatCall);
+}
+
+test("CIT 0001 public identity comes from printed PDF text rather than its filename", async () => {
+  const { loadForm } = loadModule("lib/pdf/extract");
+  const data = readFileSync(new URL("../../test-forms/cit0001e.pdf", import.meta.url));
+  const form = await loadForm(Uint8Array.from(data).buffer, "PRIVATE-FILENAME.pdf");
+  assert.equal(form.formNumber, "CIT 0001");
+  assert.match(form.formTitle, /APPLICATION FOR CITIZENSHIP CERTIFICATE/i);
+  assert.doesNotMatch(form.formTitle, /PRIVATE-FILENAME/);
+});
+
+test("printed field context preserves explicit PDF required flags without inventing them", () => {
+  const { enrichFields } = loadModule("lib/fields");
+  const context = {
+    status: "resolved", source: "layout",
+    question: "Printed question", instructions: [],
+  };
+  for (const required of [true, false, undefined]) {
+    const [field] = enrichFields([{
+      name: "Text Field 1", path: "Text Field 1", page: 1,
+      rects: [[10, 10, 80, 20]], type: "text", required, context,
+    }]);
+    assert.equal(field.required, required);
+    assert.equal(field.label, context.question);
+    assert.equal(field.context, context);
+  }
+});
 
 test("ISP-1000 Yes/No fields retain their printed questions and choices", async () => {
   const { loadForm } = loadModule("lib/pdf/extract");
@@ -65,8 +114,8 @@ test("ISP-1000 Yes/No fields retain their printed questions and choices", async 
     assert.match(allowance.label, /Family Allowance\?/);
     assert.doesNotMatch(field.label, /Family Allowance/);
     const fields = form.fields.map(loadModule("lib/field-context").summarizeField);
-    await loadModule("lib/ai/gemini").streamGeminiChat({
-      message: "What does this question mean?", language: "en",
+    await explainInChat({
+      message: "What does this field mean?", language: "en",
       selectedFieldId: field.id,
       form: { fields, pageCount: form.pageCount, fileName: form.fileName },
     });
@@ -110,6 +159,24 @@ async function loadFixture(annotations, items) {
   }
 }
 
+test("browser PDF loading uses bundled standard fonts instead of host system fonts", async () => {
+  await loadFixture([], []);
+  assert.equal(documentOptions.useSystemFonts, false);
+  assert.equal(documentOptions.standardFontDataUrl, "/pdf-standard-fonts/");
+});
+
+test("public-form heading extraction excludes text inside widgets", async () => {
+  const form = await loadFixture([{
+    subtype: "Widget", fieldName: "Field1", fieldType: "Tx", rect: [20, 480, 500, 530],
+  }], [
+    { ...text("APPLICATION FOR PUBLIC HOUSING ASSISTANCE", 20, 700, 400), height: 14 },
+    { ...text("APPLICATION FOR PRIVATE VALUE CIT 9999", 20, 500, 400), height: 30 },
+  ]);
+  assert.equal(form.formTitle, "APPLICATION FOR PUBLIC HOUSING ASSISTANCE");
+  assert.equal(form.formNumber, undefined);
+  assert.doesNotMatch(JSON.stringify({ title: form.formTitle, number: form.formNumber }), /PRIVATE|9999/);
+});
+
 test("student-aid SIN and birth date use their own printed labels", async () => {
   const data = readFileSync(new URL("../../test-forms/154091_Student_Aid_Application_2026-27.pdf", import.meta.url));
   const form = await loadModule("lib/pdf/extract").loadForm(Uint8Array.from(data).buffer, "student-aid.pdf");
@@ -123,8 +190,8 @@ test("student-aid SIN and birth date use their own printed labels", async () => 
     assert.doesNotMatch(birthDate.context.instructions.join(" "), /SIN|Employment and Social Development/);
     const summary = loadModule("lib/field-context").summarizeField(birthDate);
     assert.doesNotMatch(loadModule("lib/explain").explainField(summary).whatToEnter, /SIN|Social Insurance/i);
-    await loadModule("lib/ai/gemini").streamGeminiChat({
-      message: "What do I enter here?", language: "en", selectedFieldId: birthDate.id,
+    await explainInChat({
+      message: "What should I enter in this field?", language: "en", selectedFieldId: birthDate.id,
       form: { pageCount: form.pageCount, fields: form.fields.map(loadModule("lib/field-context").summarizeField) },
     });
     const context = JSON.parse(chatCall.contents.split("FORM_CONTEXT:\n")[1].split("\n\nRECENT_CONVERSATION:")[0]);
@@ -292,8 +359,8 @@ test("a question above a horizontal radio group is shared with guidance and chat
   const summary = summarizeField(field);
   assert.equal(summary.context.question, field.context.question);
   assert.match(loadModule("lib/explain").explainField(summary).meaning, /Do you receive this benefit/);
-  await loadModule("lib/ai/gemini").streamGeminiChat({
-    message: "Explain this", language: "en", selectedFieldId: field.id,
+  await explainInChat({
+    message: "Explain this field", language: "en", selectedFieldId: field.id,
     form: { pageCount: 1, fields: [summary] },
   });
   assert.match(chatCall.contents, /"question":"Do you receive this benefit\?"/);

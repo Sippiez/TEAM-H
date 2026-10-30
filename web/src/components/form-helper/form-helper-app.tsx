@@ -1,6 +1,6 @@
 "use client";
 
-import { FileUpIcon, InfoIcon, RotateCcwIcon } from "lucide-react";
+import { FileUpIcon, InfoIcon, LockIcon, RotateCcwIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 
@@ -9,7 +9,9 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { applyAssociation } from "@/lib/context-association";
 import { summarizeField } from "@/lib/field-context";
 import { loadForm, type LoadedForm } from "@/lib/pdf/extract";
-import type { ChatMessage, ChatRequest, FieldExplanation, FormContext, FormField } from "@/lib/types";
+import { readChatEvents } from "@/lib/chat-stream";
+import type { LookupChoice, LookupContext } from "@/lib/official/catalog";
+import type { ChatMessage, ChatRequest, ChatStreamEvent, FieldExplanation, FormContext, FormField } from "@/lib/types";
 
 import { ChatPanel } from "./chat-panel";
 import { FieldPanel } from "./field-panel";
@@ -24,12 +26,6 @@ const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_DOCS = 5;
 const SAMPLE = { url: "/forms/pptc153.pdf", name: "pptc153.pdf" };
 
-const NAVIGATOR_SUGGESTIONS = [
-  "How do I renew my passport?",
-  "I lost my job. What can I apply for?",
-  "Sign in to my CRA account",
-];
-
 /** Where a selection came from. Clicks on the sheet itself never scroll the sheet. */
 type Origin = "sheet" | "route" | "step" | "ref";
 type Tab = "field" | "ask";
@@ -37,6 +33,7 @@ type Tab = "field" | "ask";
 function toContext(form: LoadedForm, selectedFieldId?: string): FormContext {
   return {
     formNumber: form.formNumber,
+    formTitle: form.formTitle,
     fileName: form.fileName,
     pageCount: form.pageCount,
     fields: form.fields
@@ -245,6 +242,7 @@ export function FormHelperApp() {
       target: Target | null,
       fieldId: string | null,
       intent?: ChatRequest["intent"],
+      options?: { lookupContext?: LookupContext; lookupChoice?: LookupChoice; displayText?: string; retry?: boolean },
     ) => {
       const requestKey = target?.key ?? "navigator";
       if (chatRequests.current.has(requestKey)) return;
@@ -254,6 +252,14 @@ export function FormHelperApp() {
       const currentMessages = target
         ? docsRef.current.find((doc) => doc.key === target.key)?.messages ?? []
         : navMessagesRef.current;
+      const lastLookup = [...currentMessages].reverse().find((message) => message.role === "assistant")?.lookup;
+      const lookupContext = options?.lookupContext ?? {
+        ...(lastLookup?.serviceId ? { serviceId: lastLookup.serviceId } : {}),
+        ...(lastLookup?.jurisdiction ? { jurisdiction: lastLookup.jurisdiction } : {}),
+        ...(lastLookup?.facetId ? { facetId: lastLookup.facetId } : {}),
+        ...(lastLookup?.formId ? { formId: lastLookup.formId } : {}),
+        ...(lastLookup?.publicForm ? { publicForm: lastLookup.publicForm } : {}),
+      };
 
       const push = (message: ChatMessage) => {
         if (!isCurrent()) return;
@@ -272,7 +278,7 @@ export function FormHelperApp() {
 
       const updateMessage = (
         messageId: string,
-        text: string,
+        patch: Partial<ChatMessage>,
       ) => {
         if (!isCurrent()) return;
         const key = target?.key ?? navigatorDocKey.current;
@@ -281,32 +287,15 @@ export function FormHelperApp() {
               ...doc,
               messages: doc.messages.map((message) =>
                 message.id === messageId
-                  ? { ...message, text }
+                  ? { ...message, ...patch }
                   : message,
               ),
             }))
           : setNavMessages((messages) =>
               messages.map((message) =>
                 message.id === messageId
-                  ? { ...message, text }
+                  ? { ...message, ...patch }
                   : message,
-              ),
-            );
-      };
-
-      const removeMessage = (messageId: string) => {
-        if (!isCurrent()) return;
-        const key = target?.key ?? navigatorDocKey.current;
-        return key
-          ? updateDoc(key, (doc) => ({
-              ...doc,
-              messages: doc.messages.filter(
-                (message) => message.id !== messageId,
-              ),
-            }))
-          : setNavMessages((messages) =>
-              messages.filter(
-                (message) => message.id !== messageId,
               ),
             );
       };
@@ -333,11 +322,11 @@ export function FormHelperApp() {
           text: message.text,
         }));
 
-      if (text) {
+      if (text && !options?.retry) {
         push({
           id: nextId(),
           role: "user",
-          text,
+          text: options?.displayText ?? text,
         });
       }
 
@@ -347,6 +336,13 @@ export function FormHelperApp() {
         id: assistantMessageId,
         role: "assistant",
         text: "",
+        request: {
+          message: text ?? undefined,
+          intent,
+          selectedFieldId: fieldId ?? undefined,
+          lookupContext,
+          lookupChoice: options?.lookupChoice,
+        },
       });
 
       setPending(true);
@@ -356,6 +352,7 @@ export function FormHelperApp() {
         30_000,
       );
 
+      let responseError: ChatMessage["error"] = "connection";
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
@@ -376,9 +373,12 @@ export function FormHelperApp() {
             selectedFieldId: fieldId ?? undefined,
             history: intent === "field" ? undefined : history,
             language: lang,
+            lookupContext,
+            lookupChoice: options?.lookupChoice,
           }),
         });
         if (!res.ok) {
+          responseError = res.status === 503 ? "not_configured" : res.status === 504 ? "timeout" : "unavailable";
           const payload = (await res
             .json()
             .catch(() => null)) as
@@ -396,46 +396,54 @@ export function FormHelperApp() {
           );
         }
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let completeText = "";
-
-        while (true) {
-          const { value, done } = await reader.read();
-
-          if (done) break;
-
-          completeText += decoder.decode(value, {
-            stream: true,
-          });
-
-          updateMessage(
-            assistantMessageId,
-            completeText,
-          );
+        if (!res.headers.get("content-type")?.startsWith("text/event-stream")) {
+          throw new Error("The server returned an unsupported response stream");
         }
 
-        completeText += decoder.decode();
+        let completeText = "";
+        let completed = false;
+        let lookupReceived = false;
 
-        if (!completeText.trim()) {
+        const applyEvent = (event: ChatStreamEvent) => {
+          if (event.type === "delta") {
+            completeText += event.text;
+            updateMessage(assistantMessageId, { text: completeText });
+          } else if (event.type === "lookup") {
+            lookupReceived = true;
+            updateMessage(assistantMessageId, {
+              lookup: event.outcome,
+              resources: event.sources,
+            });
+          } else if (event.type === "error") {
+            updateMessage(assistantMessageId, {
+              incomplete: true,
+              error: event.code === "unavailable" ? "timeout" : "unavailable",
+            });
+          } else if (event.type === "complete") {
+            completed = true;
+            updateMessage(assistantMessageId, { incomplete: !event.complete });
+          }
+        };
+
+        for await (const event of readChatEvents(res.body)) applyEvent(event);
+        if (!completed) throw new Error("The assistant stream did not complete");
+
+        if (!completeText.trim() && !lookupReceived) {
           throw new Error(
             "The AI returned an empty response",
           );
         }
 
-        updateMessage(assistantMessageId, completeText);
+        updateMessage(assistantMessageId, { text: completeText });
       } catch (error) {
         if (!isCurrent()) return;
-        removeMessage(assistantMessageId);
-
-        push({
-          id: nextId(),
-          role: "assistant",
-          text:
+        updateMessage(assistantMessageId, {
+          incomplete: true,
+          error:
             controller.signal.aborted ||
             (error instanceof Error && error.name === "AbortError")
-              ? t.chatTimeout
-              : t.chatError,
+              ? "timeout"
+              : responseError,
         });
       } finally {
         window.clearTimeout(timeout);
@@ -448,8 +456,6 @@ export function FormHelperApp() {
     [
       lang,
       setNavMessages,
-      t.chatError,
-      t.chatTimeout,
       updateDoc,
     ],
   );
@@ -598,7 +604,7 @@ export function FormHelperApp() {
     if (!active || !target) return;
     updateDoc(active.key, (d) => ({ ...d, ctxCleared: false, tab: "ask" }));
     if (!isDesktop) revealSide();
-    void sendChat("What should I enter in this field?", target, field.id, "field");
+    void sendChat(t.fieldSuggestion, target, field.id, "field");
   };
 
   const setTab = (tab: Tab) => {
@@ -608,10 +614,27 @@ export function FormHelperApp() {
   const askingAbout = active?.ctxCleared ? undefined : selected;
 
   const formSuggestions = askingAbout
-    ? ["What should I enter in this field?", "Give me an overview of this form"]
-    : form?.formNumber === "PPTC 153"
-      ? ["Give me an overview of this form", "Who can be my guarantor?", "Where do I put my date of birth?", "How much does a passport cost?"]
-      : ["Give me an overview of this form", "Where do I put my address?"];
+    ? [t.fieldSuggestion, t.downloadSuggestion, t.overviewSuggestion]
+    : [t.overviewSuggestion, t.downloadSuggestion, t.feesSuggestion];
+
+  const retryChat = (message: ChatMessage, destination: Target | null) => {
+    if (!message.request) return;
+    void sendChat(message.request.message ?? null, destination, message.request.selectedFieldId ?? null, message.request.intent, {
+      lookupContext: message.request.lookupContext,
+      lookupChoice: message.request.lookupChoice,
+      retry: true,
+    });
+  };
+
+  const resolveChat = (message: ChatMessage, destination: Target | null, choice: LookupChoice, label: string) => {
+    if (!message.request) return;
+    const question = message.request.message ?? label;
+    void sendChat(question, destination, message.request.selectedFieldId ?? null, undefined, {
+      lookupContext: { ...message.request.lookupContext, ...choice },
+      lookupChoice: { ...message.request.lookupChoice, ...choice },
+      displayText: label,
+    });
+  };
 
   const mapHighlight = useMemo(() => {
     const last = [...navMessages].reverse().find((m) => m.role === "assistant");
@@ -643,9 +666,9 @@ export function FormHelperApp() {
         <span className="underline-offset-[0.2em] group-hover:underline">{t.brand}</span>
         <span className="sr-only">{t.brandHome}</span>
       </button>
-      <p className="flex items-center gap-2 text-[15px] text-ink-2 max-sm:order-3 max-sm:w-full sm:mr-auto">
-        <InfoIcon className="size-5 flex-none text-ink" strokeWidth={2.25} aria-hidden />
-        {t.notOfficial}
+      <p className="flex min-w-0 items-start gap-2 text-[13px] leading-[1.4] text-ink-2 max-sm:order-3 max-sm:w-full sm:mr-auto sm:flex-1">
+        <LockIcon className="mt-0.5 size-3.5 flex-none text-ink" strokeWidth={2.25} aria-hidden />
+        <span>{t.labelsOnly}</span>
       </p>
       <div className="flex items-center gap-2 sm:gap-3">
         <button
@@ -703,7 +726,9 @@ export function FormHelperApp() {
                 messages={navMessages}
                 pending={navPending}
                 onSend={(text) => void sendChat(text, null, null)}
-                suggestions={NAVIGATOR_SUGGESTIONS}
+                onRetry={(message) => retryChat(message, null)}
+                onResolve={(message, choice, label) => resolveChat(message, null, choice, label)}
+                suggestions={t.navigatorSuggestions}
                 placeholder={t.navPlaceholder}
                 inputLabel={t.navInputLabel}
               />
@@ -858,6 +883,8 @@ export function FormHelperApp() {
               messages={active.messages}
               pending={active.pending}
               onSend={(text) => void sendChat(text, target, active.ctxCleared ? null : active.selectedId)}
+              onRetry={(message) => retryChat(message, target)}
+              onResolve={(message, choice, label) => resolveChat(message, target, choice, label)}
               onFieldRef={(id) => selectField(target, id, "ref")}
               askingAbout={askingAbout}
               onClearAsking={() => updateDoc(active.key, (d) => ({ ...d, ctxCleared: true }))}

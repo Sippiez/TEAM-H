@@ -1,4 +1,5 @@
 import type { KeyPoints } from "@/lib/types";
+import { PUBLIC_FORMS, publicFormsInText } from "@/lib/official/catalog";
 
 /**
  * Curated guidance for one or more fields. Rules are matched against the
@@ -548,6 +549,8 @@ export function detectFormNumber(pageText: string, fieldNames: string[]): string
       return form.formNumber;
     }
   }
+  const registered = publicFormsInText(pageText);
+  if (registered.length === 1) return PUBLIC_FORMS[registered[0]].formNumber;
   const m = pageText.match(GENERIC_FORM_NUMBER);
   return m ? `${m[1]} ${m[2]}` : undefined;
 }

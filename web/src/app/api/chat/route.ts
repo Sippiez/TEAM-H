@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { streamGeminiChat } from "@/lib/ai/gemini";
+import { abortable } from "@/lib/abortable";
+import { validateLookupChoice, validateLookupContext, validatePublicForm } from "@/lib/official/catalog";
 import { isFieldSummary } from "@/lib/field-context";
 import type {
+  ChatStreamEvent,
   ChatHistoryMessage,
   ChatRequest,
   FormContext,
@@ -32,6 +35,7 @@ function isFormContext(value: unknown): value is FormContext {
     ) &&
     (form.formNumber === undefined ||
       typeof form.formNumber === "string") &&
+    (form.formTitle === undefined || validatePublicForm({ title: form.formTitle }) !== null) &&
     (form.fileName === undefined ||
       typeof form.fileName === "string")
   );
@@ -61,6 +65,12 @@ function sanitizeHistory(value: unknown): ChatHistoryMessage[] {
 }
 
 function validateRequest(body: ChatRequest): string | null {
+  if (body.lookupContext !== undefined && !validateLookupContext(body.lookupContext)) {
+    return "Invalid lookup context";
+  }
+  if (body.lookupChoice !== undefined && !validateLookupChoice(body.lookupChoice)) {
+    return "Invalid lookup choice";
+  }
   if (
     body.intent !== undefined &&
     body.intent !== "overview" &&
@@ -128,21 +138,6 @@ function validateRequest(body: ChatRequest): string | null {
   }
 
   return null;
-}
-
-async function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
-  let onAbort: () => void = () => {};
-  const aborted = new Promise<never>((_, reject) => {
-    onAbort = () => reject(signal.reason);
-    signal.addEventListener("abort", onAbort, { once: true });
-    if (signal.aborted) onAbort();
-  });
-
-  try {
-    return await Promise.race([operation, aborted]);
-  } finally {
-    signal.removeEventListener("abort", onAbort);
-  }
 }
 
 export async function POST(request: Request) {
@@ -213,37 +208,46 @@ export async function POST(request: Request) {
       history: body.intent === "field" ? [] : sanitizeHistory(body.history),
       language: body.language ?? "en",
       signal: timeoutController.signal,
+      lookupContext: body.lookupContext,
+      lookupChoice: body.lookupChoice,
     }), timeoutController.signal);
 
     const iterator = geminiStream[Symbol.asyncIterator]();
-    const nextText = async () => {
+    const nextEvent = async (): Promise<ChatStreamEvent | null> => {
       while (true) {
         timeoutController.signal.throwIfAborted();
         const chunk = await abortable(iterator.next(), timeoutController.signal);
         if (chunk.done) return null;
-        if (chunk.value.text) return chunk.value.text;
+        return chunk.value;
       }
     };
 
     // The SDK may defer upstream failures until the first iterator read.
-    const firstText = await nextText();
-    if (firstText === null) throw new Error("The AI returned an empty response");
+    const firstEvent = await nextEvent();
+    if (firstEvent === null) throw new Error("The AI returned an empty response");
     const encoder = new TextEncoder();
     let cancelled = false;
+    const frame = (event: ChatStreamEvent) =>
+      encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
 
     const bodyStream = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(encoder.encode(firstText));
+        controller.enqueue(frame(firstEvent));
       },
       async pull(controller) {
         try {
-          const text = await nextText();
+          const event = await nextEvent();
           if (cancelled) return;
-          if (text === null) {
+          if (event === null) {
             cleanup();
+            controller.enqueue(frame({
+              version: 1,
+              type: "complete",
+              complete: true,
+            }));
             controller.close();
           } else {
-            controller.enqueue(encoder.encode(text));
+            controller.enqueue(frame(event));
           }
         } catch (error) {
           cleanup();
@@ -255,7 +259,17 @@ export async function POST(request: Request) {
                 : "UnknownError",
           });
 
-          controller.error(new Error("The AI response was interrupted"));
+          controller.enqueue(frame({
+            version: 1,
+            type: "error",
+            code: timeoutController.signal.aborted ? "unavailable" : "interrupted",
+          }));
+          controller.enqueue(frame({
+            version: 1,
+            type: "complete",
+            complete: false,
+          }));
+          controller.close();
         }
       },
       cancel() {
@@ -268,9 +282,10 @@ export async function POST(request: Request) {
     return new Response(bodyStream, {
       status: 200,
       headers: {
-        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-store, no-cache, must-revalidate",
         "X-Content-Type-Options": "nosniff",
+        Connection: "keep-alive",
       },
     });
   } catch (error) {

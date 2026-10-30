@@ -131,7 +131,7 @@ export function Route({ fields, selectedId, visited, onSelect }: RouteProps) {
       className="relative overflow-x-auto overflow-y-hidden border-b border-rule bg-desk pt-3.5 pb-2.5 desk:overflow-auto desk:border-r desk:border-b-0 desk:pt-5 desk:pr-3.5 desk:pb-24 desk:pl-2.5"
     >
       <div className="sticky left-0 flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 pb-2 desk:static desk:flex-col desk:gap-0.5 desk:pr-1.5 desk:pb-3 desk:pl-3.5">
-        <h2 id="route-title" className="text-[17px]">
+        <h2 id="route-title" className="text-[17px] desk:self-stretch desk:pr-10">
           {tr.fieldsTitle}
         </h2>
         <p className="text-[15px] text-ink-2 tabular-nums" aria-live="polite">
