@@ -264,8 +264,14 @@ counts and example values.
   Margin notes and connectors resolve together over 220ms, and the selected
   date-of-birth field gets a 350ms highlighter swipe; the sequence finishes
   within 800ms. The hero and upload remain available throughout. Supporting
-  motion is limited to 150ms control-colour feedback, a 3px upload-icon nudge
-  on hover/focus/drag, and a 180ms fade when opening the service navigator.
+  motion uses 120ms control-colour feedback and a 1px press on shared buttons
+  and suggestion chips, with a 3px upload-icon nudge on hover/focus/drag.
+  Native disclosures expand and fade in over 240ms, closing in 160ms where
+  intrinsic-size transitions are supported (otherwise they toggle instantly).
+  Workspace/chat entrances and tab changes use a 240ms fade; newly mounted
+  chat messages fade once over 180ms, never restarting for streamed text.
+  Menus, tooltips and sheets share route easing on entry and faster ease-in
+  exits. No motion blocks focus or interaction, and no dependency is required.
   There are no decorative loops or scroll reveals. Reduced motion skips
   the entrance, swipe and supporting transitions.
   Unlike the prototype, production offers only the bundled English PPTC 153

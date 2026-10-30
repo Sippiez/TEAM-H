@@ -694,7 +694,7 @@ export function FormHelperApp() {
       return (
         <div className="flex min-h-dvh flex-col desk:h-dvh desk:overflow-hidden">
           {header}
-          <main className="flex min-h-0 flex-1 flex-col bg-desk px-3 py-4 sm:px-7 sm:py-6">
+          <main className="pr-view-enter flex min-h-0 flex-1 flex-col bg-desk px-3 py-4 sm:px-7 sm:py-6">
             <section aria-labelledby="chat-only-title" className="mx-auto flex min-h-0 w-full max-w-[860px] flex-1 flex-col rounded-md border border-rule bg-paper shadow-card">
               <div className="flex flex-none flex-wrap items-center justify-between gap-3 border-b border-rule-2 px-4 py-4 sm:px-5">
                 <div>
@@ -760,7 +760,7 @@ export function FormHelperApp() {
   return (
     <div className="flex min-h-dvh flex-col desk:h-dvh desk:overflow-hidden">
       {header}
-      <main className="pr-workspace flex min-h-0 flex-1 flex-col">
+      <main className="pr-view-enter pr-workspace flex min-h-0 flex-1 flex-col">
         <p className="sr-only" role="status" aria-live="polite">
           {selected ? t.fieldSelected(selected.label, selected.page) : ""}
         </p>
@@ -850,7 +850,7 @@ export function FormHelperApp() {
             id="panel-field"
             aria-labelledby="tab-field"
             hidden={tab !== "field"}
-            className="relative desk:min-h-0 desk:flex-1 desk:overflow-auto"
+            className="pr-tab-panel relative desk:min-h-0 desk:flex-1 desk:overflow-auto"
           >
             <FieldPanel
               fields={form.fields}
@@ -872,7 +872,7 @@ export function FormHelperApp() {
             id="panel-ask"
             aria-labelledby="tab-ask"
             hidden={tab !== "ask"}
-            className="flex-col data-[shown]:flex max-desk:h-[min(640px,88dvh)] desk:min-h-0 desk:flex-1"
+            className="pr-tab-panel flex-col data-[shown]:flex max-desk:h-[min(640px,88dvh)] desk:min-h-0 desk:flex-1"
             data-shown={tab === "ask" ? "" : undefined}
           >
             <ChatPanel

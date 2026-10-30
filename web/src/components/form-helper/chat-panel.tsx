@@ -104,13 +104,13 @@ export function ChatPanel({
           return m.role === "user" ? (
             <div
               key={m.id}
-              className="max-w-[85%] self-end rounded-[10px_10px_2px_10px] bg-hover-wash px-3.5 py-2.5 whitespace-pre-wrap"
+              className="pr-message-enter max-w-[85%] self-end rounded-[10px_10px_2px_10px] bg-hover-wash px-3.5 py-2.5 whitespace-pre-wrap"
             >
               <span className="sr-only">{t.youAsked}</span>
               {m.text}
             </div>
           ) : (
-            <article key={m.id} className="flex flex-col gap-2">
+            <article key={m.id} className="pr-message-enter flex flex-col gap-2">
               <span className="sr-only">{t.answer}</span>
               {m.overview ? (
                 <OverviewCard overview={m.overview} />

@@ -65,6 +65,10 @@
 
 /* shadcn/ui tokens mapped onto the Paper Route palette, for the primitives that remain. */
 :root {
+  --ease-dismiss: cubic-bezier(0.4, 0, 1, 1);
+  --motion-feedback: 120ms;
+  --motion-enter: 240ms;
+  --motion-exit: 160ms;
   --background: #f3f5f7;
   --foreground: #22262b;
   --card: #ffffff;
@@ -124,9 +128,63 @@
     color: var(--color-ink-2);
     opacity: 1;
   }
+
+  button,
+  summary,
+  a,
+  input,
+  textarea {
+    transition-property: background-color, border-color, color, box-shadow;
+    transition-duration: var(--motion-feedback);
+    transition-timing-function: var(--ease-route);
+  }
 }
 
 @layer components {
+  .pr-control {
+    transition-property: background-color, border-color, color, box-shadow, translate;
+    transition-duration: var(--motion-feedback);
+    transition-timing-function: var(--ease-route);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .pr-control:active:not(:disabled):not([aria-disabled="true"]):not(:has(input:disabled)) {
+      translate: 0 1px;
+      transition-duration: 80ms;
+    }
+
+    .pr-view-enter,
+    .pr-tab-panel:not([hidden]),
+    .pr-message-enter {
+      animation: pr-content-in var(--motion-enter) var(--ease-route);
+    }
+
+    .pr-message-enter {
+      animation-duration: 180ms;
+    }
+
+    /* Native disclosure semantics stay intact; older browsers open instantly. */
+    @supports (interpolate-size: allow-keywords) and selector(details::details-content) {
+      details::details-content {
+        interpolate-size: allow-keywords;
+        block-size: 0;
+        opacity: 0;
+        overflow: clip;
+        transition:
+          block-size var(--motion-exit) var(--ease-dismiss),
+          opacity var(--motion-exit) var(--ease-dismiss),
+          content-visibility var(--motion-exit) allow-discrete;
+      }
+
+      details[open]::details-content {
+        block-size: auto;
+        opacity: 1;
+        transition-duration: var(--motion-enter);
+        transition-timing-function: var(--ease-route);
+      }
+    }
+  }
+
   html:has(.pr-workspace),
   body:has(.pr-workspace),
   .pr-workspace,
@@ -1225,6 +1283,46 @@
   }
 }
 
+@keyframes pr-content-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Base UI keeps these surfaces mounted through their ending transition. */
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"],
+[data-slot="tooltip-content"] {
+  animation: none;
+  opacity: 1;
+  transform: scale(1);
+  transition:
+    opacity var(--motion-enter) var(--ease-route),
+    transform var(--motion-enter) var(--ease-route);
+}
+
+:is([data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"], [data-slot="tooltip-content"]):is(
+  [data-starting-style],
+  [data-ending-style]
+) {
+  opacity: 0;
+  transform: scale(0.98);
+}
+
+:is([data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"], [data-slot="tooltip-content"], [data-slot="sheet-content"], [data-slot="sheet-overlay"])[data-ending-style] {
+  transition-duration: var(--motion-exit);
+  transition-timing-function: var(--ease-dismiss);
+}
+
+[data-slot="sheet-content"] {
+  transition-property: translate, opacity;
+  transition-duration: var(--motion-enter);
+  transition-timing-function: var(--ease-route);
+}
+
 @keyframes fh-arrive {
   0%,
   100% {
@@ -1274,15 +1372,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .marginalia-drop,
-  .marginalia-drop::before,
-  .pr-yah,
-  .pr-ff {
-    transition: none;
+  *,
+  *::before,
+  *::after,
+  details::details-content {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
 
-  .pr-ff.is-selected,
-  .pr-hl-swipe {
-    animation: none;
-  }
 }
