@@ -11,7 +11,7 @@ import { summarizeField } from "@/lib/field-context";
 import { loadForm, type LoadedForm } from "@/lib/pdf/extract";
 import { readChatEvents } from "@/lib/chat-stream";
 import type { LookupChoice, LookupContext } from "@/lib/official/catalog";
-import type { ChatMessage, ChatStreamEvent, FieldExplanation, FormContext, FormField } from "@/lib/types";
+import type { ChatMessage, ChatRequest, ChatStreamEvent, FieldExplanation, FormContext, FormField } from "@/lib/types";
 
 import { ChatPanel } from "./chat-panel";
 import { FieldPanel } from "./field-panel";
@@ -30,13 +30,15 @@ const SAMPLE = { url: "/forms/pptc153.pdf", name: "pptc153.pdf" };
 type Origin = "sheet" | "route" | "step" | "ref";
 type Tab = "field" | "ask";
 
-function toContext(form: LoadedForm): FormContext {
+function toContext(form: LoadedForm, selectedFieldId?: string): FormContext {
   return {
     formNumber: form.formNumber,
     formTitle: form.formTitle,
     fileName: form.fileName,
     pageCount: form.pageCount,
-    fields: form.fields.map(summarizeField),
+    fields: form.fields
+      .filter((field) => selectedFieldId === undefined || field.id === selectedFieldId)
+      .map(summarizeField),
   };
 }
 
@@ -237,7 +239,7 @@ export function FormHelperApp() {
       text: string | null,
       target: Target | null,
       fieldId: string | null,
-      intent?: "overview",
+      intent?: ChatRequest["intent"],
       options?: { lookupContext?: LookupContext; lookupChoice?: LookupChoice; displayText?: string; retry?: boolean },
     ) => {
       const requestKey = target?.key ?? "navigator";
@@ -357,10 +359,13 @@ export function FormHelperApp() {
             message: text ?? undefined,
             intent,
             form: target
-              ? toContext(docsRef.current.find((doc) => doc.key === target.key)?.form ?? target.form)
+              ? toContext(
+                  docsRef.current.find((doc) => doc.key === target.key)?.form ?? target.form,
+                  intent === "field" ? fieldId ?? undefined : undefined,
+                )
               : undefined,
             selectedFieldId: fieldId ?? undefined,
-            history,
+            history: intent === "field" ? undefined : history,
             language: lang,
             lookupContext,
             lookupChoice: options?.lookupChoice,
@@ -572,7 +577,7 @@ export function FormHelperApp() {
     if (!active || !target) return;
     updateDoc(active.key, (d) => ({ ...d, ctxCleared: false, tab: "ask" }));
     if (!isDesktop) revealSide();
-    void sendChat(t.fieldSuggestion, target, field.id);
+    void sendChat(t.fieldSuggestion, target, field.id, "field");
   };
 
   const setTab = (tab: Tab) => {

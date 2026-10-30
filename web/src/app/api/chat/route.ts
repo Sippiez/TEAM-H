@@ -73,7 +73,8 @@ function validateRequest(body: ChatRequest): string | null {
   }
   if (
     body.intent !== undefined &&
-    body.intent !== "overview"
+    body.intent !== "overview" &&
+    body.intent !== "field"
   ) {
     return "Unsupported intent";
   }
@@ -102,6 +103,13 @@ function validateRequest(body: ChatRequest): string | null {
 
   if (body.intent === "overview" && !body.form) {
     return "An overview requires form context";
+  }
+
+  if (
+    body.intent === "field" &&
+    body.selectedFieldId === undefined
+  ) {
+    return "A field explanation requires a selected field";
   }
 
   if (
@@ -197,7 +205,7 @@ export async function POST(request: Request) {
       intent: body.intent,
       form: body.form,
       selectedFieldId: body.selectedFieldId,
-      history: sanitizeHistory(body.history),
+      history: body.intent === "field" ? [] : sanitizeHistory(body.history),
       language: body.language ?? "en",
       signal: timeoutController.signal,
       lookupContext: body.lookupContext,

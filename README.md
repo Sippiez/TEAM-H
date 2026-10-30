@@ -191,6 +191,11 @@ coordinates, not PDF bytes or entered values. Do not include personal informatio
 in chat, filenames or field labels. Responses are not official guidance and can
 be wrong; verify government requirements using the linked official guide.
 
+**Ask about this field** sends only the selected field's metadata and document
+identity (form number, filename and page count), without other fields or earlier
+chat messages. Regular chat follow-ups and form overviews retain the broader
+form context.
+
 You can keep up to five PDFs open as document tabs. **Add PDF** opens
 another, and each tab has its own close button. The button to the left of
 **New session** switches the interface between English and French, and the

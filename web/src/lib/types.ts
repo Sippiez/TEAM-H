@@ -164,7 +164,7 @@ export interface ChatHistoryMessage {
 
 export interface ChatRequest {
   message?: string;
-  intent?: "overview";
+  intent?: "overview" | "field";
   form?: FormContext;
   selectedFieldId?: string;
   history?: ChatHistoryMessage[];

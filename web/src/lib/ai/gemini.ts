@@ -11,6 +11,7 @@ import type { AssociationRequest } from "@/lib/context-association";
 
 import type {
   ChatHistoryMessage,
+  ChatRequest,
   ChatStreamEvent,
   FieldExplanation,
   FieldSummary,
@@ -242,6 +243,7 @@ function fieldForPrompt(field: FormContext["fields"][number], fullContext = true
 function buildContext(
   form: FormContext | undefined,
   selectedFieldId: string | undefined,
+  intent: ChatRequest["intent"],
 ): string {
   if (!form) {
     return JSON.stringify({
@@ -264,8 +266,8 @@ function buildContext(
       pageCount: form.pageCount,
     },
     selectedField: selectedField ? fieldForPrompt(selectedField) : null,
-    fields: form.fields.slice(0, MAX_FIELDS_IN_PROMPT).map((field) => fieldForPrompt(field, false)),
-    fieldsTruncated: form.fields.length > MAX_FIELDS_IN_PROMPT,
+    fields: intent === "field" ? [] : form.fields.slice(0, MAX_FIELDS_IN_PROMPT).map((field) => fieldForPrompt(field, false)),
+    fieldsTruncated: intent !== "field" && form.fields.length > MAX_FIELDS_IN_PROMPT,
   });
 }
 
@@ -315,7 +317,7 @@ function buildSystemInstruction(language: "en" | "fr"): string {
 
 export interface StreamChatInput {
   message?: string;
-  intent?: "overview";
+  intent?: ChatRequest["intent"];
   form?: FormContext;
   selectedFieldId?: string;
   history?: ChatHistoryMessage[];
@@ -330,7 +332,7 @@ export interface StreamChatInput {
 }
 
 function needsCurrentLookup(input: StreamChatInput): boolean {
-  if (input.intent === "overview") return false;
+  if (input.intent === "overview" || input.intent === "field") return false;
   const message = normalizedRequest(input.message ?? "").trim();
   if (input.form && /^(?:give me an overview of this form|what is this form|explain this form|donne[z]?-moi un apercu de ce formulaire|presente ce formulaire)\s*[?.!]*$/.test(message)) return false;
   if (input.form && /^where (?:do i put|can i find|is) (?:my|the) (?:address|date of birth|name|signature)(?: field)?\s*[?.!]*$/.test(message)) return false;
@@ -450,10 +452,10 @@ async function* streamMetadataAnswer(
 
   const prompt = [
     "FORM_CONTEXT:",
-    buildContext(input.form, input.selectedFieldId),
+    buildContext(input.form, input.selectedFieldId, input.intent),
     "",
     "RECENT_CONVERSATION:",
-    historyAsPrompt(input.history),
+    historyAsPrompt(input.intent === "field" ? undefined : input.history),
     "",
     "CURRENT_USER_REQUEST:",
     currentRequest,

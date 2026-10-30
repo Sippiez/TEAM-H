@@ -72,6 +72,8 @@ test("malformed requests fail before contacting the provider", async (t) => {
     null, [], "hello", 42, true, {}, { message: 1 }, { message: "\u0000 " },
     { message: "a", language: "de" }, { message: "a", intent: "unknown" },
     { intent: "overview" }, { message: "a", selectedFieldId: "orphan" },
+    { ...message, intent: "field", selectedFieldId: undefined },
+    { message: "Explain", intent: "field", selectedFieldId: field.id },
     { ...message, selectedFieldId: "missing" },
     { ...message, form: { ...form, fields: [{ ...field, page: 2 }] } },
     { ...message, form: { ...form, fields: [{ ...field, type: "unknown" }] } },
@@ -136,6 +138,34 @@ test("text is streamed incrementally with bounded history and selected context",
   const completeFrame = decoder.decode((await reader.read()).value);
   assert.match(completeFrame, /"type":"complete","complete":true/);
   assert.equal((await reader.read()).done, true);
+  assert.equal(timers.size, 0);
+});
+
+test("field intent validates the selection, drops history and preserves streaming", async () => {
+  let input;
+  const { POST, timers } = setupRoute(async (value) => {
+    input = value;
+    return (async function* () {
+      yield { version: 1, type: "delta", text: "Use the printed " };
+      yield { version: 1, type: "delta", text: "instructions." };
+    })();
+  });
+  const response = await POST(request({
+    ...message, intent: "field",
+    history: [{ role: "user", text: "Unrelated earlier conversation" }],
+  }));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("Content-Type"), "text/event-stream; charset=utf-8");
+  const events = (await response.text()).trim().split("\n\n").map((frame) => JSON.parse(frame.slice(6)));
+  assert.deepEqual(events, [
+    { version: 1, type: "delta", text: "Use the printed " },
+    { version: 1, type: "delta", text: "instructions." },
+    { version: 1, type: "complete", complete: true },
+  ]);
+  assert.equal(input.intent, "field");
+  assert.equal(input.selectedFieldId, field.id);
+  assert.equal(input.language, "fr");
+  assert.equal(input.history.length, 0);
   assert.equal(timers.size, 0);
 });
 
@@ -905,4 +935,62 @@ test("full structured context is kept for the selected field without multiplying
   assert.equal(context.fields[1].context.question.length, 200);
   assert.deepEqual(context.fields[1].context.instructions, []);
   assert.doesNotMatch(calls[0].contents, /private-answer|private-candidate-not-for-chat/);
+});
+
+test("field intent sends only the selected field and document metadata to Gemini", async (t) => {
+  const { streamGeminiChat, calls } = setupGemini();
+  const selected = {
+    ...field,
+    context: {
+      status: "resolved", source: "layout", question: "Your full name?",
+      instructions: ["Use the name printed on your document."],
+    },
+  };
+  const fields = Array.from({ length: 250 }, (_, i) => ({
+    ...field, id: `other-${i}`, label: `Unrelated field ${i}`,
+  }));
+  fields.push(selected);
+  const input = {
+    message: "What should I enter in this field?", language: "fr",
+    selectedFieldId: selected.id, form: { ...form, fields },
+    history: [{ role: "user", text: "Unrelated earlier conversation" }],
+  };
+  await collect(await streamGeminiChat(input));
+  await collect(await streamGeminiChat({ ...input, intent: "field" }));
+  const regular = calls[0].contents;
+  const focused = calls[1].contents;
+  const context = JSON.parse(focused.split("FORM_CONTEXT:\n")[1].split("\n\nRECENT_CONVERSATION:")[0]);
+  assert.equal(context.fields.length, 0);
+  assert.equal(context.fieldsTruncated, false);
+  assert.equal(context.document.fileName, form.fileName);
+  assert.equal(context.document.pageCount, form.pageCount);
+  assert.equal(context.selectedField.id, selected.id);
+  assert.deepEqual(context.selectedField.context, selected.context);
+  assert.match(calls[1].config.systemInstruction, /Answer in French/);
+  assert.doesNotMatch(focused, /Unrelated field|Unrelated earlier conversation/);
+  assert.ok(focused.length < regular.length / 5, "Focused prompt must be at least 80% smaller for a 251-field form");
+  t.diagnostic(`Prompt size: ${regular.length} -> ${focused.length} characters (${Math.round((1 - focused.length / regular.length) * 100)}% smaller)`);
+  const minimal = { ...input, form: { ...form, fields: [fields[0], selected] } };
+  await collect(await streamGeminiChat({ ...minimal, intent: "field" }));
+  assert.equal(calls[2].contents, focused, "Unrelated fields must not affect a field-only prompt");
+});
+
+test("explicit field intent uses focused metadata without depending on the question wording", async () => {
+  const { streamGeminiChat, calls } = setupGemini();
+  const events = await collect(await streamGeminiChat({
+    message: "Help me understand the selected question.",
+    intent: "field",
+    language: "en",
+    selectedFieldId: field.id,
+    form,
+    history: [{ role: "user", text: "Unrelated earlier conversation" }],
+    lookup: () => assert.fail("A focused field explanation must not dispatch official lookup"),
+  }));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].kind, "stream");
+  assert.ok(events.every((event) => event.type === "delta"));
+  const context = JSON.parse(calls[0].contents.split("FORM_CONTEXT:\n")[1].split("\n\nRECENT_CONVERSATION:")[0]);
+  assert.equal(context.selectedField.id, field.id);
+  assert.deepEqual(context.fields, []);
+  assert.doesNotMatch(calls[0].contents, /Unrelated earlier conversation/);
 });
