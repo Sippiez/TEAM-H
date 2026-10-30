@@ -238,12 +238,16 @@ counts and example values.
   brand, toggle and button fit on one row.
 - **Landing (Marginalia):** a maximum width of 1440px in a 2fr / 1fr grid
   with a 56px gap. An illustrative passport sheet and three margin notes
-  sit on the left; the hero, folded-paper upload control, working sample
-  and privacy notes sit on the right. Leader lines attach to the measured
+  sit on the left; the hero, folded-paper upload control and working sample
+  sit on the right. Below the preview, a "What formER does" list fills the
+  left column with four short feature points (two columns, one below 860px)
+  and an expandable "How chat and search use data" section that keeps the
+  full privacy and AI disclosure. Leader lines attach to the measured
   field edges and note headings, not fixed SVG coordinates. Only date of
   birth is selected; the three explained fields carry visited checks.
   At 1180px, the right column is 340px and the gaps narrow. At 1100px or
-  below, the upload column comes first, followed by the study copy.
+  below, the upload column comes first, followed by the study copy and
+  the feature list.
   At 860px or below, notes stack below the paper and connectors disappear.
   The service directory uses pencil-blue links, dotted leaders and department
   abbreviations, with keyword search. The existing service navigator remains

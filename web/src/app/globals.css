@@ -193,12 +193,80 @@
 
   .marginalia-pitch {
     grid-column: 2;
-    grid-row: 1;
+    grid-row: 1 / span 2;
   }
 
   .marginalia-sample {
     grid-column: 1;
     grid-row: 1;
+  }
+
+  .marginalia-features {
+    grid-column: 1;
+    grid-row: 2;
+    max-width: 760px;
+    padding-top: 24px;
+    border-top: 1.5px solid var(--color-ink);
+  }
+
+  .marginalia-features h2 {
+    font-size: 19px;
+    font-weight: 800;
+    line-height: 1.25;
+  }
+
+  .marginalia-features ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 40px;
+    margin-top: 20px;
+  }
+
+  .marginalia-features li {
+    display: flex;
+    gap: 12px;
+  }
+
+  .marginalia-features h3 {
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.3;
+  }
+
+  .marginalia-features li p {
+    margin-top: 4px;
+    color: var(--color-ink-2);
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .marginalia-data-details {
+    margin-top: 20px;
+    color: var(--color-ink-2);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .marginalia-data-details summary {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    color: var(--color-ink);
+    cursor: pointer;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+  }
+
+  .marginalia-data-details summary:focus-visible {
+    outline: 3px solid var(--color-ink);
+    outline-offset: 3px;
+  }
+
+  .marginalia-data-details > div {
+    display: grid;
+    gap: 8px;
+    max-width: 70ch;
   }
 
   .marginalia-desk {
@@ -533,12 +601,9 @@
       gap: 48px;
     }
 
-    .marginalia-pitch {
-      grid-column: auto;
-      grid-row: auto;
-    }
-
-    .marginalia-sample {
+    .marginalia-pitch,
+    .marginalia-sample,
+    .marginalia-features {
       grid-column: auto;
       grid-row: auto;
     }
@@ -552,6 +617,10 @@
     .marginalia-desk {
       grid-template-columns: minmax(0, 1fr);
       gap: 24px;
+    }
+
+    .marginalia-features ul {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .marginalia-sheet::before {

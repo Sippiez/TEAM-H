@@ -2,12 +2,14 @@
 
 import {
   CheckIcon,
+  ExternalLinkIcon,
   FileUpIcon,
   InfoIcon,
+  LanguagesIcon,
   LoaderCircleIcon,
   LockIcon,
   MessageCircleIcon,
-  PencilIcon,
+  MousePointerClickIcon,
 } from "lucide-react";
 import { useState, type DragEvent } from "react";
 
@@ -29,6 +31,12 @@ interface LandingProps {
 }
 
 const noticeIcon = "mt-0.5 size-5 flex-none text-ink";
+const featureIcons = [
+  MousePointerClickIcon,
+  ExternalLinkIcon,
+  LockIcon,
+  LanguagesIcon,
+];
 
 export function Landing({
   loading,
@@ -234,30 +242,6 @@ export function Landing({
               {t.supported}
             </p>
           </section>
-
-          {/* Footnotes */}
-          <aside
-            aria-label={t.importantInformation}
-            className="relative mt-7 flex flex-col gap-2 pt-4 text-[15.5px] leading-relaxed text-ink-2 before:absolute before:top-0 before:left-0 before:w-[72px] before:border-t-[1.5px] before:border-ink"
-          >
-            <p className="flex items-start gap-2.5">
-              <LockIcon className={noticeIcon} strokeWidth={2.25} aria-hidden />
-
-              <span>
-                <strong className="font-bold text-ink">{t.privacyLead}</strong>{" "}
-                {t.privacyRest}
-              </span>
-            </p>
-
-            <p className="flex items-start gap-2.5">
-              <PencilIcon
-                className={noticeIcon}
-                strokeWidth={2.15}
-                aria-hidden
-              />
-              {t.rulesNotAi}
-            </p>
-          </aside>
         </div>
 
         <figure className="marginalia-sample min-w-0">
@@ -267,6 +251,38 @@ export function Landing({
             {t.sampleCaption}
           </figcaption>
         </figure>
+
+        <section
+          aria-labelledby="features-title"
+          className="marginalia-features min-w-0"
+        >
+            <h2 id="features-title">{t.featuresTitle}</h2>
+            <ul>
+              {t.features.map((feature, index) => {
+                const Icon = featureIcons[index];
+                return (
+                  <li key={feature.title}>
+                    <Icon
+                      className="mt-0.5 size-5 flex-none"
+                      strokeWidth={2.15}
+                      aria-hidden
+                    />
+                    <div>
+                      <h3>{feature.title}</h3>
+                      <p>{feature.body}</p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            <details className="marginalia-data-details">
+              <summary>{t.dataDetails}</summary>
+              <div>
+                <p>{t.privacyRest}</p>
+                <p>{t.rulesNotAi}</p>
+              </div>
+            </details>
+        </section>
       </div>
 
       <section

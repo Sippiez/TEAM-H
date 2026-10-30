@@ -29,7 +29,6 @@ const en = {
   chatTitle: "How can we help?",
   chatSub: "Ask about a government service, or add a PDF for help with a form.",
   chooseFile: "Choose a file",
-  importantInformation: "Important information",
   sampleCaption:
     "A study copy of a government form with explanations written in the margin. When you select a field, formER connects it to the information you need.",
   landingPreview: {
@@ -67,11 +66,18 @@ const en = {
   sourcesHint: "Forms from IRCC, CRA, Service Canada and others",
   limits: ["PDF only", "Up to 10 MB", "Up to 5 open at once", "Fillable forms"],
   supported: "Use blank, fillable PDFs. Scanned, flattened, password-protected and XFA-only forms aren't supported for field explanations.",
-  privacyLead: "Your form stays on your device.",
   privacyRest:
     "The PDF is read in your browser and isn't uploaded. Chat sends the filename, form and field metadata, and recent messages to Google Gemini, not PDF bytes or entered field values. Official lookup checks pages directly first, then uses Google Search grounding only if that fails. Search requests use catalog keywords or the public title and number read from a blank form, plus the information topic and jurisdiction when known — never chat history, filenames or field values. Use blank forms only.",
   rulesNotAi: "Chat uses Google Gemini. Official lookup checks pages directly first, using Brave discovery if configured. Google Search grounding is the fallback. Search requests use catalog keywords or the public title and number read from a blank form, plus the information topic and jurisdiction when known, not chat history, filenames or field values. Use blank forms only. Google generates its grounding search queries and retains grounding requests and responses for 30 days. Sources identify whether the app fetched the page or Google grounded the answer.",
   aiPrivacyDetails: "AI and search privacy",
+  featuresTitle: "What formER does",
+  features: [
+    { title: "Explains each field", body: "Select a field for plain-language help." },
+    { title: "Points to official pages", body: "Guidance links to government sources." },
+    { title: "Keeps your PDF local", body: "Your PDF is read in your browser, not uploaded." },
+    { title: "English or French", body: "Switch languages anytime." },
+  ],
+  dataDetails: "How chat and search use data",
   sampleTitle: "Try a sample form",
   sampleName: "Adult passport application",
   sampleLangTitle: "English",
@@ -317,7 +323,6 @@ const fr: Dict = {
   chatTitle: "Comment pouvons-nous vous aider?",
   chatSub: "Posez une question sur un service gouvernemental ou ajoutez un PDF pour obtenir de l'aide avec un formulaire.",
   chooseFile: "Choisir un fichier",
-  importantInformation: "Informations importantes",
   sampleCaption:
     "Une copie d'étude d'un formulaire gouvernemental, avec des explications dans la marge. Lorsque vous sélectionnez un champ, formER le relie aux renseignements dont vous avez besoin.",
   landingPreview: {
@@ -355,11 +360,18 @@ const fr: Dict = {
   sourcesHint: "Formulaires d'IRCC, de l'ARC, de Service Canada et d'autres",
   limits: ["PDF seulement", "Jusqu'à 10 Mo", "Jusqu'à 5 ouverts à la fois", "Formulaires à remplir"],
   supported: "Utilisez des PDF vierges avec des champs à remplir. Les formulaires numérisés, aplatis, protégés par mot de passe ou uniquement XFA ne permettent pas d'expliquer les champs.",
-  privacyLead: "Votre formulaire reste sur votre appareil.",
   privacyRest:
     "Le PDF est lu dans votre navigateur et n'est pas téléversé. Le clavardage transmet le nom du fichier, les métadonnées et les messages récents à Google Gemini, pas le PDF ni les valeurs saisies. L'application vérifie d'abord les pages directement et utilise Google Search seulement en cas d'échec. Les recherches utilisent les mots-clés du catalogue ou le titre public et le numéro lus sur un formulaire vierge, le sujet et le territoire si connu, jamais l'historique, le nom du fichier ni les valeurs saisies. Utilisez uniquement des formulaires vierges.",
   rulesNotAi: "Le clavardage utilise Google Gemini. L'application vérifie d'abord les pages directement, avec Brave si configuré, puis utilise Google Search en cas d'échec. Les recherches utilisent les mots-clés du catalogue ou le titre public et le numéro lus sur un formulaire vierge, le sujet et le territoire si connu, pas l'historique, le nom du fichier ni les valeurs saisies. Utilisez uniquement des formulaires vierges. Google génère ses recherches et conserve les requêtes et réponses pendant 30 jours. Chaque source distingue une page consultée directement d'une réponse appuyée par Google.",
   aiPrivacyDetails: "Confidentialité : IA et recherche",
+  featuresTitle: "Ce que fait formER",
+  features: [
+    { title: "Explique chaque champ", body: "Sélectionnez un champ pour obtenir une aide claire." },
+    { title: "Renvoie aux pages officielles", body: "Les conseils renvoient aux sources gouvernementales." },
+    { title: "Garde votre PDF sur l'appareil", body: "Votre PDF est lu dans votre navigateur, sans téléversement." },
+    { title: "Français ou anglais", body: "Changez de langue en tout temps." },
+  ],
+  dataDetails: "Utilisation des données par le clavardage et la recherche",
   sampleTitle: "Essayer un formulaire exemple",
   sampleName: "Demande de passeport pour adultes (version anglaise)",
   sampleLangTitle: "Anglais",

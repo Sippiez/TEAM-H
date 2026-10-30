@@ -65,4 +65,18 @@ for (const language of ["en", "fr"]) {
       assert.match(html, /ARC/);
     }
   });
+
+  test(`landing summarizes features and keeps data details available in ${language}`, () => {
+    const html = renderLanding(language);
+    const section = html.match(/<section aria-labelledby="features-title"[\s\S]*?<\/section>/)?.[0];
+    assert.ok(section);
+    assert.match(section, /class="marginalia-features min-w-0"/);
+    assert.match(html, /<\/figure><section aria-labelledby="features-title"/);
+    assert.equal(section.match(/<li>/g)?.length, 4);
+    assert.match(section, language === "en" ? /What formER does/ : /Ce que fait formER/);
+    assert.match(section, /<details class="marginalia-data-details"><summary>/);
+    assert.match(section, /Google Gemini/);
+    assert.match(section, language === "en" ? /30 days/ : /30 jours/);
+    assert.doesNotMatch(html, /Important information|Informations importantes/);
+  });
 }
