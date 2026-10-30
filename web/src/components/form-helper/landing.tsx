@@ -6,6 +6,7 @@ import {
   InfoIcon,
   LoaderCircleIcon,
   LockIcon,
+  MessageCircleIcon,
   PencilIcon,
 } from "lucide-react";
 import { useState, type DragEvent, type ReactNode } from "react";
@@ -23,6 +24,7 @@ interface LandingProps {
   loading: boolean;
   onFile: (file: File) => void;
   onSample: () => void;
+  onStartChat: () => void;
   mapHighlight?: readonly string[];
   navigator: ReactNode;
 }
@@ -43,6 +45,7 @@ export function Landing({
   loading,
   onFile,
   onSample,
+  onStartChat,
   mapHighlight,
   navigator,
 }: LandingProps) {
@@ -102,6 +105,14 @@ export function Landing({
             <h2 id="start-title" className="sr-only">
               {t.startHere}
             </h2>
+
+            <div className="mt-7">
+              <button type="button" onClick={onStartChat} disabled={loading} className={btnPrimary}>
+                <MessageCircleIcon className="size-5" aria-hidden />
+                {t.startChat}
+              </button>
+              <p className="mt-2 text-[15.5px] text-ink-2">{t.chatOnlyHint}</p>
+            </div>
 
             <label
               onDragEnter={(event) => {

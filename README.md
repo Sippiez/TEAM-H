@@ -48,8 +48,8 @@ disabled because Next.js has no override metrics for this font.
 `npm test` uses Node's built-in runner and the existing TypeScript
 compiler to exercise chat validation, prompts, typed streaming, errors, timeouts,
 cancellation, URL policy, Google grounding metadata, query privacy, and provenance using
-isolated fakes, plus message/document identity across Fast Refresh; it needs no
-API key or network.
+isolated fakes, chat-only/PDF transitions, plus message/document identity across
+Fast Refresh; it needs no API key or network.
 
 If you're behind a TLS-inspecting proxy, `next/font` and npm can fail to
 download. Point Node at your organisation's root CA instead of disabling TLS
@@ -204,6 +204,14 @@ request time; existing answers are not retranslated. New field explanations also
 use the selected language; curated source material and linked resources retain
 their original language. The
 French copy is a draft and needs review by a fluent speaker.
+
+Choose **Start with just chat** on the landing page to ask questions without a
+PDF. **Add PDF** in chat opens the existing document preview, fields and details
+panels, carrying the conversation into the form's **Ask** tab. An answer already
+streaming continues there; it uses the context available when it was requested.
+Closing the last PDF in a chat-started session returns to chat and keeps that
+document's conversation. **New session** clears the chat and documents and returns
+to the landing page.
 
 The landing page carries over **design concept 1 (Marginalia)**: a blank study
 copy with field-linked margin notes, a folded-paper upload area, and a searchable

@@ -24,6 +24,10 @@ const en = {
   heroSub:
     "Upload a government form and click any field for a plain-language explanation. Or ask the service navigator for current official instructions.",
   startHere: "Start here",
+  startChat: "Start with just chat",
+  chatOnlyHint: "No PDF needed. Add one anytime to open the form preview.",
+  chatTitle: "How can we help?",
+  chatSub: "Ask about a government service, or add a PDF for help with a form.",
   chooseFile: "Choose a file",
   importantInformation: "Important information",
   sampleCaption:
@@ -305,6 +309,10 @@ const fr: Dict = {
   heroSub:
     "Téléversez un formulaire gouvernemental et sélectionnez un champ pour obtenir une explication en langage clair. Ou demandez au navigateur de services des instructions officielles à jour.",
   startHere: "Commencez ici",
+  startChat: "Commencer par le clavardage",
+  chatOnlyHint: "Aucun PDF requis. Ajoutez-en un pour ouvrir l'aperçu du formulaire.",
+  chatTitle: "Comment pouvons-nous vous aider?",
+  chatSub: "Posez une question sur un service gouvernemental ou ajoutez un PDF pour obtenir de l'aide avec un formulaire.",
   chooseFile: "Choisir un fichier",
   importantInformation: "Informations importantes",
   sampleCaption:
