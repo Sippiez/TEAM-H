@@ -59,7 +59,10 @@ The default is the stable `gemini-3.1-flash-lite`, with low reasoning effort
 to limit cost and latency. It is the cheapest stable thinking model verified
 accessible with the configured account; older 2.5 models returned 404.
 See [decision 0004](docs/decisions/0004-gemini-streaming-chat.md).
-Field-panel explanations remain rule-based and work without a key.
+Field-panel explanations also use Gemini and require a key. They use the
+selected field's printed question and instructions, plus curated guidance when
+available. PDF loading and local field-context extraction do not require a key;
+ambiguous contexts can be associated on demand using Gemini.
 
 Service navigation uses **direct official-page lookup first**, with **Google
 Search grounding only as a fallback**. Recognized download questions fetch
@@ -147,16 +150,19 @@ than repeated beneath each chat input.
 
 PDF bytes and entered field values stay in the browser. Chat shares bounded
 form and field metadata (including the filename), the selected field, and recent
-messages with the external AI provider. Do not include personal information in
-chat, filenames or field labels. Responses are not official guidance and can be
-wrong; verify government requirements using the linked official guide.
+messages with the external AI provider. Field explanations share bounded field
+context; on-demand context association shares candidate printed text and layout
+coordinates, not PDF bytes or entered values. Do not include personal information
+in chat, filenames or field labels. Responses are not official guidance and can
+be wrong; verify government requirements using the linked official guide.
 
 You can keep up to five PDFs open as document tabs. **Add PDF** opens
 another, and each tab has its own close button. The button to the left of
 **New session** switches the interface between English and French, and the
 choice is saved in the browser. New chat answers use the interface language at
-request time; existing answers are not retranslated. Curated field explanations
-and linked resources stay in English. The
+request time; existing answers are not retranslated. New field explanations also
+use the selected language; curated source material and linked resources retain
+their original language. The
 French copy is a draft and needs review by a fluent speaker.
 
 The landing page carries over **design concept 1 (Marginalia)**: a blank study

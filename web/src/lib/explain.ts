@@ -67,6 +67,26 @@ const HEURISTICS: Heuristic[] = [
 ];
 
 function fallback(field: FieldSummary): Omit<FieldExplanation, "fieldId" | "sources" | "grounded"> {
+  if (field.context && field.context.status !== "resolved") {
+    return {
+      meaning: "We could not identify this field's question reliably.",
+      whatToEnter: field.context.status === "needs-ocr"
+        ? "This page has no readable PDF text. Use a text-based copy or check the original form; OCR is needed before its question can be identified."
+        : "Check the highlighted field and surrounding instructions on the original form. Its question or option labels could not be matched reliably.",
+      commonMistakes: [],
+    };
+  }
+  if (field.context?.question) {
+    return {
+      meaning: field.context.question,
+      whatToEnter: field.context.instructions.length
+        ? field.context.instructions.join(" ")
+        : field.type === "radio" || field.type === "choice"
+          ? `Choose one of the printed options${field.options?.length ? `: ${field.options.join(", ")}` : ""}.`
+          : "Use the instructions printed beside this field. No additional entry requirements were identified.",
+      commonMistakes: [],
+    };
+  }
   const text = `${field.label} ${field.path}`.toLowerCase().replace(/([a-z])([A-Z])/g, "$1 $2");
   if (field.type === "checkbox") {
     return {

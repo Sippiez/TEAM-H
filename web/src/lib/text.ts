@@ -43,6 +43,10 @@ export function cleanWhitespace(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+export function cleanPdfText(text: string): string {
+  return cleanWhitespace(text.replace(/_{3,}/g, " "));
+}
+
 /** The shared user-approved official-host and public-page URL policy. */
 export function isAllowedGovUrl(url: string): boolean {
   return parseAllowedOfficialUrl(url) !== null;

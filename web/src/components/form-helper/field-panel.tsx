@@ -26,6 +26,9 @@ interface FieldPanelProps {
   selected?: FormField;
   explanation?: FieldExplanation;
   explanationError?: boolean;
+  contextPending?: boolean;
+  contextError?: "failed" | "uncertain";
+  onIdentify: (field: FormField) => void;
   onSelect: (fieldId: string) => void;
   onAsk: (field: FormField) => void;
   onRetry: (field: FormField) => void;
@@ -38,6 +41,9 @@ export function FieldPanel({
   selected,
   explanation,
   explanationError,
+  contextPending,
+  contextError,
+  onIdentify,
   onSelect,
   onAsk,
   onRetry,
@@ -52,6 +58,7 @@ export function FieldPanel({
   const index = selected ? fields.findIndex((f) => f.id === selected.id) : -1;
   const prev = index > 0 ? fields[index - 1] : undefined;
   const next = index >= 0 ? fields[index + 1] : undefined;
+  const unresolved = selected?.context && selected.context.status !== "resolved";
 
   useEffect(() => {
     const dir = stepped.current;
@@ -100,7 +107,7 @@ export function FieldPanel({
           ref={headingRef}
           id="field-title"
           tabIndex={-1}
-          className="text-[23px] tracking-[-0.01em] focus:outline-none focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-ink sm:text-[27px]"
+          className="text-[23px] tracking-[-0.01em] [overflow-wrap:anywhere] focus:outline-none focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-ink sm:text-[27px]"
         >
           <span key={selected.id} className="pr-hl pr-hl-swipe">
             {selected.label}
@@ -111,7 +118,7 @@ export function FieldPanel({
             </span>
           )}
         </h2>
-        {selected.tooltip && selected.tooltip !== selected.label && (
+        {!unresolved && selected.tooltip && selected.tooltip !== selected.label && (
           <p className="text-[15px] text-ink-2">
             {t.pdfLabel} <q>{selected.tooltip}</q>
           </p>
@@ -166,10 +173,10 @@ export function FieldPanel({
       <div
         className="flex flex-col gap-6 px-4 pt-4 pb-8 sm:px-6 sm:pt-[18px] desk:pb-24"
         aria-live="polite"
-        aria-busy={!explanation && !explanationError}
+        aria-busy={Boolean(contextPending) || (!unresolved && !explanation && !explanationError)}
       >
         <div className="flex flex-wrap items-center justify-between gap-2.5">
-          {explanation &&
+          {!unresolved && explanation &&
             (explanation.grounded ? (
               <p className="inline-flex items-center gap-2 text-[15.5px] text-ink-2">
                 <CheckIcon
@@ -186,7 +193,7 @@ export function FieldPanel({
                   strokeWidth={2.25}
                   aria-hidden
                 />
-                {t.general}
+                {selected.context?.source === "ai" ? t.aiContextMatched : t.general}
               </p>
             ))}
           <button
@@ -199,7 +206,35 @@ export function FieldPanel({
           </button>
         </div>
 
-        {explanationError ? (
+        {unresolved ? (
+          <section className="flex flex-col items-start gap-3 rounded-sm border border-rule bg-status-wash p-4">
+            <h3 className="flex items-start gap-2 text-[17px]">
+              <TriangleAlertIcon className={cn(icon, "mt-0.5")} aria-hidden />
+              {t.contextUncertain}
+            </h3>
+            <p className="max-w-[62ch]">
+              {selected.context?.status === "needs-ocr" ? t.contextNeedsOcr : t.contextMissing}
+            </p>
+            {Boolean(selected.contextCandidates?.blocks.length) && selected.context?.status !== "needs-ocr" && (
+              <>
+                <p className="text-[15px] text-ink-2">{t.contextAiPrivacy}</p>
+                <button
+                  type="button"
+                  disabled={contextPending}
+                  className={cn(btnPaper, "min-h-11 max-w-full px-3 py-2 text-left")}
+                  onClick={() => onIdentify(selected)}
+                >
+                  {contextPending ? t.contextIdentifying : t.contextIdentify}
+                </button>
+              </>
+            )}
+            {contextError && (
+              <p role="alert" className="max-w-[62ch] font-semibold">
+                {contextError === "uncertain" ? t.contextStillUncertain : t.contextFailed}
+              </p>
+            )}
+          </section>
+        ) : explanationError ? (
           <div
             className="flex flex-wrap items-center gap-3 rounded-sm bg-status-wash px-3.5 py-2.5"
             role="alert"

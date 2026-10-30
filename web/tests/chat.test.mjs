@@ -35,6 +35,7 @@ function setupRoute(streamGeminiChat, env = { GEMINI_API_KEY: "test-only" }) {
     "@/lib/ai/gemini": { streamGeminiChat },
     "@/lib/official/catalog": catalog,
     "@/lib/abortable": loadModule("../src/lib/abortable.ts", {}),
+    "@/lib/field-context": loadModule("../src/lib/field-context.ts", {}),
   }, {
     process: { env },
     console: { error: (...args) => logs.push(args) },
@@ -77,6 +78,8 @@ test("malformed requests fail before contacting the provider", async (t) => {
     { ...message, lookupContext: { serviceId: "passport", query: "PERSONAL-CANARY" } },
     { ...message, lookupChoice: { jurisdiction: "evil.test" } },
     { ...message, lookupChoice: { serviceId: "passport", formId: "isp1000" } },
+    { ...message, form: { ...form, fields: [{ ...field, context: { status: "resolved", source: "layout", instructions: [] } }] } },
+    { ...message, form: { ...form, fields: [{ ...field, context: { status: "ambiguous", source: "layout", instructions: [42] } }] } },
   ];
   for (const body of invalid) {
     await t.test(JSON.stringify(body), async () => {
@@ -662,4 +665,28 @@ test("unresolved or repeated planner calls produce guided clarification", async 
       assert.equal(events[0].outcome.status, "clarification_required");
     });
   }
+});
+
+test("full structured context is kept for the selected field without multiplying instructions across the catalogue", async () => {
+  const { streamGeminiChat, calls } = setupGemini();
+  const detailed = {
+    ...field,
+    context: {
+      status: "resolved", source: "layout",
+      question: "Question ".repeat(100),
+      instructions: ["A printed conditional instruction."],
+      fieldValue: "private-answer",
+    },
+    contextCandidates: { blocks: [{ text: "private-candidate-not-for-chat" }] },
+  };
+  await collect(await streamGeminiChat({
+    message: "Explain this field", language: "en", selectedFieldId: field.id,
+    form: { ...form, fields: [detailed, { ...detailed, id: "other" }] },
+  }));
+  const context = JSON.parse(calls[0].contents.split("FORM_CONTEXT:\n")[1].split("\n\nRECENT_CONVERSATION:")[0]);
+  assert.equal(context.selectedField.context.question, detailed.context.question.trim());
+  assert.deepEqual(context.selectedField.context.instructions, detailed.context.instructions);
+  assert.equal(context.fields[1].context.question.length, 200);
+  assert.deepEqual(context.fields[1].context.instructions, []);
+  assert.doesNotMatch(calls[0].contents, /private-answer|private-candidate-not-for-chat/);
 });

@@ -6,6 +6,8 @@ import { toast } from "sonner";
 
 import { cn } from "cn";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { applyAssociation } from "@/lib/context-association";
+import { summarizeField } from "@/lib/field-context";
 import { loadForm, type LoadedForm } from "@/lib/pdf/extract";
 import { readChatEvents } from "@/lib/chat-stream";
 import type { LookupChoice, LookupContext } from "@/lib/official/catalog";
@@ -33,15 +35,7 @@ function toContext(form: LoadedForm): FormContext {
     formNumber: form.formNumber,
     fileName: form.fileName,
     pageCount: form.pageCount,
-    fields: form.fields.map(({ id, path, page, type, label, section, options }) => ({
-      id,
-      path,
-      page,
-      type,
-      label,
-      section,
-      options,
-    })),
+    fields: form.fields.map(summarizeField),
   };
 }
 
@@ -54,6 +48,8 @@ interface DocSession {
   visited: ReadonlySet<string>;
   explanations: Record<string, FieldExplanation>;
   explainErrors: ReadonlySet<string>;
+  contextPending: ReadonlySet<string>;
+  contextErrors: Record<string, "failed" | "uncertain">;
   messages: ChatMessage[];
   pending: boolean;
   ctxCleared: boolean;
@@ -80,12 +76,16 @@ export function FormHelperApp() {
   const navMessagesRef = useRef<ChatMessage[]>([]);
   const docsRef = useRef<DocSession[]>([]);
   const chatRequests = useRef(new Map<string, AbortController>());
+  const contextRequests = useRef(new Map<string, AbortController>());
 
   useEffect(() => {
     const requests = chatRequests.current;
+    const associations = contextRequests.current;
     return () => {
       for (const controller of requests.values()) controller.abort();
       requests.clear();
+      for (const controller of associations.values()) controller.abort();
+      associations.clear();
     };
   }, []);
 
@@ -133,20 +133,77 @@ export function FormHelperApp() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            field: { id: field.id, path: field.path, page: field.page, type: field.type, label: field.label, section: field.section, options: field.options },
+            field: summarizeField(field),
             formNumber,
+            language: lang,
           }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as FieldExplanation;
-        updateDoc(key, (d) => ({ ...d, explanations: { ...d.explanations, [field.id]: data } }));
+        updateDoc(key, (d) => d.form.fields.find((f) => f.id === field.id) !== field
+          ? d : ({ ...d, explanations: { ...d.explanations, [field.id]: data } }));
       } catch {
         requested.current.delete(`${key}:${field.id}`);
-        updateDoc(key, (d) => ({ ...d, explainErrors: new Set(d.explainErrors).add(field.id) }));
+        updateDoc(key, (d) => d.form.fields.find((f) => f.id === field.id) !== field
+          ? d : ({ ...d, explainErrors: new Set(d.explainErrors).add(field.id) }));
       }
     },
-    [updateDoc],
+    [updateDoc, lang],
   );
+
+  const identifyContext = useCallback(async (key: string, fieldId: string) => {
+    const doc = docsRef.current.find((doc) => doc.key === key);
+    const field = doc?.form.fields.find((field) => field.id === fieldId);
+    if (!doc || !field?.contextCandidates?.blocks.length) return;
+    const requestKey = `${key}:${fieldId}`;
+    if (contextRequests.current.has(requestKey)) return;
+    const controller = new AbortController();
+    contextRequests.current.set(requestKey, controller);
+    const isCurrent = () => contextRequests.current.get(requestKey) === controller;
+    updateDoc(key, (d) => {
+      const errors = { ...d.contextErrors };
+      delete errors[fieldId];
+      return { ...d, contextPending: new Set(d.contextPending).add(fieldId), contextErrors: errors };
+    });
+    const timeout = window.setTimeout(() => controller.abort(), 30_000);
+    try {
+      const response = await fetch("/api/field-context", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        cache: "no-store", signal: controller.signal,
+        body: JSON.stringify({ fieldId, page: field.page, type: field.type, candidates: field.contextCandidates }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const { selection } = await response.json() as { selection: unknown };
+      const updatedField = applyAssociation(field, selection);
+      if (!isCurrent()) return;
+      if (updatedField === field) {
+        updateDoc(key, (d) => ({ ...d, contextErrors: { ...d.contextErrors, [fieldId]: "uncertain" } }));
+        return;
+      }
+      updateDoc(key, (d) => {
+        const explanations = { ...d.explanations };
+        delete explanations[fieldId];
+        return {
+          ...d,
+          form: { ...d.form, fields: d.form.fields.map((f) => f.id === fieldId ? updatedField : f) },
+          explanations,
+        };
+      });
+      void loadExplanation(key, updatedField, doc.form.formNumber);
+    } catch {
+      if (isCurrent()) updateDoc(key, (d) => ({ ...d, contextErrors: { ...d.contextErrors, [fieldId]: "failed" } }));
+    } finally {
+      window.clearTimeout(timeout);
+      if (isCurrent()) {
+        contextRequests.current.delete(requestKey);
+        updateDoc(key, (d) => {
+          const pending = new Set(d.contextPending);
+          pending.delete(fieldId);
+          return { ...d, contextPending: pending };
+        });
+      }
+    }
+  }, [loadExplanation, updateDoc]);
 
   const selectField = useCallback(
     (target: Target, id: string, origin: Origin) => {
@@ -298,7 +355,7 @@ export function FormHelperApp() {
             message: text ?? undefined,
             intent,
             form: target
-              ? toContext(target.form)
+              ? toContext(docsRef.current.find((doc) => doc.key === target.key)?.form ?? target.form)
               : undefined,
             selectedFieldId: fieldId ?? undefined,
             history,
@@ -418,6 +475,8 @@ export function FormHelperApp() {
           visited: new Set(),
           explanations: {},
           explainErrors: new Set(),
+          contextPending: new Set(),
+          contextErrors: {},
           messages: [],
           pending: false,
           ctxCleared: false,
@@ -470,6 +529,12 @@ export function FormHelperApp() {
     const controller = chatRequests.current.get(key);
     chatRequests.current.delete(key);
     controller?.abort();
+    for (const [requestKey, request] of contextRequests.current) {
+      if (requestKey.startsWith(`${key}:`)) {
+        contextRequests.current.delete(requestKey);
+        request.abort();
+      }
+    }
     void docs[idx].form.doc.loadingTask.destroy();
     forget(key);
     const rest = docs.filter((d) => d.key !== key);
@@ -487,6 +552,8 @@ export function FormHelperApp() {
   const reset = () => {
     for (const controller of chatRequests.current.values()) controller.abort();
     chatRequests.current.clear();
+    for (const controller of contextRequests.current.values()) controller.abort();
+    contextRequests.current.clear();
     navMessagesRef.current = [];
     setNavMessages([]);
     setNavPending(false);
@@ -719,6 +786,9 @@ export function FormHelperApp() {
               selected={selected}
               explanation={selected ? active.explanations[selected.id] : undefined}
               explanationError={selected ? active.explainErrors.has(selected.id) : false}
+              contextPending={selected ? active.contextPending?.has(selected.id) : false}
+              contextError={selected ? active.contextErrors?.[selected.id] : undefined}
+              onIdentify={(field) => void identifyContext(active.key, field.id)}
               onSelect={(id) => selectField(target, id, "step")}
               onAsk={askAboutField}
               onRetry={(f) => void loadExplanation(active.key, f, form.formNumber)}

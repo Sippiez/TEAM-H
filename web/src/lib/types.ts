@@ -5,6 +5,26 @@ export type PdfRect = [number, number, number, number];
 
 export type FieldType = "text" | "checkbox" | "radio" | "choice" | "signature";
 
+export interface FieldContext {
+  status: "resolved" | "ambiguous" | "needs-ocr";
+  source: "curated" | "tooltip" | "layout" | "ai";
+  question?: string;
+  instructions: string[];
+}
+
+export interface PdfTextBlock {
+  id: string;
+  text: string;
+  rect: PdfRect;
+  /** The source run included a printed blank answer line. */
+  hasAnswerLine?: boolean;
+}
+
+export interface FieldContextCandidates {
+  blocks: PdfTextBlock[];
+  widgets: { rect: PdfRect; option?: string }[];
+}
+
 export interface FormField {
   id: string;
   rawName: string;
@@ -20,11 +40,14 @@ export interface FormField {
   section: string;
   /** Present only when the PDF marks the field as required. */
   required?: boolean;
+  context?: FieldContext;
+  /** Browser-only evidence for on-demand association; never includes field values. */
+  contextCandidates?: FieldContextCandidates;
 }
 
 export type FieldSummary = Pick<
   FormField,
-  "id" | "path" | "page" | "type" | "label" | "section" | "options"
+  "id" | "path" | "page" | "type" | "label" | "section" | "options" | "context"
 >;
 
 /** What the client sends to the server about the open form. Never includes field values. */
@@ -152,4 +175,5 @@ export interface ChatRequest {
 export interface ExplainRequest {
   field: FieldSummary;
   formNumber?: string;
+  language?: "en" | "fr";
 }
