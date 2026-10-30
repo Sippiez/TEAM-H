@@ -14,7 +14,7 @@ const atkinson = Atkinson_Hyperlegible_Next({
 });
 
 export const metadata: Metadata = {
-  title: "Form Helper – Government form helper and service navigator (demo)",
+  title: "formER – Government form helper and service navigator (demo)",
   description:
     "Upload a Government of Canada form, click any field for a plain-language explanation, and find official Canada.ca resources. Unofficial hackathon prototype.",
 };

@@ -265,10 +265,70 @@ export const RESOURCES: Resource[] = [
 
 const BY_ID = new Map(RESOURCES.map((r) => [r.id, r]));
 
-export function getResources(ids: string[]): Resource[] {
+// French counterparts published in Canada.ca's alternate-language links.
+const FRENCH_RESOURCES: Record<string, Pick<Resource, "title" | "url" | "department" | "description">> = {
+  passports: {
+    title: "Passeports canadiens",
+    url: "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/passeports-canadiens.html",
+    department: "IRCC – Programme de passeport",
+    description: "Demander, renouveler ou remplacer un passeport canadien et consulter les exigences.",
+  },
+  sin: {
+    title: "Numéro d'assurance sociale (NAS)",
+    url: "https://www.canada.ca/fr/emploi-developpement-social/services/numero-assurance-sociale.html",
+    department: "Service Canada",
+    description: "Demander, mettre à jour ou protéger votre NAS.",
+  },
+  ei: {
+    title: "Assurance-emploi",
+    url: "https://www.canada.ca/fr/services/prestations/ae.html",
+    department: "Emploi et Développement social Canada",
+    description: "Soutien temporaire du revenu en cas de perte d'emploi, de maladie ou de congé parental ou pour proches aidants.",
+  },
+  ccb: {
+    title: "Allocation canadienne pour enfants",
+    url: "https://www.canada.ca/fr/agence-revenu/services/prestations-enfants-familles/allocation-canadienne-enfants.html",
+    department: "Agence du revenu du Canada",
+    description: "Versement mensuel non imposable pour aider les familles à subvenir aux besoins de leurs enfants.",
+  },
+  cpp: {
+    title: "Régime de pensions du Canada (RPC)",
+    url: "https://www.canada.ca/fr/services/prestations/pensionspubliques/rpc.html",
+    department: "Emploi et Développement social Canada",
+    description: "Pension de retraite et prestations d'invalidité et de survivant.",
+  },
+  oas: {
+    title: "Sécurité de la vieillesse",
+    url: "https://www.canada.ca/fr/services/prestations/pensionspubliques/securite-vieillesse.html",
+    department: "Emploi et Développement social Canada",
+    description: "Versement mensuel pour les personnes de 65 ans et plus, et Supplément de revenu garanti.",
+  },
+  "cra-sign-in": {
+    title: "Se connecter à son compte de l'ARC",
+    url: "https://www.canada.ca/fr/agence-revenu/services/services-electroniques/services-ouverture-session-arc.html",
+    department: "Agence du revenu du Canada",
+    description: "Consulter vos déclarations de revenus, avis de cotisation et versements de prestations.",
+  },
+  "passport-citizenship-proof": {
+    title: "Preuve de citoyenneté canadienne pour un passeport",
+    url: "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/passeports-canadiens/nouveau-passeport-adulte/preuve-citoyennete.html",
+    department: "IRCC – Programme de passeport",
+    description: "Certificats de naissance et de citoyenneté acceptés.",
+  },
+  "passport-submit": {
+    title: "Présenter une demande de passeport et payer les frais",
+    url: "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/passeports-canadiens/nouveau-passeport-adulte/demander-soumettre-frais.html",
+    department: "IRCC – Programme de passeport",
+    description: "Où et comment présenter votre demande, en personne ou par la poste, selon votre date de départ.",
+  },
+};
+
+export function getResources(ids: string[], language: "en" | "fr" = "en"): Resource[] {
   return ids.flatMap((id) => {
     const r = BY_ID.get(id);
-    return r ? [r] : [];
+    if (!r) return [];
+    const french = language === "fr" ? FRENCH_RESOURCES[id] : undefined;
+    return [french ? { ...r, ...french, language: "fr-CA" as const } : r];
   });
 }
 

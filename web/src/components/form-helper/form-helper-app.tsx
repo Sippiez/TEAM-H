@@ -656,15 +656,15 @@ export function FormHelperApp() {
       <button
         type="button"
         onClick={reset}
-        className="group inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-[19px] font-extrabold tracking-[-0.01em] whitespace-nowrap max-sm:mr-auto"
+        aria-label={`${t.brand}${t.brandHome}`}
+        className="group inline-flex min-h-11 cursor-pointer items-center gap-2.5 rounded-sm text-[25px] leading-none font-extrabold tracking-[-0.025em] whitespace-nowrap focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink max-sm:mr-auto"
       >
         <svg width="24" height="28" viewBox="0 0 28 32" aria-hidden="true" focusable="false">
           <rect x="3" y="2" width="22" height="28" rx="2" className="fill-paper stroke-ink" strokeWidth="1.6" />
           <rect x="6" y="11.5" width="16" height="6" className="fill-highlighter" />
           <path d="M8 8h12M8 14.5h10M8 21h12M8 25h8" className="stroke-ink" strokeWidth="1.4" />
         </svg>
-        <span className="underline-offset-[0.2em] group-hover:underline">{t.brand}</span>
-        <span className="sr-only">{t.brandHome}</span>
+        <span aria-hidden="true">form<span className="relative isolate ml-px inline-block px-0.5 before:absolute before:inset-x-0 before:bottom-0 before:-z-10 before:h-[0.46em] before:-rotate-3 before:bg-highlighter group-hover:before:bg-highlighter-deep">ER</span></span>
       </button>
       <p className="flex min-w-0 items-start gap-2 text-[13px] leading-[1.4] text-ink-2 max-sm:order-3 max-sm:w-full sm:mr-auto sm:flex-1">
         <LockIcon className="mt-0.5 size-3.5 flex-none text-ink" strokeWidth={2.25} aria-hidden />

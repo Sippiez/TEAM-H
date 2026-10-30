@@ -1,5 +1,5 @@
 ---
-name: Form Helper
+name: formER
 description: Understand a government form, one field at a time.
 colors:
   desk: "#f3f5f7"
@@ -109,7 +109,12 @@ components:
     rounded: "{rounded.md}"
 ---
 
-# Design System: Form Helper
+# Design System: formER
+
+The product name is **formER** in both interface languages. Its header wordmark
+uses the existing heavy Atkinson type at 25px, with a small yellow highlighter
+swipe beneath **ER**. Keep the highlighted-paper document mark; the browser's
+SVG and ICO icons use the same mark and palette.
 
 The workspace reference implementation is
 [design-explorations/06-paper-route.html](design-explorations/06-paper-route.html),

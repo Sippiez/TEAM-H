@@ -6,7 +6,6 @@ import { getResources } from "@/lib/catalog/resources";
 
 import { useI18n } from "./i18n";
 
-const sources = getResources(["passport-citizenship-proof", "passport-submit"]);
 const noteFields = ["surname", "dob", "travel"] as const;
 
 interface Leader {
@@ -51,7 +50,8 @@ function Boxes({ labels }: { labels: string[] }) {
 }
 
 export function MarginaliaPreview() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const sources = getResources(["passport-citizenship-proof", "passport-submit"], lang);
   const copy = t.landingPreview;
   const deskRef = useRef<HTMLDivElement>(null);
   const [leaders, setLeaders] = useState<Leader[]>([]);
@@ -252,7 +252,7 @@ export function MarginaliaPreview() {
           <li key={noteFields[index]} data-preview-note={noteFields[index]} className="marginalia-note">
             <h3><span className="pr-hl">{note.title}</span></h3>
             {note.body}
-            <a href={note.source.url} target="_blank" rel="noopener noreferrer" lang="en">
+            <a href={note.source.url} target="_blank" rel="noopener noreferrer" lang={t.htmlLang}>
               {note.source.title}
               <span className="sr-only">{t.opensNewTab}</span>
             </a>

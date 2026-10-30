@@ -29,16 +29,6 @@ interface LandingProps {
 }
 
 const noticeIcon = "mt-0.5 size-5 flex-none text-ink";
-const services = getResources(["passports", "sin", "ei", "ccb", "cpp", "oas", "cra-sign-in"]);
-const departments: Record<string, string> = {
-  passports: "IRCC",
-  sin: "ESDC",
-  ei: "ESDC",
-  ccb: "CRA",
-  cpp: "ESDC",
-  oas: "ESDC",
-  "cra-sign-in": "CRA",
-};
 
 export function Landing({
   loading,
@@ -49,7 +39,8 @@ export function Landing({
 }: LandingProps) {
   const [dragging, setDragging] = useState(false);
   const [query, setQuery] = useState("");
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const services = getResources(["passports", "sin", "ei", "ccb", "cpp", "oas", "cra-sign-in"], lang);
   const tokens = tokenize(query);
   const matches = services
     .map((resource) => {
@@ -330,8 +321,8 @@ export function Landing({
                       {t.serviceIndex[resource.id]}
                     </span>
                     <span className="marginalia-service-leader" aria-hidden="true" />
-                    <span lang="en" className="marginalia-service-department">
-                      {departments[resource.id]}
+                    <span className="marginalia-service-department">
+                      {t.serviceDepartments[resource.id]}
                     </span>
                     <span className="sr-only">
                       {suggested ? t.suggested : ""}

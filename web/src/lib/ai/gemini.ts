@@ -297,7 +297,7 @@ function historyAsPrompt(history: ChatHistoryMessage[] | undefined): string {
 function buildSystemInstruction(language: "en" | "fr"): string {
   const responseLanguage = language === "fr" ? "French" : "English";
   return [
-    "You are the Government Form Helper assistant.",
+    "You are formER, a government form helper assistant.",
     `Answer in ${responseLanguage}.`,
     "Explain form fields only from supplied form metadata; never invent official requirements.",
     "A field label alone establishes its meaning, not official instructions about what to enter, capitalization, legal names, or which documents an answer must match.",

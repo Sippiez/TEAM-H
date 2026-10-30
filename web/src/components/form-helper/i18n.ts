@@ -13,7 +13,7 @@ export type Lang = "en" | "fr";
  */
 const en = {
   htmlLang: "en-CA",
-  brand: "Form Helper",
+  brand: "formER",
   brandHome: ", home",
   otherLangName: "Français",
   otherLang: "fr" as Lang,
@@ -31,7 +31,7 @@ const en = {
   chooseFile: "Choose a file",
   importantInformation: "Important information",
   sampleCaption:
-    "A study copy of a government form with explanations written in the margin. When you select a field, Form Helper connects it to the information you need.",
+    "A study copy of a government form with explanations written in the margin. When you select a field, formER connects it to the information you need.",
   landingPreview: {
     facsimile: "illustrative facsimile",
     page: "Page 1 of 8",
@@ -66,7 +66,7 @@ const en = {
   reading: "Reading your form…",
   sourcesHint: "Forms from IRCC, CRA, Service Canada and others",
   limits: ["PDF only", "Up to 10 MB", "Up to 5 open at once", "Fillable forms"],
-  supported: "Works with fillable PDFs. Scanned or flattened forms aren't supported yet.",
+  supported: "Use blank, fillable PDFs. Scanned, flattened, password-protected and XFA-only forms aren't supported for field explanations.",
   privacyLead: "Your form stays on your device.",
   privacyRest:
     "The PDF is read in your browser and isn't uploaded. Chat sends the filename, form and field metadata, and recent messages to Google Gemini, not PDF bytes or entered field values. Official lookup checks pages directly first, then uses Google Search grounding only if that fails. Search requests use catalog keywords or the public title and number read from a blank form, plus the information topic and jurisdiction when known — never chat history, filenames or field values. Use blank forms only.",
@@ -92,6 +92,10 @@ const en = {
     cpp: "Retirement pension (CPP)",
     oas: "Old Age Security",
     "cra-sign-in": "Sign in to my CRA account",
+  } as Record<string, string>,
+  serviceDepartments: {
+    passports: "IRCC", sin: "ESDC", ei: "ESDC", ccb: "CRA",
+    cpp: "ESDC", oas: "ESDC", "cra-sign-in": "CRA",
   } as Record<string, string>,
   footer:
     "Unofficial hackathon prototype, not affiliated with any government. Explanations are general information, not legal advice. Check the linked official instructions.",
@@ -288,7 +292,7 @@ const en = {
   openFailTitle: "Couldn't open this PDF",
   openFailBody: "It may be damaged, password-protected or an XFA-only form.",
   tooLargeTitle: "File too large",
-  tooLargeBody: "Please choose a PDF under 10 MB.",
+  tooLargeBody: "Please choose a PDF of 10 MB or less.",
   notPdfTitle: "That isn't a PDF",
   notPdfBody: "Please choose a PDF form.",
   sampleFail: "Couldn't load the sample form",
@@ -298,7 +302,7 @@ export type Dict = typeof en;
 
 const fr: Dict = {
   htmlLang: "fr-CA",
-  brand: "Aide-formulaires",
+  brand: "formER",
   brandHome: ", accueil",
   otherLangName: "English",
   otherLang: "en",
@@ -315,7 +319,7 @@ const fr: Dict = {
   chooseFile: "Choisir un fichier",
   importantInformation: "Informations importantes",
   sampleCaption:
-    "Une copie d'étude d'un formulaire gouvernemental, avec des explications dans la marge. Lorsque vous sélectionnez un champ, Aide-formulaires le relie aux renseignements dont vous avez besoin.",
+    "Une copie d'étude d'un formulaire gouvernemental, avec des explications dans la marge. Lorsque vous sélectionnez un champ, formER le relie aux renseignements dont vous avez besoin.",
   landingPreview: {
     facsimile: "fac-similé illustratif",
     page: "Page 1 de 8",
@@ -350,7 +354,7 @@ const fr: Dict = {
   reading: "Lecture de votre formulaire…",
   sourcesHint: "Formulaires d'IRCC, de l'ARC, de Service Canada et d'autres",
   limits: ["PDF seulement", "Jusqu'à 10 Mo", "Jusqu'à 5 ouverts à la fois", "Formulaires à remplir"],
-  supported: "Fonctionne avec les PDF à remplir. Les formulaires numérisés ou aplatis ne sont pas encore pris en charge.",
+  supported: "Utilisez des PDF vierges avec des champs à remplir. Les formulaires numérisés, aplatis, protégés par mot de passe ou uniquement XFA ne permettent pas d'expliquer les champs.",
   privacyLead: "Votre formulaire reste sur votre appareil.",
   privacyRest:
     "Le PDF est lu dans votre navigateur et n'est pas téléversé. Le clavardage transmet le nom du fichier, les métadonnées et les messages récents à Google Gemini, pas le PDF ni les valeurs saisies. L'application vérifie d'abord les pages directement et utilise Google Search seulement en cas d'échec. Les recherches utilisent les mots-clés du catalogue ou le titre public et le numéro lus sur un formulaire vierge, le sujet et le territoire si connu, jamais l'historique, le nom du fichier ni les valeurs saisies. Utilisez uniquement des formulaires vierges.",
@@ -376,6 +380,10 @@ const fr: Dict = {
     cpp: "Pension de retraite (RPC)",
     oas: "Sécurité de la vieillesse",
     "cra-sign-in": "Me connecter à mon dossier de l'ARC",
+  },
+  serviceDepartments: {
+    passports: "IRCC", sin: "EDSC", ei: "EDSC", ccb: "ARC",
+    cpp: "EDSC", oas: "EDSC", "cra-sign-in": "ARC",
   },
   footer:
     "Prototype de hackathon non officiel, sans affiliation avec un gouvernement. Les explications sont des renseignements généraux, pas des conseils juridiques. Consultez les instructions officielles liées.",
@@ -564,7 +572,7 @@ const fr: Dict = {
   openFailTitle: "Impossible d'ouvrir ce PDF",
   openFailBody: "Il est peut-être endommagé, protégé par un mot de passe ou au format XFA seulement.",
   tooLargeTitle: "Fichier trop volumineux",
-  tooLargeBody: "Choisissez un PDF de moins de 10 Mo.",
+  tooLargeBody: "Choisissez un PDF de 10 Mo ou moins.",
   notPdfTitle: "Ce n'est pas un PDF",
   notPdfBody: "Choisissez un formulaire PDF.",
   sampleFail: "Impossible de charger le formulaire exemple",

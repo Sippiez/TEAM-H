@@ -1,4 +1,7 @@
-# TEAM-H
+# formER
+
+formER helps people understand government forms and find official service
+instructions. The name stays **formER** in English and French.
 
 Hackathon workspace. The topic, problem, and technology stack are intentionally
 undecided. This repository provides team conventions and documentation
@@ -205,6 +208,15 @@ use the selected language; curated source material and linked resources retain
 their original language. The
 French copy is a draft and needs review by a fluent speaker.
 
+The landing page's service-directory and illustrative margin-note links open
+the corresponding official English or French pages for the selected language,
+including localized department abbreviations. The bundled PPTC 153 sample
+remains English and is labeled accordingly in French.
+Each PDF can be up to 10 MB (10 × 1024 × 1024 bytes), inclusive, with up to
+five documents open at once. Use blank, fillable PDFs; scanned, flattened,
+password-protected and XFA-only forms are not supported for field explanations.
+The header and browser tab share the highlighted-paper logo.
+
 Choose **Start with just chat** on the landing page to ask questions without a
 PDF. **Add PDF** in chat opens the existing document preview, fields and details
 panels, carrying the conversation into the form's **Ask** tab. An answer already
@@ -330,7 +342,7 @@ The script includes tracked text files only, skips binary and ignored files, and
 - [.env.example](.env.example): safe environment configuration template.
 - [docs/decisions/](docs/decisions/): decision records.
 - [docs/research/](docs/research/): research notes and sources.
-- [web/](web/): Next.js app for the Form Helper MVP.
+- [web/](web/): Next.js app for the formER MVP.
 - [DESIGN.md](DESIGN.md): the visual system (Paper Route workspace, decision 0003,
   and the concept 1 Marginalia landing page).
 - [design-explorations/](design-explorations/): six static UI direction

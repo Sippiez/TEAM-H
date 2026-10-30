@@ -138,6 +138,39 @@ function mount({ language = "en", failPdf = false } = {}) {
   };
 }
 
+for (const language of ["en", "fr"]) {
+  test(`header uses the formER name and localized home label in ${language}`, () => {
+    const app = mount({ language });
+    assert.ok(app.find((node) =>
+      node.type === "button" &&
+      node.props["aria-label"] === `formER${language === "en" ? ", home" : ", accueil"}`,
+    ));
+  });
+
+  test(`10 MB upload boundary matches the requirement in ${language}`, async () => {
+    const app = mount({ language });
+    const data = new Uint8Array(10 * 1024 * 1024);
+    data.set(new TextEncoder().encode("%PDF-1.7"));
+    await app.component("Landing").onFile({
+      name: "limit.pdf", size: data.byteLength, arrayBuffer: async () => data.buffer,
+    });
+    app.render();
+    assert.equal(app.errors.length, 0);
+    assert.ok(app.component("FormViewer"));
+    app.streams[0].end();
+    await settle();
+    const rejected = mount({ language });
+    await rejected.component("Landing").onFile({
+      name: "too-large.pdf", size: data.byteLength + 1,
+      arrayBuffer: async () => assert.fail("Oversized PDFs must be rejected before reading"),
+    });
+    assert.equal(rejected.errors.length, 1);
+    assert.equal(rejected.errors[0][0], translations.dicts[language].tooLargeTitle);
+    assert.match(rejected.errors[0][1].description,
+      language === "en" ? /10 MB or less/ : /10 Mo ou moins/);
+  });
+}
+
 test("landing starts chat without a PDF; requests omit form context", async () => {
   const app = mount();
   assert.ok(app.component("Landing").onStartChat);
