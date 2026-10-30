@@ -2,6 +2,8 @@
 
 - Status: Accepted; direct-first lookup with Google fallback, with successful live grounding blocked by project quota
 - Supersedes: [0005](0005-restricted-official-search.md)
+- Amended by: [0007](0007-automatic-public-form-discovery.md) for unregistered
+  public-form discovery and removal of the service dropdown.
 
 ## Context
 

@@ -4,8 +4,6 @@ import { useId, useState } from "react";
 
 import {
   JURISDICTION_IDS,
-  SERVICE_CATALOG,
-  SERVICE_IDS,
   type LookupContext,
 } from "@/lib/official/catalog";
 import { JURISDICTIONS } from "@/lib/official/hosts";
@@ -30,19 +28,15 @@ export function LookupRecovery({
   const choiceId = useId();
   if (outcome.status === "verified") return null;
   if (outcome.status === "clarification_required") {
-    const needsService = !outcome.serviceId;
-    const label = needsService ? t.chooseService : t.chooseJurisdiction;
+    if (!outcome.serviceId && !outcome.publicForm) return null;
+    const label = outcome.publicForm ? t.chooseFormJurisdiction : t.chooseJurisdiction;
     return (
       <form
         className="flex flex-col gap-2"
         onSubmit={(event) => {
           event.preventDefault();
-          const serviceId = SERVICE_IDS.find((id) => id === choice);
           const jurisdiction = JURISDICTION_IDS.find((id) => id === choice);
-          if (needsService && serviceId) {
-            const service = SERVICE_CATALOG[serviceId];
-            onResolve?.({ serviceId }, lang === "fr" ? service.labelFr : service.label);
-          } else if (!needsService && jurisdiction) {
+          if (jurisdiction) {
             const place = JURISDICTIONS[jurisdiction];
             onResolve?.({ jurisdiction }, lang === "fr" ? place.labelFr : place.label);
           }
@@ -60,13 +54,7 @@ export function LookupRecovery({
           required
         >
           <option value="">{t.selectOption}</option>
-          {needsService
-            ? SERVICE_IDS.map((id) => (
-                <option key={id} value={id}>
-                  {lang === "fr" ? SERVICE_CATALOG[id].labelFr : SERVICE_CATALOG[id].label}
-                </option>
-              ))
-            : JURISDICTION_IDS.filter((id) => id !== "federal").map((id) => (
+          {JURISDICTION_IDS.filter((id) => outcome.publicForm || id !== "federal").map((id) => (
                 <option key={id} value={id}>
                   {lang === "fr" ? JURISDICTIONS[id].labelFr : JURISDICTIONS[id].label}
                 </option>

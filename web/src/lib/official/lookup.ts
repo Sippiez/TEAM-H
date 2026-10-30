@@ -3,9 +3,11 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { abortable } from "@/lib/abortable";
 import {
-  allowedRootForSelection,
+  allowedRootsForSelection,
   PUBLIC_FORMS,
   publicFormReference,
+  publicFormMatchesText,
+  publicFormMention,
   serviceMatchesText,
   validateLookupSelection,
   type LookupSelection,
@@ -31,6 +33,7 @@ import type {
 export type LookupReason =
   | "none"
   | "invalid_selection"
+  | "missing_jurisdiction"
   | "provider_not_configured"
   | "search_failed"
   | "no_allowed_candidates"
@@ -84,6 +87,7 @@ function isRelevantServicePage(
   page: { title: string; text: string },
 ): boolean {
   const content = `${page.title} ${page.text}`;
+  if (selection.publicForm) return publicFormMatchesText(selection.publicForm, content);
   return serviceMatchesText(content, selection.serviceId) &&
     (!selection.formId || selection.facetId !== "documents" || publicFormReference(selection.formId, content) !== null);
 }
@@ -110,14 +114,16 @@ function asSource(
   now: Date,
 ): OfficialSource {
   const parsed = parseAllowedOfficialUrl(page.url);
-  if (!parsed || parsed.jurisdiction !== selection.jurisdiction) {
+  if (!parsed || (selection.jurisdiction && parsed.jurisdiction !== selection.jurisdiction)) {
     throw new OfficialFetchError("blocked_url");
   }
   const retrievedAt = now.toISOString();
   const id = `live-${createHash("sha256").update(page.url).digest("hex").slice(0, 16)}`;
   const jurisdiction = JURISDICTIONS[parsed.jurisdiction];
-  const formMention = selection.formId && selection.facetId === "documents"
-    ? publicFormReference(selection.formId, page.text) : null;
+  const formMention = selection.publicForm
+    ? publicFormMention(selection.publicForm, page.text)
+    : selection.formId && selection.facetId === "documents"
+      ? publicFormReference(selection.formId, page.text) : null;
   const evidenceStart = formMention ? Math.max(0, formMention.index - 1_000) : 0;
   return {
     id,
@@ -148,11 +154,12 @@ export async function lookupOfficialInformation(
     };
   }
   const jurisdiction = selection.jurisdiction;
-  const common: Pick<OfficialLookupSummary, "jurisdiction" | "serviceId" | "facetId" | "formId" | "method"> = {
+  const common: Pick<OfficialLookupSummary, "jurisdiction" | "serviceId" | "facetId" | "formId" | "publicForm" | "method"> = {
     jurisdiction,
     serviceId: selection.serviceId,
     facetId: selection.facetId,
     ...(selection.formId ? { formId: selection.formId } : {}),
+    ...(selection.publicForm ? { publicForm: selection.publicForm } : {}),
     method: selection.formId && selection.facetId === "documents" ? "official_page" : "search",
   };
   if (signal?.aborted) {
@@ -186,8 +193,8 @@ export async function lookupOfficialInformation(
       .map((candidate) => candidate.url)
       .filter((url) => {
         const parsed = parseAllowedOfficialUrl(url);
-        return parsed?.jurisdiction === jurisdiction &&
-          parsed.root === allowedRootForSelection(selection);
+        return parsed && (!jurisdiction || parsed.jurisdiction === jurisdiction) &&
+          allowedRootsForSelection(selection).includes(parsed.root);
       }))].slice(0, MAX_CANDIDATES);
     if (urls.length === 0) {
       return {
@@ -197,6 +204,7 @@ export async function lookupOfficialInformation(
     }
 
     const sources: OfficialSource[] = [];
+    const seenUrls = new Set(urls);
     let failedFetches = 0;
     let irrelevantPages = 0;
     let nextIndex = 0;
@@ -209,7 +217,24 @@ export async function lookupOfficialInformation(
         }
         try {
           const page = await abortable(fetchPage(urls[index], controller.signal), controller.signal);
-          if (isArchivedPage(page) || !isRelevantServicePage(selection, page)) {
+          if (isArchivedPage(page)) {
+            irrelevantPages += 1;
+            continue;
+          }
+          if (selection.publicForm) {
+            let nextLinkIndex = nextIndex;
+            for (const link of page.links ?? []) {
+              const parsed = parseAllowedOfficialUrl(link.url);
+              const label = `${link.title} ${parsed?.url.pathname ?? ""}`;
+              const matches = publicFormMatchesText(selection.publicForm, label) ||
+                (selection.publicForm.title && publicFormMatchesText({ title: selection.publicForm.title }, label));
+              if (!matches || !parsed || seenUrls.has(link.url) || seenUrls.size >= MAX_CANDIDATES ||
+                (jurisdiction && parsed.jurisdiction !== jurisdiction)) continue;
+              seenUrls.add(link.url);
+              urls.splice(nextLinkIndex++, 0, link.url);
+            }
+          }
+          if (!isRelevantServicePage(selection, page)) {
             irrelevantPages += 1;
             continue;
           }
@@ -227,6 +252,13 @@ export async function lookupOfficialInformation(
     );
 
     if (sources.length > 0) {
+      const jurisdictions = new Set(sources.map((source) => source.jurisdiction));
+      if (!jurisdiction && jurisdictions.size > 1) {
+        return {
+          outcome: { ...common, status: "clarification_required", reason: "missing_jurisdiction", partial: false },
+          sources: [],
+        };
+      }
       return {
         outcome: {
           status: "verified",
@@ -237,6 +269,7 @@ export async function lookupOfficialInformation(
             urls.length > MAX_FETCHES ||
             searchResult.rejectedSponsored > 0,
           ...common,
+          jurisdiction: jurisdiction ?? sources[0].jurisdiction,
           restrictedDownload: sources.some((source) => source.restrictedDownload),
         },
         sources: sources.slice(0, MAX_FETCHES),

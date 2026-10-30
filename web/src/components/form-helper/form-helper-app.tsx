@@ -33,6 +33,7 @@ type Tab = "field" | "ask";
 function toContext(form: LoadedForm): FormContext {
   return {
     formNumber: form.formNumber,
+    formTitle: form.formTitle,
     fileName: form.fileName,
     pageCount: form.pageCount,
     fields: form.fields.map(summarizeField),
@@ -253,6 +254,7 @@ export function FormHelperApp() {
         ...(lastLookup?.jurisdiction ? { jurisdiction: lastLookup.jurisdiction } : {}),
         ...(lastLookup?.facetId ? { facetId: lastLookup.facetId } : {}),
         ...(lastLookup?.formId ? { formId: lastLookup.formId } : {}),
+        ...(lastLookup?.publicForm ? { publicForm: lastLookup.publicForm } : {}),
       };
 
       const push = (message: ChatMessage) => {

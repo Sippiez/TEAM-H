@@ -17,6 +17,9 @@ Keep records brief and link to supporting [research](../research/).
 - [0006: Google Search grounding](0006-google-search-grounding.md) -
   Accepted as fallback after direct lookup; successful live grounding is blocked
   by project quota.
+- [0007: Automatic public-form discovery](0007-automatic-public-form-discovery.md) -
+  Accepted; removes the service-catalog gate for identifiable forms and the
+  service dropdown, preserving direct verification and the approved roots.
 
 ## Template
 

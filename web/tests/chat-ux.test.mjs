@@ -75,6 +75,27 @@ test("clarification renders one labeled missing-detail selector in both language
   assert.doesNotMatch(english, /value="federal"/);
 });
 
+test("unknown services never render the catalog dropdown in either language", () => {
+  for (const language of ["en", "fr"]) {
+    const html = render({
+      lookup: { status: "clarification_required", reason: "missing_service", partial: false },
+    }, language);
+    assert.doesNotMatch(html, /<select|Which service|De quel service|Choose one below|Choisissez-le ci-dessous/);
+    assert.match(html, language === "en" ? /public title or number/ : /titre public ou son numéro/);
+  }
+});
+
+test("ambiguous public-form jurisdictions can select federal as well as a province", () => {
+  const html = render({ lookup: {
+    status: "clarification_required", reason: "missing_jurisdiction", partial: false,
+    publicForm: { title: "Application for accessibility assistance" },
+  } });
+  assert.match(html, /Which government issued this form/);
+  assert.match(html, /value="federal"/);
+  assert.match(html, /value="on"/);
+  assert.equal((html.match(/<select/g) ?? []).length, 1);
+});
+
 test("missing search setup shows truthful saved links without a pointless retry", () => {
   const html = render({
     lookup: {

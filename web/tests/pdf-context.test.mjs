@@ -70,6 +70,15 @@ async function explainInChat(input) {
   assert.ok(chatCall);
 }
 
+test("CIT 0001 public identity comes from printed PDF text rather than its filename", async () => {
+  const { loadForm } = loadModule("lib/pdf/extract");
+  const data = readFileSync(new URL("../../test-forms/cit0001e.pdf", import.meta.url));
+  const form = await loadForm(Uint8Array.from(data).buffer, "PRIVATE-FILENAME.pdf");
+  assert.equal(form.formNumber, "CIT 0001");
+  assert.match(form.formTitle, /APPLICATION FOR CITIZENSHIP CERTIFICATE/i);
+  assert.doesNotMatch(form.formTitle, /PRIVATE-FILENAME/);
+});
+
 test("printed field context preserves explicit PDF required flags without inventing them", () => {
   const { enrichFields } = loadModule("lib/fields");
   const context = {
@@ -147,6 +156,18 @@ async function loadFixture(annotations, items) {
     fixture = undefined;
   }
 }
+
+test("public-form heading extraction excludes text inside widgets", async () => {
+  const form = await loadFixture([{
+    subtype: "Widget", fieldName: "Field1", fieldType: "Tx", rect: [20, 480, 500, 530],
+  }], [
+    { ...text("APPLICATION FOR PUBLIC HOUSING ASSISTANCE", 20, 700, 400), height: 14 },
+    { ...text("APPLICATION FOR PRIVATE VALUE CIT 9999", 20, 500, 400), height: 30 },
+  ]);
+  assert.equal(form.formTitle, "APPLICATION FOR PUBLIC HOUSING ASSISTANCE");
+  assert.equal(form.formNumber, undefined);
+  assert.doesNotMatch(JSON.stringify({ title: form.formTitle, number: form.formNumber }), /PRIVATE|9999/);
+});
 
 test("student-aid SIN and birth date use their own printed labels", async () => {
   const data = readFileSync(new URL("../../test-forms/154091_Student_Aid_Application_2026-27.pdf", import.meta.url));

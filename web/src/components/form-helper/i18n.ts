@@ -65,8 +65,8 @@ const en = {
   supported: "Works with fillable PDFs. Scanned or flattened forms aren't supported yet.",
   privacyLead: "Your form stays on your device.",
   privacyRest:
-    "The PDF is read in your browser and isn't uploaded. Chat sends the filename, form and field metadata, and recent messages to Google Gemini, not PDF bytes or entered field values. Official lookup checks pages directly first, then uses Google Search grounding only if that fails. Search requests contain only catalog keywords, jurisdiction and recognized public form references — never chat history, filenames or field values.",
-  rulesNotAi: "Chat uses Google Gemini. Official lookup checks pages directly first, using Brave discovery if configured. Google Search grounding is the fallback. Search requests contain only catalog keywords, jurisdiction and recognized public form references, not chat history, filenames or field values. Google generates its grounding search queries and retains grounding requests and responses for 30 days. Sources identify whether the app fetched the page or Google grounded the answer.",
+    "The PDF is read in your browser and isn't uploaded. Chat sends the filename, form and field metadata, and recent messages to Google Gemini, not PDF bytes or entered field values. Official lookup checks pages directly first, then uses Google Search grounding only if that fails. Search requests use catalog keywords or the public title and number read from a blank form, plus the information topic and jurisdiction when known — never chat history, filenames or field values. Use blank forms only.",
+  rulesNotAi: "Chat uses Google Gemini. Official lookup checks pages directly first, using Brave discovery if configured. Google Search grounding is the fallback. Search requests use catalog keywords or the public title and number read from a blank form, plus the information topic and jurisdiction when known, not chat history, filenames or field values. Use blank forms only. Google generates its grounding search queries and retains grounding requests and responses for 30 days. Sources identify whether the app fetched the page or Google grounded the answer.",
   aiPrivacyDetails: "AI and search privacy",
   sampleTitle: "Try a sample form",
   sampleName: "Adult passport application",
@@ -207,7 +207,7 @@ const en = {
   showFieldSr: " (show this field)",
   thinking: "Working on your question…",
   preparingAnswer: "Preparing an answer from the verified official pages…",
-  chooseService: "Which service is this about?",
+  chooseFormJurisdiction: "Which government issued this form?",
   chooseJurisdiction: "Which province or territory?",
   selectOption: "Choose an option",
   continueLookup: "Find official information",
@@ -251,9 +251,10 @@ const en = {
           ? "Some official pages could not be verified; this answer uses only the verified pages."
           : "Current information was checked against the official source shown below.";
       case "clarification_required":
+        if (outcome.publicForm) return "Matching pages cover more than one jurisdiction. Choose the government that issued this form so I can check the right version.";
         return outcome.serviceId
           ? "I know which service you mean. Choose a province or territory so I can check the right official instructions."
-          : "I couldn't identify the service from this question or form. Choose one below; there's no need to share personal details.";
+          : "I couldn't identify a public form to look up. Open a blank, text-based PDF or send its public title or number, without personal details.";
       case "no_verified_results":
         if (outcome.method === "google_grounding") return "Google Search did not return usable grounding with only permitted official sources. No answer from model memory is shown.";
         return "No verified official result was found for this service and jurisdiction.";
@@ -343,8 +344,8 @@ const fr: Dict = {
   supported: "Fonctionne avec les PDF à remplir. Les formulaires numérisés ou aplatis ne sont pas encore pris en charge.",
   privacyLead: "Votre formulaire reste sur votre appareil.",
   privacyRest:
-    "Le PDF est lu dans votre navigateur et n'est pas téléversé. Le clavardage transmet le nom du fichier, les métadonnées et les messages récents à Google Gemini, pas le PDF ni les valeurs saisies. L'application vérifie d'abord les pages directement et utilise Google Search seulement en cas d'échec. Les recherches contiennent uniquement les mots-clés du catalogue, le territoire et les références publiques reconnues, jamais l'historique, le nom du fichier ni les valeurs saisies.",
-  rulesNotAi: "Le clavardage utilise Google Gemini. L'application vérifie d'abord les pages directement, avec Brave si configuré, puis utilise Google Search en cas d'échec. Les recherches contiennent uniquement les mots-clés du catalogue, le territoire et les références publiques reconnues, pas l'historique, le nom du fichier ni les valeurs saisies. Google génère ses recherches et conserve les requêtes et réponses pendant 30 jours. Chaque source distingue une page consultée directement d'une réponse appuyée par Google.",
+    "Le PDF est lu dans votre navigateur et n'est pas téléversé. Le clavardage transmet le nom du fichier, les métadonnées et les messages récents à Google Gemini, pas le PDF ni les valeurs saisies. L'application vérifie d'abord les pages directement et utilise Google Search seulement en cas d'échec. Les recherches utilisent les mots-clés du catalogue ou le titre public et le numéro lus sur un formulaire vierge, le sujet et le territoire si connu, jamais l'historique, le nom du fichier ni les valeurs saisies. Utilisez uniquement des formulaires vierges.",
+  rulesNotAi: "Le clavardage utilise Google Gemini. L'application vérifie d'abord les pages directement, avec Brave si configuré, puis utilise Google Search en cas d'échec. Les recherches utilisent les mots-clés du catalogue ou le titre public et le numéro lus sur un formulaire vierge, le sujet et le territoire si connu, pas l'historique, le nom du fichier ni les valeurs saisies. Utilisez uniquement des formulaires vierges. Google génère ses recherches et conserve les requêtes et réponses pendant 30 jours. Chaque source distingue une page consultée directement d'une réponse appuyée par Google.",
   aiPrivacyDetails: "Confidentialité : IA et recherche",
   sampleTitle: "Essayer un formulaire exemple",
   sampleName: "Demande de passeport pour adultes (version anglaise)",
@@ -478,7 +479,7 @@ const fr: Dict = {
   showFieldSr: " (afficher ce champ)",
   thinking: "Traitement de votre question…",
   preparingAnswer: "Préparation d'une réponse à partir des pages officielles vérifiées…",
-  chooseService: "De quel service s'agit-il ?",
+  chooseFormJurisdiction: "Quel gouvernement a publié ce formulaire ?",
   chooseJurisdiction: "Quelle province ou quel territoire ?",
   selectOption: "Choisir une option",
   continueLookup: "Trouver les renseignements officiels",
@@ -522,9 +523,10 @@ const fr: Dict = {
           ? "Certaines pages officielles n’ont pas pu être vérifiées ; cette réponse utilise uniquement les pages vérifiées."
           : "Les renseignements actuels ont été vérifiés auprès de la source officielle ci-dessous.";
       case "clarification_required":
+        if (outcome.publicForm) return "Les pages trouvées concernent plusieurs territoires. Choisissez le gouvernement qui a publié ce formulaire pour vérifier la bonne version.";
         return outcome.serviceId
           ? "Le service est identifié. Choisissez une province ou un territoire pour vérifier les bonnes instructions officielles."
-          : "Le service n'a pas pu être identifié à partir de la question ou du formulaire. Choisissez-le ci-dessous, sans renseignements personnels.";
+          : "Le formulaire public n'a pas pu être identifié. Ouvrez un PDF vierge contenant du texte ou envoyez son titre public ou son numéro, sans renseignements personnels.";
       case "no_verified_results":
         if (outcome.method === "google_grounding") return "Google Search n'a pas fourni de réponse exploitable citant uniquement des sources officielles autorisées. Aucune réponse issue de la mémoire du modèle n'est affichée.";
         return "Aucun résultat officiel vérifié n’a été trouvé pour ce service et ce territoire de compétence.";

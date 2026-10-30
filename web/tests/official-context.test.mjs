@@ -31,6 +31,93 @@ const forms = load("../src/lib/catalog/forms.ts", {
 });
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
+test("uncatalogued public form identities bypass service planning and survive follow-ups", () => {
+  const first = resolveLookupContext({
+    message: "Where do I download this form?",
+    formNumber: "CIT 0001",
+    formTitle: "Application for citizenship certificate for adults and minors",
+    language: "en",
+    lookupContext: { serviceId: "passport", jurisdiction: "federal" },
+  });
+  assert.equal(first.reason, "none");
+  assert.equal(first.selection.serviceId, undefined);
+  assert.equal(first.selection.publicForm.number, "CIT 0001");
+  assert.equal(first.selection.publicForm.title, "Application for citizenship certificate for adults and minors");
+  const next = resolveLookupContext({ message: "What about the fees?", lookupContext: first.context, language: "en" });
+  assert.equal(next.selection.publicForm.number, "CIT 0001");
+  assert.equal(next.selection.facetId, "fees");
+  const different = resolveLookupContext({
+    message: "How do I get a health card in Ontario?", lookupContext: first.context, language: "en",
+  });
+  assert.equal(different.selection.serviceId, "health_card");
+  assert.equal(different.selection.publicForm, undefined);
+});
+
+test("public-form discovery validates bounds and keeps private extra properties out of queries", () => {
+  const selection = catalog.validateLookupSelection({
+    publicForm: { title: "Application for accessibility assistance", number: "ABC 123" },
+    facetId: "documents", language: "en",
+  });
+  assert.ok(selection);
+  assert.match(catalog.buildCanonicalQuery(selection), /ABC 123/);
+  assert.match(catalog.buildCanonicalQuery(selection), /Application for accessibility assistance/);
+  for (const publicForm of [
+    {}, { title: "x".repeat(201) }, { title: "https://evil.test/info" },
+    { number: "PRIVATE FILENAME.pdf" }, { number: "ABC 123", query: "PRIVATE-CANARY" },
+  ]) {
+    assert.equal(catalog.validateLookupSelection({ publicForm, facetId: "documents", language: "en" }), null);
+  }
+});
+
+test("public-form references match formatted numbers without admitting other variants or years", () => {
+  for (const number of ["CIT0001", "CIT 0001", "CIT-0001"]) {
+    assert.ok(catalog.publicFormMatchesText({ number }, "Download CIT 0001 here."));
+    assert.equal(catalog.publicFormMatchesText({ number }, "Download CIT 0001A here."), false);
+    assert.equal(catalog.publicFormMatchesText({ number }, "Download CIT 00010 here."), false);
+  }
+  const identity = { title: "Application for accessibility assistance 2026-27" };
+  assert.ok(catalog.publicFormMatchesText(identity, "Accessibility assistance application 2026-27"));
+  assert.equal(catalog.publicFormMatchesText(identity, "Accessibility assistance application 2026-28"), false);
+});
+
+test("IRCC directory candidates preserve language, number variants and jurisdiction restrictions", () => {
+  for (const language of ["en", "fr"]) {
+    const selection = { publicForm: { number: "IMM 0503" }, facetId: "documents", language };
+    const pages = Array.from(catalog.publicFormDirectoryPages(selection));
+    assert.equal(pages.length, 1);
+    assert.ok(pages[0].startsWith(`https://www.canada.ca/${language}/`));
+    assert.ok(pages[0].endsWith("/imm0503.html"));
+    assert.deepEqual(Array.from(catalog.publicFormDirectoryPages({ ...selection, jurisdiction: "on" })), []);
+  }
+  assert.ok(catalog.publicFormDirectoryPages({
+    publicForm: { number: "IMM 5257B" }, facetId: "documents", language: "en",
+  })[0].endsWith("/imm5257b.html"));
+});
+
+test("a typed unregistered form resumes the question and jurisdiction replies retain only its scope", () => {
+  const first = resolveLookupContext({
+    message: "ABC123", history: [{ role: "user", text: "Where do I download this form?" }],
+    lookupContext: { serviceId: "passport", jurisdiction: "federal", formId: "pptc153" },
+    formNumber: "PPTC 153", language: "en",
+  });
+  assert.equal(first.selection.publicForm.number, "ABC123");
+  assert.equal(first.selection.jurisdiction, undefined);
+  assert.equal(first.selection.facetId, "documents");
+  const next = resolveLookupContext({
+    message: "Ontario", lookupContext: first.context,
+    history: [{ role: "user", text: "What are passport fees?" }], language: "en",
+  });
+  assert.equal(next.selection.publicForm.number, "ABC123");
+  assert.equal(next.selection.jurisdiction, "on");
+  assert.equal(next.selection.serviceId, undefined);
+  const titled = resolveLookupContext({
+    message: "Application for accessibility assistance",
+    history: [{ role: "user", text: "Where do I download this form?" }], language: "en",
+  });
+  assert.equal(titled.selection.publicForm.title, "Application for accessibility assistance");
+  assert.equal(titled.selection.facetId, "documents");
+});
+
 test("the student-aid screenshot resolves from its public PDF title through provincial routing", () => {
   const formNumber = forms.detectFormNumber(
     "Full-Time Post-Secondary Student Saskatchewan Student Aid 2026-27 Student Service Centre",

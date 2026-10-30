@@ -1,4 +1,5 @@
 import { detectFormNumber } from "@/lib/catalog/forms";
+import { validatePublicForm } from "@/lib/official/catalog";
 import { enrichFields, normalizePath, type RawField } from "@/lib/fields";
 import { buildTextBlocks, matchFieldContext } from "@/lib/pdf/context";
 import { getPdfjs, type PDFDocumentProxy } from "@/lib/pdf/pdfjs";
@@ -28,6 +29,7 @@ export interface LoadedForm {
   fileName: string;
   pageCount: number;
   formNumber?: string;
+  formTitle?: string;
   fields: FormField[];
 }
 
@@ -113,25 +115,46 @@ async function readFields(doc: PDFDocumentProxy): Promise<RawField[]> {
   });
 }
 
-async function firstPageText(doc: PDFDocumentProxy): Promise<string> {
+async function firstPageIdentity(doc: PDFDocumentProxy, fieldNames: string[]) {
   const page = await doc.getPage(1);
   const content = await page.getTextContent();
-  return content.items.map((i) => ("str" in i ? i.str : "")).join(" ");
+  const annotations = await page.getAnnotations({ intent: "display" });
+  const widgets = annotations.filter((annotation) => annotation.subtype === "Widget");
+  const items = content.items.filter((item) => "str" in item).filter((item) =>
+    item.str.trim() && !widgets.some((widget) => {
+      const [x1, y1, x2, y2] = widget.rect;
+      return item.transform[4] >= x1 && item.transform[4] <= x2 &&
+        item.transform[5] >= y1 && item.transform[5] <= y2;
+    }),
+  );
+  const headings = items.filter((item) =>
+    /^(application|request|demande|formulaire|declaration|déclaration|statement|return)\b/i.test(item.str.trim()),
+  ).sort((a, b) => b.height - a.height || b.transform[5] - a.transform[5]);
+  const heading = headings[0];
+  const title = heading ? items.filter((item) =>
+    item.height >= heading.height * 0.9 &&
+    Math.abs(item.transform[4] - heading.transform[4]) < 20 &&
+    item.transform[5] <= heading.transform[5] &&
+    item.transform[5] >= heading.transform[5] - heading.height * 3,
+  ).sort((a, b) => b.transform[5] - a.transform[5] || a.transform[4] - b.transform[4])
+    .map((item) => item.str.trim()).join(" ") : undefined;
+  return {
+    formNumber: detectFormNumber(items.map((item) => item.str).join(" "), fieldNames),
+    formTitle: validatePublicForm({ title })?.title,
+  };
 }
 
 export async function loadForm(data: ArrayBuffer, fileName: string): Promise<LoadedForm> {
   const pdfjs = await getPdfjs();
   const doc = await pdfjs.getDocument({ data: new Uint8Array(data) }).promise;
   const raw = await readFields(doc);
-  const formNumber = detectFormNumber(
-    await firstPageText(doc),
-    raw.map((f) => f.rawName),
-  );
+  const { formNumber, formTitle } = await firstPageIdentity(doc, raw.map((field) => field.rawName));
   return {
     doc,
     fileName,
     pageCount: doc.numPages,
     formNumber,
+    formTitle,
     fields: enrichFields(raw, formNumber),
   };
 }

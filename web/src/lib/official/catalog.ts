@@ -1,4 +1,4 @@
-import { JURISDICTIONS, type JurisdictionId } from "./hosts";
+import { ALLOWED_ROOTS, JURISDICTIONS, type JurisdictionId } from "./hosts";
 
 export const SERVICE_CATALOG = {
   passport: {
@@ -103,11 +103,35 @@ export const PUBLIC_FORMS = {
 
 export type PublicFormId = keyof typeof PUBLIC_FORMS;
 
+export interface PublicFormIdentity {
+  number?: string;
+  title?: string;
+}
+
+export function validatePublicForm(value: unknown): PublicFormIdentity | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const object = value as Record<string, unknown>;
+  if (Object.keys(object).some((key) => key !== "number" && key !== "title")) return null;
+  if (object.number !== undefined && (typeof object.number !== "string" ||
+    object.number.length > 32 ||
+    !/^(?:[A-Z]{1,8}[\s-]?\d{1,8}(?:[\s-]?[A-Z]{1,2})?|\d{3,8}(?:-[A-Z]{1,3})?)$/i.test(object.number.trim()))) return null;
+  if (object.title !== undefined && (typeof object.title !== "string" ||
+    object.title.trim().length < 8 || object.title.length > 200 ||
+    !/^[\p{L}\p{N} ()'’.,/&–-]+$/u.test(object.title) ||
+    object.title.trim().split(/\s+/).length < 2)) return null;
+  if (object.number === undefined && object.title === undefined) return null;
+  return {
+    ...(typeof object.number === "string" ? { number: object.number.trim().toUpperCase().replace(/\s+/g, " ") } : {}),
+    ...(typeof object.title === "string" ? { title: object.title.trim().replace(/\s+/g, " ") } : {}),
+  };
+}
+
 export interface LookupContext {
   serviceId?: ServiceId;
   jurisdiction?: JurisdictionId;
   facetId?: FacetId;
   formId?: PublicFormId;
+  publicForm?: PublicFormIdentity;
 }
 
 export type LookupChoice = Pick<LookupContext, "serviceId" | "jurisdiction">;
@@ -115,7 +139,7 @@ export type LookupChoice = Pick<LookupContext, "serviceId" | "jurisdiction">;
 export function validateLookupChoice(value: unknown): LookupChoice | null {
   const context = validateLookupContext(value);
   if (!context || Object.keys(context).length === 0 ||
-    context.formId !== undefined || context.facetId !== undefined) return null;
+    context.formId !== undefined || context.facetId !== undefined || context.publicForm !== undefined) return null;
   return context;
 }
 
@@ -174,39 +198,56 @@ export const SERVICE_IDS = Object.keys(SERVICE_CATALOG) as ServiceId[];
 export const FACET_IDS = Object.keys(FACETS) as FacetId[];
 export const JURISDICTION_IDS = Object.keys(JURISDICTION_KEYWORDS) as JurisdictionId[];
 
-export interface LookupSelection {
-  serviceId: ServiceId;
-  jurisdiction: JurisdictionId;
+export type LookupSelection = {
   facetId: FacetId;
   language: "en" | "fr";
-  formId?: PublicFormId;
-}
+} & (
+  { serviceId: ServiceId; jurisdiction: JurisdictionId; formId?: PublicFormId; publicForm?: never } |
+  { publicForm: PublicFormIdentity; jurisdiction?: JurisdictionId; serviceId?: never; formId?: never }
+);
 
 export function validateLookupContext(value: unknown): LookupContext | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const object = value as Record<string, unknown>;
-  if (Object.keys(object).some((key) => !["serviceId", "jurisdiction", "facetId", "formId"].includes(key))) return null;
+  if (Object.keys(object).some((key) => !["serviceId", "jurisdiction", "facetId", "formId", "publicForm"].includes(key))) return null;
   const serviceId = SERVICE_IDS.find((id) => id === object.serviceId);
   const jurisdiction = JURISDICTION_IDS.find((id) => id === object.jurisdiction);
   const facetId = FACET_IDS.find((id) => id === object.facetId);
   const formId = (Object.keys(PUBLIC_FORMS) as PublicFormId[]).find((id) => id === object.formId);
+  const publicForm = object.publicForm === undefined ? undefined : validatePublicForm(object.publicForm);
   if (
     (object.serviceId !== undefined && !serviceId) ||
     (object.jurisdiction !== undefined && !jurisdiction) ||
     (object.facetId !== undefined && !facetId) ||
-    (object.formId !== undefined && !formId)
+    (object.formId !== undefined && !formId) ||
+    (object.publicForm !== undefined && (!publicForm || serviceId || formId))
   ) return null;
   return {
     ...(serviceId ? { serviceId } : {}),
     ...(jurisdiction ? { jurisdiction } : {}),
     ...(facetId ? { facetId } : {}),
     ...(formId ? { formId } : {}),
+    ...(publicForm ? { publicForm } : {}),
   };
 }
 
 export function validateLookupSelection(value: unknown): LookupSelection | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const object = value as Record<string, unknown>;
+  if (object.publicForm !== undefined) {
+    if (Object.keys(object).some((key) => !["publicForm", "jurisdiction", "facetId", "language"].includes(key))) return null;
+    const context = validateLookupContext({
+      publicForm: object.publicForm,
+      jurisdiction: object.jurisdiction,
+      facetId: object.facetId,
+    });
+    if (!context?.publicForm || !context.facetId ||
+      (object.language !== "en" && object.language !== "fr")) return null;
+    return {
+      publicForm: context.publicForm, facetId: context.facetId, language: object.language,
+      ...(context.jurisdiction ? { jurisdiction: context.jurisdiction } : {}),
+    };
+  }
   if (
     Object.keys(object).filter((key) => key !== "formId").sort().join(",") !==
     ["facetId", "jurisdiction", "language", "serviceId"].sort().join(",") ||
@@ -241,8 +282,14 @@ export function validateLookupSelection(value: unknown): LookupSelection | null 
 }
 
 export function buildCanonicalQuery(selection: LookupSelection): string {
-  const service = SERVICE_CATALOG[selection.serviceId];
   const facet = FACETS[selection.facetId];
+  if (selection.publicForm) {
+    return [
+      selection.publicForm.number, selection.publicForm.title,
+      selection.language === "fr" ? facet.fr : facet.en,
+    ].filter(Boolean).join(" ");
+  }
+  const service = SERVICE_CATALOG[selection.serviceId];
   const jurisdiction = JURISDICTION_KEYWORDS[selection.jurisdiction];
   const terms = selection.language === "fr"
     ? [jurisdiction.fr, ...service.keywordsFr, facet.fr]
@@ -263,7 +310,7 @@ export function containsPhrase(text: string, phrase: string): boolean {
 export function requestedFacet(message: string): FacetId {
   const text = normalizedText(message);
   if (/\b(download|telecharger|telechargement)\b/.test(text)) return "documents";
-  const matches = FACET_IDS.filter((id) =>
+  const matches = FACET_IDS.filter((id) => id !== "overview" &&
     FACET_CUES[id].some((cue) => containsPhrase(text, cue)),
   );
   return matches.length === 1 ? matches[0] : "overview";
@@ -280,6 +327,7 @@ export function selectionIsExplicit(
   message: string,
   selection: LookupSelection,
 ): boolean {
+  if (!selection.serviceId) return false;
   const text = normalizedText(message);
   const mentionedServices = SERVICE_IDS.filter((serviceId) =>
     serviceMatchesText(text, serviceId),
@@ -293,8 +341,34 @@ export function selectionIsExplicit(
     matchingFacets[0] === selection.facetId;
 }
 
-export function allowedRootForSelection(
+export function allowedRootsForSelection(
   selection: LookupSelection,
-): string {
-  return JURISDICTIONS[selection.jurisdiction].root;
+): readonly string[] {
+  return selection.jurisdiction ? [JURISDICTIONS[selection.jurisdiction].root] : ALLOWED_ROOTS;
+}
+
+export function publicFormDirectoryPages(selection: LookupSelection): string[] {
+  const number = selection.publicForm?.number?.match(/^(CIT|IMM)[\s-]?(\d{4}[A-Z]?)$/);
+  if (!number || !allowedRootsForSelection(selection).includes("canada.ca")) return [];
+  const directory = selection.language === "fr"
+    ? "fr/immigration-refugies-citoyennete/services/demande/formulaires-demande-guides"
+    : "en/immigration-refugees-citizenship/services/application/application-forms-guides";
+  return [`https://www.canada.ca/${directory}/${number[1].toLowerCase()}${number[2].toLowerCase()}.html`];
+}
+
+export function publicFormMention(identity: PublicFormIdentity, text: string): RegExpExecArray | null {
+  const reference = identity.number
+    ? identity.number.replace(/^([A-Z]+)[\s-]*(\d)/i, "$1 $2")
+    : identity.title;
+  if (!reference) return null;
+  const escaped = reference.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/[\s-]+/g, "[\\s-]*");
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?=$|[^a-z0-9])`, "i").exec(text);
+}
+
+export function publicFormMatchesText(identity: PublicFormIdentity, text: string): boolean {
+  if (identity.number) return publicFormMention(identity, text) !== null;
+  const terms = [...new Set(normalizedText(identity.title ?? "").match(/[a-z0-9]+/g))]
+    .filter((term) => (term.length > 2 || /^\d+$/.test(term)) &&
+      !["the", "for", "and", "application", "form", "request", "demande", "formulaire", "les", "des", "pour", "une", "aux"].includes(term));
+  return terms.length >= 2 && terms.every((term) => containsPhrase(normalizedText(text), term));
 }

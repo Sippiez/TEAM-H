@@ -17,6 +17,7 @@ export interface OfficialPage {
   language: "en-CA" | "fr-CA";
   archived: boolean;
   hasBlockedDownloads?: boolean;
+  links?: Array<{ url: string; title: string }>;
 }
 
 export function isArchivedPage(
@@ -283,6 +284,7 @@ function extractPage(body: Uint8Array, contentType: string, url: URL): OfficialP
   let text = source;
   let documentText = source;
   let hasBlockedDownloads = false;
+  const links: Array<{ url: string; title: string }> = [];
   let language: "en-CA" | "fr-CA" =
     /(?:^|\/)fr(?:\/|$)/i.test(url.pathname) ? "fr-CA" : "en-CA";
   if (mediaType === "text/html") {
@@ -297,6 +299,16 @@ function extractPage(body: Uint8Array, contentType: string, url: URL): OfficialP
     ).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 240);
     text = htmlToText(main);
     documentText = htmlToText(source);
+    for (const match of main.matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a\s*>/gi)) {
+      const reference = decodeHtmlEntities(match[1]);
+      if (!URL.canParse(reference, url)) continue;
+      const destination = parseAllowedOfficialUrl(new URL(reference, url).toString());
+      if (destination && !/\.(?:pdf|docx?|xlsx?|zip)$/i.test(destination.url.pathname) &&
+        !links.some((link) => link.url === destination.url.toString())) {
+        links.push({ url: destination.url.toString(), title: htmlToText(match[2]).slice(0, 240) });
+      }
+      if (links.length >= 80) break;
+    }
     for (const match of source.matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"']+)["']/gi)) {
       if (!/\.pdf(?:$|[?#])|\/CallForm\.html\b/i.test(match[1])) continue;
       try {
@@ -310,7 +322,7 @@ function extractPage(body: Uint8Array, contentType: string, url: URL): OfficialP
   const archived = isArchivedPage({ title, text: documentText });
   text = text.replace(/\s+/g, " ").trim().slice(0, MAX_TEXT_CHARS);
   if (text.length < 80) throw new OfficialFetchError("empty_content");
-  return { url: url.toString(), title: title || url.hostname, text, language, archived, hasBlockedDownloads };
+  return { url: url.toString(), title: title || url.hostname, text, language, archived, hasBlockedDownloads, links };
 }
 
 export async function fetchOfficialPage(

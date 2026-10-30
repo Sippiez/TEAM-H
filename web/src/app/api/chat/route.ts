@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { streamGeminiChat } from "@/lib/ai/gemini";
 import { abortable } from "@/lib/abortable";
-import { validateLookupChoice, validateLookupContext } from "@/lib/official/catalog";
+import { validateLookupChoice, validateLookupContext, validatePublicForm } from "@/lib/official/catalog";
 import { isFieldSummary } from "@/lib/field-context";
 import type {
   ChatStreamEvent,
@@ -35,6 +35,7 @@ function isFormContext(value: unknown): value is FormContext {
     ) &&
     (form.formNumber === undefined ||
       typeof form.formNumber === "string") &&
+    (form.formTitle === undefined || validatePublicForm({ title: form.formTitle }) !== null) &&
     (form.fileName === undefined ||
       typeof form.fileName === "string")
   );

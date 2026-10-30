@@ -80,6 +80,10 @@ test("malformed requests fail before contacting the provider", async (t) => {
     { ...message, lookupChoice: { serviceId: "passport", formId: "isp1000" } },
     { ...message, form: { ...form, fields: [{ ...field, context: { status: "resolved", source: "layout", instructions: [] } }] } },
     { ...message, form: { ...form, fields: [{ ...field, context: { status: "ambiguous", source: "layout", instructions: [42] } }] } },
+    { ...message, form: { ...form, formTitle: "https://evil.test/info" } },
+    { ...message, form: { ...form, formTitle: "x".repeat(201) } },
+    { ...message, lookupContext: { publicForm: { number: "ABC 123", query: "PRIVATE-QUERY" } } },
+    { ...message, lookupContext: { publicForm: { number: "ABC 123" }, serviceId: "passport" } },
   ];
   for (const body of invalid) {
     await t.test(JSON.stringify(body), async () => {
@@ -236,8 +240,12 @@ function setupGemini({
   finalChunks = [{ text: "verified [source:live-source-id]" }],
   groundedLookup = async () => assert.fail("Injected lookup must be used"),
   directPage,
+  generationError,
+  streamError,
+  discoveryUrls = [],
 } = {}) {
   const calls = [];
+  const logs = [];
   const directAttempts = [];
   const officialHosts = loadModule("../src/lib/official/hosts.ts", {});
   const officialCatalog = loadModule("../src/lib/official/catalog.ts", {
@@ -271,6 +279,10 @@ function setupGemini({
         models = {
           generateContent: async (input) => {
             calls.push({ kind: "planner", ...input });
+            if (generationError) throw generationError;
+            if (input.config.responseMimeType === "application/json") {
+              return { text: JSON.stringify({ urls: discoveryUrls }) };
+            }
             return functionCalls !== null
               ? { functionCalls }
               : functionArgs === null
@@ -281,6 +293,7 @@ function setupGemini({
             calls.push({ kind: "stream", ...input });
             return (async function* () {
               for (const chunk of finalChunks) yield chunk;
+              if (streamError) throw streamError;
             })();
           },
         };
@@ -290,8 +303,8 @@ function setupGemini({
     "@/lib/official/context": officialContext,
     "@/lib/official/lookup": officialLookup,
     "@/lib/official/grounding": { lookupGoogleGrounding: groundedLookup },
-  }, { process: { env } });
-  return { streamGeminiChat, calls, directAttempts };
+  }, { process: { env }, console: { info: (...args) => logs.push(args) } });
+  return { streamGeminiChat, calls, directAttempts, logs };
 }
 
 async function collect(stream) {
@@ -299,6 +312,209 @@ async function collect(stream) {
   for await (const event of stream) events.push(event);
   return events;
 }
+
+test("citizenship certificate download uses the open CIT 0001 form without asking which service", async () => {
+  const { streamGeminiChat, calls } = setupGemini({
+    functionArgs: { serviceId: "unknown", jurisdiction: "unknown", facetId: "documents", language: "en" },
+  });
+  let selection;
+  const events = await collect(await streamGeminiChat({
+    message: "where do I download this form from?",
+    form: { ...form, formNumber: "CIT 0001", fields: [{ ...field, label: "Certificate no.", section: "3 Reason for application" }] },
+    selectedFieldId: field.id,
+    language: "en",
+    lookup: async (args) => {
+      selection = args;
+      return {
+        outcome: { ...args, status: "unavailable", reason: "fetch_failed", partial: false },
+        sources: [],
+      };
+    },
+  }));
+  assert.ok(selection, "The open citizenship form must dispatch a lookup, not a missing-service selector");
+  assert.equal(selection.publicForm.number, "CIT 0001");
+  assert.equal(selection.serviceId, undefined);
+  assert.equal(calls.length, 0, "A recognized form must not need Gemini service planning");
+  assert.ok(events.every((event) => event.outcome?.reason !== "missing_service"));
+});
+
+test("uncatalogued forms discover from their public title without sending private context to search", async () => {
+  const { streamGeminiChat, calls } = setupGemini({
+    groundedLookup: async (selection, signal, dependencies) => {
+      assert.equal(selection.publicForm.title, "Application for accessibility assistance");
+      assert.equal(selection.jurisdiction, undefined);
+      await dependencies.generate("PUBLIC-DISCOVERY", signal);
+      return {
+        outcome: { ...selection, status: "unavailable", reason: "grounding_quota", partial: false },
+        sources: [],
+      };
+    },
+  });
+  const events = await collect(await streamGeminiChat({
+    message: "Where do I download this form? PRIVATE-QUESTION",
+    form: { ...form, formTitle: "Application for accessibility assistance", fileName: "PRIVATE-FILENAME" },
+    history: [{ role: "user", text: "PRIVATE-HISTORY" }],
+    language: "en",
+  }));
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].config.responseMimeType, "application/json");
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[1].config.tools)), [{ googleSearch: {} }]);
+  assert.doesNotMatch(JSON.stringify(calls), /PRIVATE-/);
+  assert.equal(events[0].outcome.reason, "grounding_quota");
+});
+
+test("automatic form discovery verifies suggested pages live before synthesizing an answer", async () => {
+  const url = "https://www.canada.ca/en/accessibility-application";
+  const { streamGeminiChat, calls, directAttempts, logs } = setupGemini({
+    env: { GEMINI_API_KEY: "test-only", NODE_ENV: "development" },
+    discoveryUrls: [url],
+    directPage: { title: "Accessibility assistance ABC 123", text: "Download ABC 123 from this official accessibility assistance application page." },
+  });
+  const events = await collect(await streamGeminiChat({
+    message: "Where do I download this form? PRIVATE-QUESTION",
+    form: {
+      ...form, formNumber: "ABC 123",
+      formTitle: "Application for accessibility assistance",
+      fileName: "PRIVATE-FILENAME",
+    },
+    history: [{ role: "user", text: "PRIVATE-HISTORY" }], language: "en",
+  }));
+  assert.deepEqual(directAttempts, [url]);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].config.responseMimeType, "application/json");
+  assert.doesNotMatch(calls[0].contents, /PRIVATE-/);
+  assert.match(calls[1].contents, /Download ABC 123 from this official/);
+  assert.equal(events[0].outcome.status, "verified");
+  assert.equal(events[0].outcome.jurisdiction, "federal");
+  assert.equal(events[0].sources[0].provenance.kind, "live_official");
+  assert.ok(logs.some(([, event]) => event.operation === "form-discovery"));
+  assert.doesNotMatch(JSON.stringify(logs), /Application for accessibility|PRIVATE-/);
+});
+
+test("untrusted page suggestions cannot bypass the government URL policy", async () => {
+  const { streamGeminiChat, directAttempts } = setupGemini({
+    discoveryUrls: ["https://evil.test/info", "https://www.canada.ca/en/sign-in"],
+    groundedLookup: async () => ({
+      outcome: { status: "unavailable", reason: "grounding_quota", partial: false }, sources: [],
+    }),
+  });
+  const events = await collect(await streamGeminiChat({
+    message: "Where do I download this form?", form: { ...form, formNumber: "ABC 123" }, language: "en",
+  }));
+  assert.equal(directAttempts.length, 0);
+  assert.equal(events[0].outcome.fallbackReason, "no_allowed_candidates");
+});
+
+test("IRCC form numbers use the official form directory without a catalog entry or model URL guess", async () => {
+  const { streamGeminiChat, calls, directAttempts } = setupGemini({
+    directPage: { title: "Citizenship certificate CIT 0001", text: "Download the CIT 0001 application here." },
+  });
+  const events = await collect(await streamGeminiChat({
+    message: "Where do I download this form?", form: { ...form, formNumber: "CIT 0001" }, language: "en",
+  }));
+  assert.deepEqual(directAttempts, [
+    "https://www.canada.ca/en/immigration-refugees-citizenship/services/application/application-forms-guides/cit0001.html",
+  ]);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].kind, "stream");
+  assert.equal(events[0].outcome.status, "verified");
+});
+
+test("development logs Gemini calls and tool execution without private payloads", async () => {
+  const selection = { serviceId: "passport", jurisdiction: "federal", facetId: "fees", language: "en" };
+  const { streamGeminiChat, logs } = setupGemini({
+    env: { GEMINI_API_KEY: "PRIVATE-KEY", NODE_ENV: "development" },
+    functionArgs: selection,
+  });
+  await collect(await streamGeminiChat({
+    message: "PRIVATE-QUESTION", language: "en",
+    lookupContext: { jurisdiction: "federal", facetId: "fees" },
+    lookup: async () => ({
+      outcome: { ...selection, status: "unavailable", reason: "fetch_failed", partial: false },
+      sources: [],
+    }),
+  }));
+  const events = logs.map(([prefix, event]) => {
+    assert.equal(prefix, "[gemini]");
+    assert.ok(event.elapsedMs >= 0);
+    return event;
+  });
+  const planning = events.find((event) => event.operation === "lookup-planning" && event.event === "start");
+  assert.deepEqual(Array.from(planning.tools), ["lookup_official_information"]);
+  const response = events.find((event) => event.id === planning.id && event.event === "complete");
+  assert.equal(response.functionCalls[0].selection.serviceId, "passport");
+  const tool = events.find((event) => event.operation === "lookup_official_information" && event.event === "complete");
+  assert.equal(tool.status, "unavailable");
+  assert.equal(tool.reason, "fetch_failed");
+  assert.doesNotMatch(JSON.stringify(logs), /PRIVATE-/);
+});
+
+test("invalid planner arguments are diagnosable without logging arbitrary values", async () => {
+  const { streamGeminiChat, logs } = setupGemini({
+    env: { GEMINI_API_KEY: "test-only", NODE_ENV: "development" },
+    functionArgs: { serviceId: "unknown", jurisdiction: "PRIVATE-LOCATION", facetId: "documents", language: "en", query: "PRIVATE-QUERY" },
+  });
+  await collect(await streamGeminiChat({ message: "PRIVATE-QUESTION", language: "en" }));
+  const call = logs.find(([, event]) => event.event === "complete")[1].functionCalls[0];
+  assert.equal(call.selection, null);
+  assert.equal(call.argumentStatus, "unknown_or_invalid_selection");
+  assert.equal(call.arguments.serviceId, "unknown");
+  assert.equal(call.arguments.jurisdiction, "invalid_or_missing");
+  assert.doesNotMatch(JSON.stringify(logs), /PRIVATE-/);
+});
+test("development stream logs track completion, errors and cancellation without answer text", async () => {
+  for (const mode of ["complete", "error", "cancelled"]) {
+    const failure = new Error("PRIVATE-ERROR");
+    const { streamGeminiChat, logs } = setupGemini({
+      env: { GEMINI_API_KEY: "PRIVATE-KEY", NODE_ENV: "development" },
+      finalChunks: [{
+        text: "PRIVATE-ANSWER",
+        usageMetadata: { totalTokenCount: 12 },
+        candidates: [{ finishReason: "STOP" }],
+      }],
+      streamError: mode === "error" ? failure : undefined,
+    });
+    const stream = await streamGeminiChat({
+      intent: "overview", form: { ...form, fileName: "PRIVATE-FILENAME" }, language: "en",
+    });
+    if (mode === "cancelled") {
+      await stream.next();
+      await stream.return();
+    } else if (mode === "error") {
+      await assert.rejects(collect(stream), (error) => error === failure);
+    } else {
+      await collect(stream);
+    }
+    const events = logs.map(([, event]) => event);
+    assert.equal(events.at(-1).event, mode);
+    assert.equal(events.find((event) => event.event === "response").usage.totalTokenCount, 12);
+    assert.doesNotMatch(JSON.stringify(logs), /PRIVATE-/);
+  }
+});
+
+test("development generation failures are logged and rethrown without raw errors", async () => {
+  const failure = new Error("PRIVATE-PROVIDER-ERROR");
+  const { streamGeminiChat, logs } = setupGemini({
+    env: { GEMINI_API_KEY: "PRIVATE-KEY", NODE_ENV: "development" },
+    generationError: failure,
+  });
+  await assert.rejects(collect(await streamGeminiChat({
+    message: "PRIVATE-QUESTION", language: "en",
+  })), (error) => error === failure);
+  assert.equal(logs.at(-1)[1].event, "error");
+  assert.doesNotMatch(JSON.stringify(logs), /PRIVATE-/);
+});
+
+test("Gemini request and tool logging is disabled outside development", async () => {
+  for (const NODE_ENV of ["production", "test", undefined]) {
+    const { streamGeminiChat, logs } = setupGemini({
+      env: { GEMINI_API_KEY: "test-only", NODE_ENV },
+    });
+    await collect(await streamGeminiChat({ intent: "overview", form, language: "en" }));
+    await collect(await streamGeminiChat({ message: "Unrecognized request", language: "en" }));
+    assert.equal(logs.length, 0);
+  }
+});
 
 test("the default lookup falls back to Google Search after a failed direct fetch without a second synthesis", async () => {
   const { streamGeminiChat, calls, directAttempts } = setupGemini({

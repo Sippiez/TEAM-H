@@ -65,6 +65,74 @@ const lookupImports = {
 };
 const lookup = loadModule("../src/lib/official/lookup.ts", lookupImports);
 
+test("uncatalogued forms directly verify matching pages without assuming a jurisdiction", async () => {
+  const selection = {
+    publicForm: { number: "CIT 0001", title: "Application for citizenship certificate for adults and minors" },
+    facetId: "documents", language: "en",
+  };
+  const url = "https://www.canada.ca/en/citizenship-application";
+  const dependencies = {
+    search: async () => ({ candidates: [{ url, sponsored: false }], rejectedSponsored: 0 }),
+    fetchPage: async () => ({
+      url, title: "Citizenship certificate application", text: "Download the application for a citizenship certificate CIT 0001.",
+      language: "en-CA",
+    }),
+  };
+  const result = await lookup.lookupOfficialInformation(selection, undefined, dependencies);
+  assert.equal(result.outcome.status, "verified");
+  assert.equal(result.outcome.jurisdiction, "federal");
+  assert.equal(result.sources[0].jurisdiction, "federal");
+  const wrongForm = await lookup.lookupOfficialInformation(selection, undefined, {
+    ...dependencies,
+    fetchPage: async () => ({ url, title: "Citizenship certificate", text: "Download CIT 0002.", language: "en-CA" }),
+  });
+  assert.equal(wrongForm.outcome.reason, "no_relevant_pages");
+});
+
+test("discovery follows a matching public-form link within the existing page budget", async () => {
+  const selection = {
+    publicForm: { number: "CIT 0001", title: "Application for citizenship certificate for adults and minors" },
+    facetId: "documents", language: "en",
+  };
+  const start = "https://www.canada.ca/en/citizenship/apply";
+  const formUrl = "https://www.canada.ca/en/application-citizenship-certificate-adults-minors.html";
+  const fetched = [];
+  const result = await lookup.lookupOfficialInformation(selection, undefined, {
+    search: async () => ({ candidates: [{ url: start, sponsored: false }], rejectedSponsored: 0 }),
+    fetchPage: async (url) => {
+      fetched.push(url);
+      return url === start ? {
+        url, title: "Apply for a citizenship certificate", language: "en-CA",
+        text: "Apply on paper by getting the official application package.",
+        links: [
+          { url: "https://evil.test/cit0001", title: "CIT 0001" },
+          { url: "https://www.canada.ca/en/sign-in", title: "CIT 0001" },
+          { url: formUrl, title: "Get the application package" },
+        ],
+      } : {
+        url, title: "Citizenship certificate application", text: "Download the CIT 0001 application form here.", language: "en-CA",
+      };
+    },
+  });
+  assert.deepEqual(fetched, [start, formUrl]);
+  assert.equal(result.outcome.status, "verified");
+  assert.equal(result.sources[0].url, formUrl);
+});
+
+test("automatic form discovery asks for jurisdiction only when matching pages actually conflict", async () => {
+  const selection = { publicForm: { number: "ABC 123" }, facetId: "documents", language: "en" };
+  const result = await lookup.lookupOfficialInformation(selection, undefined, {
+    search: async () => ({
+      candidates: ["https://ontario.ca/abc123", "https://alberta.ca/abc123"].map((url) => ({ url, sponsored: false })),
+      rejectedSponsored: 0,
+    }),
+    fetchPage: async (url) => ({ url, title: "ABC 123 application", text: "Get the ABC 123 form.", language: "en-CA" }),
+  });
+  assert.equal(result.outcome.status, "clarification_required");
+  assert.equal(result.outcome.reason, "missing_jurisdiction");
+  assert.equal(result.sources.length, 0);
+});
+
 test("the approved registry contains exactly the fourteen jurisdiction roots", () => {
   assert.deepEqual(Array.from(hosts.ALLOWED_ROOTS), [
     "gov.bc.ca", "alberta.ca", "saskatchewan.ca", "gov.mb.ca", "ontario.ca",

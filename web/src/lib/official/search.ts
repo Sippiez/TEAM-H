@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { LookupSelection } from "./catalog";
-import { allowedRootForSelection, buildCanonicalQuery } from "./catalog";
+import { allowedRootsForSelection, buildCanonicalQuery } from "./catalog";
 import { getServiceResources } from "../catalog/resources";
 
 export interface SearchCandidate {
@@ -49,7 +49,9 @@ export async function searchOfficialCandidates(
 ): Promise<SearchResult> {
   const apiKey = process.env.BRAVE_SEARCH_API_KEY;
   if (!apiKey) {
-    const pages = getServiceResources(selection.serviceId, selection.facetId, selection.jurisdiction);
+    const pages = selection.serviceId
+      ? getServiceResources(selection.serviceId, selection.facetId, selection.jurisdiction)
+      : [];
     if (pages.length === 0) throw new Error("provider_not_configured");
     return {
       candidates: pages.map(({ url }) => ({ url, sponsored: false })),
@@ -59,9 +61,9 @@ export async function searchOfficialCandidates(
   }
 
   const query = buildCanonicalQuery(selection);
-  const site = allowedRootForSelection(selection);
+  const sites = allowedRootsForSelection(selection).map((root) => `site:${root}`).join(" OR ");
   const endpoint = new URL("https://api.search.brave.com/res/v1/web/search");
-  endpoint.searchParams.set("q", `site:${site} ${query}`);
+  endpoint.searchParams.set("q", `${allowedRootsForSelection(selection).length === 1 ? sites : `(${sites})`} ${query}`);
   endpoint.searchParams.set("count", "5");
   endpoint.searchParams.set("safesearch", "strict");
 

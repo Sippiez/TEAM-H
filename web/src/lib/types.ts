@@ -53,6 +53,7 @@ export type FieldSummary = Pick<
 /** What the client sends to the server about the open form. Never includes field values. */
 export interface FormContext {
   formNumber?: string;
+  formTitle?: string;
   fileName?: string;
   pageCount: number;
   fields: FieldSummary[];

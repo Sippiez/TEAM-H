@@ -54,6 +54,31 @@ function groundedResponse({
 }
 const generate = async () => groundedResponse();
 
+test("automatic form discovery searches all approved roots and derives jurisdiction from citations", async () => {
+  const number = "CIT 0001";
+  const title = "Application for citizenship certificate for adults and minors";
+  const url = "https://www.canada.ca/en/immigration-refugees-citizenship/services/application/application-forms-guides/cit0001.html";
+  const result = await lookupGoogleGrounding({
+    publicForm: { number, title }, facetId: "documents", language: "en",
+  }, undefined, {
+    generate: async (prompt) => {
+      assert.match(prompt, /CIT 0001/);
+      assert.match(prompt, /Application for citizenship certificate/);
+      for (const root of hosts.ALLOWED_ROOTS) assert.ok(prompt.includes(`site:${root}`));
+      return groundedResponse({ answer: `Get ${number} from its official application page.`, urls: [url] });
+    },
+  });
+  assert.equal(result.outcome.status, "verified");
+  assert.equal(result.outcome.jurisdiction, "federal");
+  assert.equal(result.sources[0].jurisdiction, "federal");
+  const blocked = await lookupGoogleGrounding({
+    publicForm: { number, title }, facetId: "documents", language: "en",
+  }, undefined, {
+    generate: async () => groundedResponse({ answer: number, urls: [url, "https://evil.test/cit0001"] }),
+  });
+  assert.equal(blocked.outcome.reason, "blocked_grounding_sources");
+});
+
 test("Google grounding provides dated provider provenance without fetching government pages", async () => {
   const result = await lookupGoogleGrounding(selection, undefined, {
     generate: async (prompt, signal) => {

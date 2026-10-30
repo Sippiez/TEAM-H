@@ -55,6 +55,16 @@ export NODE_EXTRA_CA_CERTS=/path/to/your-root-ca.pem
 ```
 
 Chat uses server-side Gemini streaming and needs `GEMINI_API_KEY` (see below).
+During `npm run dev`, the server terminal prints `[gemini]` events for API
+requests, streaming responses, completion/errors, and official-information tool
+execution. Logs include the model, enabled tools, validated public lookup
+selections, source counts, token usage when provided, and elapsed time. They
+exclude prompts, answer text, PDF context, API keys, and raw error messages.
+`form-discovery` identifies an ordinary Gemini request for unverified candidate
+page URLs, not a Google Search call. Invalid planner calls now show allowlisted
+argument values (including `unknown`) and an argument-validation status rather
+than only `selection: null`. Unregistered form labels are redacted from logs.
+These logs are disabled outside development.
 The default is the stable `gemini-3.1-flash-lite`, with low reasoning effort
 to limit cost and latency. It is the cheapest stable thinking model verified
 accessible with the configured account; older 2.5 models returned 404.
@@ -73,13 +83,27 @@ candidate discovery, followed by the same direct verification. Successful
 direct lookups use freshly retrieved excerpts and normal Gemini synthesis;
 they never consume Google Search grounding quota.
 
+Forms no longer have to belong to the service catalog. The browser also extracts
+a bounded public title from prominent printed heading text, excluding widget
+text; the server can discover official pages from this title and/or a public
+form number. Without Brave, `CIT` and `IMM` numbers first try IRCC's standard
+form-information directory. Other forms use ordinary Gemini to suggest up to
+two unverified official-page candidates. No claim or URL suggestion becomes
+evidence until its page is fetched and checked. Matching information-page links
+can be followed within the existing five-candidate, three-fetch budget.
+Download pages must identify the exact supplied form number, or match the
+distinctive title terms when no number is available.
+
 If direct lookup fails or finds no usable evidence, it tries Google Search
 grounding through the existing `@google/genai` SDK and `GEMINI_API_KEY`.
 Clarification and user cancellation do not start a fallback. No Vercel AI SDK
-migration is needed. Search requests contain only fixed catalog service/facet
-keywords, the chosen jurisdiction, interface language and recognized public form
-references, not chat history, filenames, PDF fields, entered values or arbitrary
-user wording. Google generates its grounding queries from that public context.
+migration is needed. Discovery and search requests contain catalog keywords or
+the public title (up to 200 characters) and number (up to 32 characters) from a
+blank form, plus the information facet, interface language and jurisdiction when
+known, not chat history, filenames, PDF fields, entered values or arbitrary
+question text. Use blank forms only: printed text in a personalized or flattened
+document may itself contain personal information.
+Google generates its grounding queries from that public context.
 Service selection and ordinary chat still receive the bounded context described
 in the privacy notice.
 
@@ -97,10 +121,16 @@ current Google pricing, data handling and service terms before deployment; see
 
 Recognized form IDs and conversation-scoped service selections resolve questions
 such as "Where do I download this form?" and "What about the fees?". Federal
-programs do not require users to repeat "federal". When a service or region is
-missing, an inline selector asks only for the missing detail and resumes the
-original question. A typed, recognized form number also resumes the previous
-question, rather than restarting service selection. OAS/GIS and CPP have distinct
+programs do not require users to repeat "federal". The service dropdown has been
+removed. An identifiable unregistered form starts discovery automatically,
+searching only the fourteen approved roots when its jurisdiction is unknown.
+Jurisdiction is established from admitted source URLs, not guessed from a
+filename. Matching results from multiple jurisdictions still ask which government
+issued the form; known provincial services retain their region selector. If no
+public form can be identified, the assistant explicitly asks for a blank
+text-based PDF or its public title/number, rather than presenting a catalog menu.
+A typed public form number or application title can resume the previous question.
+OAS/GIS and CPP have distinct
 service routing and saved links. Saskatchewan's 2026-27 full-time Student Aid
 application (public product `154091`) is recognized locally from its public
 first-page title, not its filename, and routes to Saskatchewan. Reopen an already

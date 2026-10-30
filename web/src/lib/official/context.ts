@@ -11,6 +11,7 @@ import {
   validateLookupContext,
   validateLookupChoice,
   validateLookupSelection,
+  validatePublicForm,
   type LookupContext,
   type LookupChoice,
   type LookupSelection,
@@ -44,15 +45,22 @@ function servicesIn(message: string): ServiceId[] {
   return [...new Set(matches)];
 }
 
+function typedPublicForm(message: string) {
+  return validatePublicForm({ number: message.trim() }) ??
+    (/^(?:application (?:for|to)|request for|demande (?:de|d')|formulaire|statement of|declaration of|déclaration de)\b/i.test(message.trim())
+      ? validatePublicForm({ title: message.trim() }) : null);
+}
+
 export function resolveLookupQuestion(message: string, history?: ChatHistoryMessage[]): string {
-  if (!publicFormForNumber(message)) return message;
-  return history?.filter((turn) => turn.role === "user" && !publicFormForNumber(turn.text))
+  if (!publicFormForNumber(message) && !typedPublicForm(message)) return message;
+  return history?.filter((turn) => turn.role === "user" && !publicFormForNumber(turn.text) && !typedPublicForm(turn.text))
     .at(-1)?.text ?? message;
 }
 
 export function resolveLookupContext(input: {
   message: string;
   formNumber?: string;
+  formTitle?: string;
   history?: ChatHistoryMessage[];
   lookupContext?: LookupContext;
   lookupChoice?: LookupChoice;
@@ -76,26 +84,48 @@ export function resolveLookupContext(input: {
     ...(previous ? { facetId: requestedFacet(previous) } : {}),
     ...supplied,
   };
+  if (supplied.publicForm) {
+    delete prior.serviceId;
+    delete prior.formId;
+  }
   const services = servicesIn(input.message);
   const jurisdictions = jurisdictionsIn(input.message);
   const choice = validateLookupChoice(input.lookupChoice);
   const mentionedForms = publicFormsInText(input.message);
   const question = resolveLookupQuestion(input.message, input.history);
-  const formReply = publicFormForNumber(input.message) !== undefined;
+  const typedForm = typedPublicForm(input.message);
+  const formReply = publicFormForNumber(input.message) !== undefined || typedForm !== null;
   const refersBack = /\b(this|that|same) (form|application|service|program)\b|\b(it|its)\b|^(and\b|what about\b|what documents\b|what forms\b|what fees\b|where (?:do|can) i (?:download|get|find)\b)|^how much(?: does (?:it|this|that) cost)?\s*[?.!]*$|^what are the (?:fees|costs|documents|requirements)\s*[?.!]*$|\b(ce|cet|cette|le meme|la meme) (formulaire|service|programme)\b|^(et\b|combien\b|quels documents\b|quelles pieces\b|quels sont les frais\b|ou (?:puis-je|telecharger)\b)/.test(text);
   const jurisdictionReply = jurisdictions.length === 1 &&
     [JURISDICTIONS[jurisdictions[0]].label, JURISDICTIONS[jurisdictions[0]].labelFr, "federal", "fédéral"]
       .some((label) => normalizedText(label) === text.replace(/[.!?]+$/, "").trim());
   const refersToOpenForm = /\bthis (form|application)\b|\bce formulaire\b|\bcette demande\b/.test(text);
-  const followupService = (refersBack || jurisdictionReply) && !refersToOpenForm ? prior.serviceId : undefined;
+  const usePriorScope = (refersBack || jurisdictionReply) && !refersToOpenForm;
+  const followupService = usePriorScope ? prior.serviceId : undefined;
+  const documentFormId = typedForm || (usePriorScope && prior.publicForm)
+    ? undefined : publicFormForNumber(input.formNumber);
   const formId = mentionedForms.length === 1
     ? mentionedForms[0]
-    : mentionedForms.length === 0
-      ? ((refersBack && !refersToOpenForm) ? prior.formId : undefined) ??
-        publicFormForNumber(input.formNumber) ??
-        (refersBack ? prior.formId : undefined)
+    : mentionedForms.length === 0 && !typedForm
+      ? (usePriorScope ? prior.formId : undefined) ?? documentFormId
       : undefined;
   const form = formId ? PUBLIC_FORMS[formId] : undefined;
+  const publicForm = typedForm ??
+    (usePriorScope ? prior.publicForm : undefined) ??
+    (!form ? validatePublicForm({ number: input.formNumber, title: input.formTitle }) : undefined);
+  if (publicForm && services.length === 0 && !choice?.serviceId && !form &&
+    (!followupService || refersToOpenForm)) {
+    const jurisdiction = choice?.jurisdiction ?? (jurisdictions.length === 1
+      ? jurisdictions[0] : publicForm === prior.publicForm ? prior.jurisdiction : undefined);
+    const facetId = jurisdictionReply || (formReply && question === input.message)
+      ? prior.facetId ?? "overview" : requestedFacet(question);
+    const context: LookupContext = { publicForm, facetId, ...(jurisdiction ? { jurisdiction } : {}) };
+    return {
+      context,
+      selection: jurisdictions.length > 1 ? null : { publicForm, facetId, language: input.language, ...(jurisdiction ? { jurisdiction } : {}) },
+      reason: jurisdictions.length > 1 ? "missing_jurisdiction" : "none",
+    };
+  }
   const serviceId = choice?.serviceId ?? (services.length === 1
     ? services[0]
     : services.length === 0
