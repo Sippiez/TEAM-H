@@ -142,6 +142,8 @@ const en = {
   // Route
   fieldsTitle: "Fields on this form",
   resizeFieldsPanel: "Resize fields panel",
+  collapseFieldsPanel: "Collapse fields sidebar",
+  expandFieldsPanel: "Expand fields sidebar",
   resizeDetailsPanel: "Resize field details and questions panel",
   viewed: (v: number, n: number) => `${v} of ${n} viewed`,
   findField: "Find a field",
@@ -249,7 +251,7 @@ const en = {
         if (outcome.method === "google_grounding") return `${outcome.fallbackReason ? "The direct lookup could not verify a usable page, so Google Search was used as a fallback. " : ""}This answer cites Google-grounded official-domain sources; the app has not independently fetched those pages.`;
         return outcome.partial
           ? "Some official pages could not be verified; this answer uses only the verified pages."
-          : "Current information was checked against the official source shown below.";
+          : "";
       case "clarification_required":
         if (outcome.publicForm) return "Matching pages cover more than one jurisdiction. Choose the government that issued this form so I can check the right version.";
         return outcome.serviceId
@@ -416,6 +418,8 @@ const fr: Dict = {
 
   fieldsTitle: "Champs de ce formulaire",
   resizeFieldsPanel: "Redimensionner le panneau des champs",
+  collapseFieldsPanel: "Réduire le panneau des champs",
+  expandFieldsPanel: "Déployer le panneau des champs",
   resizeDetailsPanel: "Redimensionner le panneau des détails et des questions",
   viewed: (v, n) => `${v} sur ${n} consultés`,
   findField: "Trouver un champ",
@@ -521,7 +525,7 @@ const fr: Dict = {
         if (outcome.method === "google_grounding") return `${outcome.fallbackReason ? "La vérification directe n'a pas fourni de page exploitable ; Google Search a servi de solution de repli. " : ""}Cette réponse cite des sources officielles appuyées par Google. L'application n'a pas consulté ces pages directement.`;
         return outcome.partial
           ? "Certaines pages officielles n’ont pas pu être vérifiées ; cette réponse utilise uniquement les pages vérifiées."
-          : "Les renseignements actuels ont été vérifiés auprès de la source officielle ci-dessous.";
+          : "";
       case "clarification_required":
         if (outcome.publicForm) return "Les pages trouvées concernent plusieurs territoires. Choisissez le gouvernement qui a publié ce formulaire pour vérifier la bonne version.";
         return outcome.serviceId

@@ -99,8 +99,9 @@ export function ChatPanel({
         {messages.length === 0 && !pending && (
           <p className="text-ink-2">{t.chatEmpty}</p>
         )}
-        {messages.map((m) =>
-          m.role === "user" ? (
+        {messages.map((m) => {
+          const lookupStatus = m.lookup ? t.lookupStatus(m.lookup) : "";
+          return m.role === "user" ? (
             <div
               key={m.id}
               className="max-w-[85%] self-end rounded-[10px_10px_2px_10px] bg-hover-wash px-3.5 py-2.5 whitespace-pre-wrap"
@@ -123,9 +124,9 @@ export function ChatPanel({
                   <RichText text={m.text} />
                 </div>
               )}
-              {m.lookup && (
+              {lookupStatus && (
                 <p role="status" className="text-[15px] text-ink-2">
-                  {t.lookupStatus(m.lookup)}
+                  {lookupStatus}
                 </p>
               )}
               {m.lookup?.restrictedDownload && (
@@ -199,8 +200,8 @@ export function ChatPanel({
                   </button>
                 )}
             </article>
-          ),
-        )}
+          );
+        })}
         {pending && <p role="status" className="py-1 text-ink-2 italic">{messages.at(-1)?.lookup?.status === "verified" ? t.preparingAnswer : t.thinking}</p>}
       </div>
 

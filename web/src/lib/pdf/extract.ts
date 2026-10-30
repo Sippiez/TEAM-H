@@ -146,7 +146,11 @@ async function firstPageIdentity(doc: PDFDocumentProxy, fieldNames: string[]) {
 
 export async function loadForm(data: ArrayBuffer, fileName: string): Promise<LoadedForm> {
   const pdfjs = await getPdfjs();
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(data) }).promise;
+  const doc = await pdfjs.getDocument({
+    data: new Uint8Array(data),
+    standardFontDataUrl: "/pdf-standard-fonts/",
+    useSystemFonts: false,
+  }).promise;
   const raw = await readFields(doc);
   const { formNumber, formTitle } = await firstPageIdentity(doc, raw.map((field) => field.rawName));
   return {

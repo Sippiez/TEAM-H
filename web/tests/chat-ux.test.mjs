@@ -59,6 +59,36 @@ function render(message, language = "en", props = {}) {
   }));
 }
 
+test("complete direct lookups keep source provenance without a redundant success sentence", () => {
+  for (const language of ["en", "fr"]) {
+    const html = render({
+      text: "Download the form from the linked official page. [1]",
+      lookup: { status: "verified", reason: "none", partial: false, method: "official_page" },
+      resources: [{
+        id: "official-form", title: "Official form", url: "https://www.canada.ca/en/form",
+        department: "Canada", description: "", tags: [],
+        provenance: { kind: "live_official", retrievedAt: "2026-10-30T01:00:00Z" },
+      }],
+    }, language);
+    assert.doesNotMatch(html, /Current information was checked|Les renseignements actuels ont été vérifiés/);
+    assert.doesNotMatch(html, /role="status"[^>]*><\/p>/);
+    assert.match(html, language === "en" ? /Live official source/ : /Source officielle en direct/);
+  }
+});
+
+test("partial direct lookups retain their verification warning in both languages", () => {
+  for (const language of ["en", "fr"]) {
+    const html = render({
+      text: "An answer using the pages that could be verified.",
+      lookup: { status: "verified", reason: "none", partial: true, method: "official_page" },
+    }, language);
+    assert.match(html, /role="status"/);
+    assert.match(html, language === "en"
+      ? /Some official pages could not be verified/
+      : /Certaines pages officielles n’ont pas pu être vérifiées/);
+  }
+});
+
 test("clarification renders one labeled missing-detail selector in both languages", () => {
   const message = {
     lookup: { status: "clarification_required", reason: "missing_jurisdiction", partial: false, serviceId: "health_card" },

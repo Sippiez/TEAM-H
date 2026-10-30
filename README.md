@@ -39,8 +39,13 @@ shadcn/ui). See [docs/mvp-design.md](docs/mvp-design.md) and
 - **Checks:** `npm test`, `npm run typecheck`, `npm run lint` and `npm run build`.
 - **Deployment:** TODO.
 
-`predev` and `prebuild` copy the pdf.js worker into `web/public/` (it's
-gitignored). `npm test` uses Node's built-in runner and the existing TypeScript
+`predev` and `prebuild` copy the matching pdf.js worker and standard fonts
+(including their licenses) into `web/public/`; these generated assets are
+gitignored. PDF rendering uses the bundled fonts rather than relying on system
+fonts such as ZapfDingbats. The interface keeps Atkinson Hyperlegible Next with
+an explicit Arial/sans-serif fallback; automatic fallback-metric adjustment is
+disabled because Next.js has no override metrics for this font.
+`npm test` uses Node's built-in runner and the existing TypeScript
 compiler to exercise chat validation, prompts, typed streaming, errors, timeouts,
 cancellation, URL policy, Google grounding metadata, query privacy, and provenance using
 isolated fakes, plus message/document identity across Fast Refresh; it needs no
@@ -211,8 +216,10 @@ preferences show the final composition immediately and remove these transitions.
 On desktop, drag either divider beside the document to resize the fields and
 details panels. You can also focus a divider and use the arrow keys, or
 double-click it to restore its adjacent panel's default width. On smaller
-screens the workspace stays stacked. Selecting a field sweeps its heading's
-highlight from left to right (unless reduced motion is enabled); long Next
+screens the workspace stays stacked. The button at the top-right of the fields
+sidebar collapses it to a narrow rail; the same button expands it back to its
+previous width, keeping its search and filters. Selecting a field sweeps its
+heading's highlight from left to right (unless reduced motion is enabled); long Next
 labels truncate instead of wrapping.
 
 ### Environment configuration

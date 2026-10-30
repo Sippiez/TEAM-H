@@ -11,6 +11,7 @@ const modules = new Map();
 const tasks = [];
 let fixture;
 let chatCall;
+let documentOptions;
 function loadModule(path) {
   if (modules.has(path)) return modules.get(path);
   const source = readFileSync(new URL(`../src/${path}.ts`, import.meta.url), "utf8");
@@ -45,6 +46,7 @@ function loadModule(path) {
       if (name === "@/lib/pdf/pdfjs") return {
         getPdfjs: async () => ({
           getDocument(options) {
+            documentOptions = options;
             if (fixture) return { promise: Promise.resolve(fixture) };
             const task = pdfjs.getDocument({
               ...options,
@@ -156,6 +158,12 @@ async function loadFixture(annotations, items) {
     fixture = undefined;
   }
 }
+
+test("browser PDF loading uses bundled standard fonts instead of host system fonts", async () => {
+  await loadFixture([], []);
+  assert.equal(documentOptions.useSystemFonts, false);
+  assert.equal(documentOptions.standardFontDataUrl, "/pdf-standard-fonts/");
+});
 
 test("public-form heading extraction excludes text inside widgets", async () => {
   const form = await loadFixture([{
