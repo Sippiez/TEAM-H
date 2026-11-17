@@ -599,10 +599,8 @@ const fr: Dict = {
 const DICTS: Record<Lang, Dict> = { en, fr };
 const KEY = "form-helper-lang";
 const listeners = new Set<() => void>();
-let memory: Lang | null = null;
 
 function read(): Lang {
-  if (memory) return memory;
   try {
     return window.localStorage.getItem(KEY) === "fr" ? "fr" : "en";
   } catch {
@@ -620,7 +618,6 @@ function subscribe(cb: () => void) {
 }
 
 export function setLang(lang: Lang) {
-  memory = lang;
   try {
     window.localStorage.setItem(KEY, lang);
   } catch {

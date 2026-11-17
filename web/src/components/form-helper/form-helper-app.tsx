@@ -83,6 +83,7 @@ export function FormHelperApp() {
   const chatRequests = useRef(new Map<string, AbortController>());
   const lookupScopes = useRef(new Map<string, LookupContext>());
   const contextRequests = useRef(new Map<string, AbortController>());
+  const previousLang = useRef(lang);
 
   useEffect(() => {
     const requests = chatRequests.current;
@@ -156,6 +157,20 @@ export function FormHelperApp() {
     },
     [updateDoc, lang],
   );
+
+  useEffect(() => {
+    if (previousLang.current === lang) return;
+    previousLang.current = lang;
+    requested.current = new Set();
+    setDocs((current) => current.map((doc) => ({
+      ...doc,
+      explanations: {},
+    })));
+
+    const doc = docsRef.current.find((item) => item.key === activeRef.current);
+    const field = doc?.form.fields.find((item) => item.id === doc.selectedId);
+    if (doc && field) void loadExplanation(doc.key, field, doc.form.formNumber);
+  }, [lang, loadExplanation]);
 
   const identifyContext = useCallback(async (key: string, fieldId: string) => {
     const doc = docsRef.current.find((doc) => doc.key === key);
