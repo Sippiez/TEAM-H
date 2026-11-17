@@ -6,7 +6,7 @@ import vm from "node:vm";
 import ts from "typescript";
 
 function setup({
-  env = { OPENAI_API_KEY: "test-key" }, fetch: fetchImpl,
+  env = { AI_PROVIDER: "openai", OPENAI_API_KEY: "test-key" }, fetch: fetchImpl,
   routing = "official_lookup", gemini, now,
 } = {}) {
   const calls = [];
@@ -104,7 +104,7 @@ const field = {
 };
 
 const fallbackEnv = {
-  OPENAI_API_KEY: "test-key", AI_FALLBACK_PROVIDER: "gemini", GEMINI_API_KEY: "google-key",
+  AI_PROVIDER: "openai", OPENAI_API_KEY: "test-key", AI_FALLBACK_PROVIDER: "gemini", GEMINI_API_KEY: "google-key",
 };
 const explanation = {
   meaning: "Your full name.", whatToEnter: "Enter your legal name.",
@@ -254,7 +254,7 @@ test("lookup-planner HTTP 429 retains the forced allowlisted tool on Gemini", as
 
 test("fallback requires explicit valid configuration, not merely a Gemini key", async () => {
   const disabled = setup({
-    env: { OPENAI_API_KEY: "test-key", GEMINI_API_KEY: "google-key" },
+    env: { AI_PROVIDER: "openai", OPENAI_API_KEY: "test-key", GEMINI_API_KEY: "google-key" },
     fetch: async () => new Response(null, { status: 429 }),
     gemini: async () => ({ text: JSON.stringify(explanation) }),
   });
@@ -452,26 +452,38 @@ test("a deferred stream uses its captured primary credentials and cannot cool do
   assert.equal(calls[1].headers.Authorization, "Bearer changed-key");
 });
 
-test("provider selection defaults to OpenAI Luna, supports overrides, and never falls back to another vendor's key", () => {
-  const defaults = setup().load("lib/ai/config");
+test("provider selection defaults to Gemini, supports explicit OpenAI, and never borrows another vendor's key", () => {
+  const defaults = setup({ env: { GEMINI_API_KEY: "google", OPENAI_API_KEY: "openai" } }).load("lib/ai/config");
   assert.deepEqual(JSON.parse(JSON.stringify(defaults.getAIConfig())), {
-    provider: "openai", model: "gpt-6-luna", apiKey: "test-key",
+    provider: "gemini", model: "gemini-3.1-flash-lite", apiKey: "google",
   });
   assert.equal(defaults.isAIConfigured(), true);
-  assert.equal(setup({ env: { OPENAI_MODEL: "another-model" } }).load("lib/ai/config").getAIConfig().model, "another-model");
-  assert.equal(setup({ env: { GEMINI_API_KEY: "only-google" } }).load("lib/ai/config").isAIConfigured(), false);
-  assert.equal(setup({ env: { OPENAI_API_KEY: "  " } }).load("lib/ai/config").isAIConfigured(), false);
-  const gemini = setup({ env: { AI_PROVIDER: "gemini", GEMINI_API_KEY: "google", OPENAI_API_KEY: "openai" } }).load("lib/ai/config");
-  assert.equal(gemini.getAIConfig().model, "gemini-3.1-flash-lite");
-  assert.equal(gemini.getAIConfig().apiKey, "google");
-  assert.equal(gemini.isAIConfigured(), true);
-  assert.equal(setup({ env: { AI_PROVIDER: "gemini", OPENAI_API_KEY: "openai" } }).load("lib/ai/config").isAIConfigured(), false);
+  assert.equal(setup({ env: { GEMINI_MODEL: "another-model" } }).load("lib/ai/config").getAIConfig().model, "another-model");
+  assert.equal(setup({ env: { OPENAI_API_KEY: "only-openai" } }).load("lib/ai/config").isAIConfigured(), false);
+  assert.equal(setup({ env: { GEMINI_API_KEY: "  " } }).load("lib/ai/config").isAIConfigured(), false);
+  const openai = setup().load("lib/ai/config");
+  assert.equal(openai.getAIConfig().model, "gpt-6-luna");
+  assert.equal(openai.getAIConfig().apiKey, "test-key");
+  assert.equal(openai.isAIConfigured(), true);
+  assert.equal(setup({ env: { AI_PROVIDER: "openai", GEMINI_API_KEY: "google" } }).load("lib/ai/config").isAIConfigured(), false);
   const invalid = setup({ env: { AI_PROVIDER: "invalid", OPENAI_API_KEY: "openai" } }).load("lib/ai/config");
   assert.equal(invalid.isAIConfigured(), false);
   assert.throws(() => invalid.getAIConfig(), /AI_PROVIDER/);
 });
 
-test("default chat streams OpenAI UTF-8 SSE across arbitrary byte boundaries with the request signal", async () => {
+test("default field generation calls Gemini directly even when an OpenAI key is present", async () => {
+  const { load, calls, geminiCalls } = setup({
+    env: { GEMINI_API_KEY: "google", OPENAI_API_KEY: "openai" },
+    fetch: async () => assert.fail("Default generation must not contact OpenAI"),
+    gemini: async () => ({ text: JSON.stringify(explanation) }),
+  });
+  assert.equal((await explain(load)).meaning, explanation.meaning);
+  assert.equal(calls.length, 0);
+  assert.equal(geminiCalls.length, 1);
+  assert.equal(geminiCalls[0].model, "gemini-3.1-flash-lite");
+});
+
+test("explicit OpenAI chat streams UTF-8 SSE across arbitrary byte boundaries with the request signal", async () => {
   const signal = new AbortController().signal;
   const { load, calls, routeCalls } = setup({
     routing: "conversation",
@@ -522,7 +534,7 @@ test("OpenAI explanations and associations use strict JSON schemas and preserve 
     status: "resolved", questionBlockIds: ["q"], instructionBlockIds: [], optionBlockIds: [],
   };
   const { load, calls } = setup({
-    env: { OPENAI_API_KEY: "test-key", OPENAI_MODEL: "custom-openai-model" },
+    env: { AI_PROVIDER: "openai", OPENAI_API_KEY: "test-key", OPENAI_MODEL: "custom-openai-model" },
     fetch: async (_url, init) => {
       const body = JSON.parse(init.body);
       return Response.json(completed(JSON.stringify(body.text.format.schema.properties.meaning ? explanation : association)));

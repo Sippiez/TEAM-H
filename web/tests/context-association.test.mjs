@@ -45,7 +45,7 @@ const selection = {
   instructionBlockIds: ["i"], optionBlockIds: ["yes", "no"],
 };
 
-function setupRoute(provider, { env = { OPENAI_API_KEY: "test-only" }, fakeTimers = false } = {}) {
+function setupRoute(provider, { env = { GEMINI_API_KEY: "test-only" }, fakeTimers = false } = {}) {
   const timers = new Map();
   const logs = [];
   return {

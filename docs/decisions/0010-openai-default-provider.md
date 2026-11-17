@@ -1,4 +1,4 @@
-# 0010: OpenAI as the default AI provider
+# 0010: AI providers and default selection
 
 - Date: 2026-11-17
 - Status: Accepted
@@ -7,14 +7,16 @@
 ## Context
 
 The user requested OpenAI API model support alongside Gemini, defaulting to
-GPT-6 Luna.
+GPT-6 Luna. After OpenAI quota failures, the user requested Gemini as the
+default rather than relying on quota fallback.
 
 ## Decision
 
-Default `AI_PROVIDER` to `openai` and `OPENAI_MODEL` to `gpt-6-luna`. Read
-`OPENAI_API_KEY` only on the server. Keep Gemini available through the explicit
-`AI_PROVIDER=gemini` setting and its existing key/model variables. Do not switch
-vendors unless the operator explicitly enables the quota fallback below.
+Default `AI_PROVIDER` to `gemini` and `GEMINI_MODEL` to
+`gemini-3.1-flash-lite`. Read `GEMINI_API_KEY` only on the server. Keep OpenAI
+available through explicit `AI_PROVIDER=openai`, `OPENAI_API_KEY` and
+`OPENAI_MODEL` (default `gpt-6-luna`). Do not switch vendors unless the operator
+explicitly enables the optional OpenAI quota fallback below.
 
 An exhausted OpenAI daily quota caused both field explanations and chat to
 return generic provider failures despite valid local field context. At the
@@ -38,8 +40,9 @@ to the configured provider.
 
 ## Consequences
 
-- Existing Gemini deployments must explicitly set `AI_PROVIDER=gemini`, or
-  supply an OpenAI API key to use the new default.
+- Gemini deployments need only `GEMINI_API_KEY`; OpenAI requires explicit
+  `AI_PROVIDER=openai` and `OPENAI_API_KEY`. Remove `AI_FALLBACK_PROVIDER` when
+  selecting Gemini directly.
 - Chat, field explanations and context association share provider selection and
   the opt-in quota-fallback policy.
 - With quota fallback enabled, each generation may use Gemini while OpenAI is
@@ -48,7 +51,7 @@ to the configured provider.
   providers automatically.
 - OpenAI receives the same bounded context previously sent to Gemini; PDF bytes
   and entered field values remain local. Privacy copy identifies both vendors.
-- The default model ID is user-requested, not a claim of verified API access.
+- The OpenAI model ID is user-requested, not a claim of verified API access.
   Account/model availability must be confirmed before deployment. An unavailable
   model surfaces as a provider error; `OPENAI_MODEL` can override it.
 - Responses token budgets include a 4,096-token reasoning allowance in addition

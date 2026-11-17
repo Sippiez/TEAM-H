@@ -1,5 +1,5 @@
 export function getAIConfig() {
-  const provider = process.env.AI_PROVIDER || "openai";
+  const provider = process.env.AI_PROVIDER || "gemini";
   const fallbackProvider = process.env.AI_FALLBACK_PROVIDER;
   if (fallbackProvider !== undefined && fallbackProvider !== "gemini") {
     throw new Error("AI_FALLBACK_PROVIDER must be gemini or unset");

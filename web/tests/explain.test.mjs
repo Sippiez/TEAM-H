@@ -40,7 +40,7 @@ const generated = {
   commonMistakes: ["Gemini warning"],
 };
 
-function setupRoute(provider, env = { OPENAI_API_KEY: "test-only" }) {
+function setupRoute(provider, env = { GEMINI_API_KEY: "test-only" }) {
   const timers = new Map();
   const logs = [];
   const route = loadModule("../src/app/api/explain/route.ts", {

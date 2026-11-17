@@ -65,8 +65,8 @@ verification:
 export NODE_EXTRA_CA_CERTS=/path/to/your-root-ca.pem
 ```
 
-Chat uses server-side OpenAI streaming by default and needs `OPENAI_API_KEY`
-(see below). Set `AI_PROVIDER=gemini` to use the existing Gemini integration.
+Chat uses server-side Gemini streaming by default and needs `GEMINI_API_KEY`
+(see below). Set `AI_PROVIDER=openai` and provide `OPENAI_API_KEY` to use OpenAI.
 During `npm run dev`, the server terminal prints `[openai]` or `[gemini]` events for API
 requests, streaming responses, completion/errors, and official-information tool
 execution. Logs include the model, enabled tools, validated public lookup
@@ -78,12 +78,11 @@ Invalid planner calls show allowlisted
 argument values (including `unknown`) and an argument-validation status rather
 than only `selection: null`. Unregistered form labels are redacted from logs.
 These logs are disabled outside development.
-The default model is `gpt-6-luna`, with low reasoning effort. `OPENAI_MODEL`
-can select another compatible OpenAI Responses API model; model availability
-depends on the account. The configured account's `gpt-6-luna` chat was verified
-live, including conversational follow-ups and official-source answers.
-Gemini defaults to `gemini-3.1-flash-lite` when explicitly selected.
-To keep OpenAI primary but recover from its quota/rate limits, set
+The default model is `gemini-3.1-flash-lite`; `GEMINI_MODEL` can override it.
+Explicitly selecting OpenAI uses `gpt-6-luna`, with low reasoning effort.
+`OPENAI_MODEL` can select another compatible OpenAI Responses API model;
+model availability and quotas depend on the account.
+When explicitly using `AI_PROVIDER=openai`, recover from its quota/rate limits with
 `AI_FALLBACK_PROVIDER=gemini` and provide `GEMINI_API_KEY`. This opt-in fallback
 applies to chat, field explanations and field-context association on OpenAI
 HTTP 429 responses only. It uses `GEMINI_MODEL` (or its default), respects a
@@ -308,13 +307,13 @@ only if you do not already have `.env.local`:
 cp -n .env.example .env.local
 ```
 
-Set `OPENAI_API_KEY` in that ignored local file or in your deployment's
-server-side secret store. The default `AI_PROVIDER=openai` uses
-`OPENAI_MODEL=gpt-6-luna`. To use Gemini instead, set `AI_PROVIDER=gemini` and
-`GEMINI_API_KEY` to a Google AI Studio key; `GEMINI_MODEL` optionally overrides
-`gemini-3.1-flash-lite`. A key for the unselected provider is not required and
-is never used as an automatic fallback. Invalid provider names return the same
-configuration error as a missing key.
+Set `GEMINI_API_KEY` to a Google AI Studio key in that ignored local file or in
+your deployment's server-side secret store. The default `AI_PROVIDER=gemini`
+uses `GEMINI_MODEL=gemini-3.1-flash-lite`. To use OpenAI instead, set
+`AI_PROVIDER=openai` and `OPENAI_API_KEY`; `OPENAI_MODEL` optionally overrides
+`gpt-6-luna`. A key for the unselected provider is not required and is never
+used automatically unless the OpenAI quota fallback is explicitly enabled.
+Invalid provider names return the same configuration error as a missing key.
 Set `SERPER_API_KEY` to your Serper
 key for search discovery and failed mapped-page lookups. Mapped pages and
 recognized downloads work without a search key if direct verification succeeds.

@@ -57,8 +57,8 @@ for official synthesis.
   and works without selecting a field or opening a PDF.
 - General guarantor definitions need no lookup; passport-specific guarantor
   qualifications still use the requirements page and its guarantor section.
-- OpenAI and Gemini use the same routing and answer policy. The OpenAI default
-  remains `gpt-6-luna`, as decided in 0010.
+- OpenAI and Gemini use the same routing and answer policy. Provider selection
+  follows 0010, now defaulting to Gemini; explicit OpenAI uses `gpt-6-luna`.
 - Routing adds model latency and token usage within the existing overall
   deadline. No additional vendor, dependency, persistent chat store or search
   input category is introduced.

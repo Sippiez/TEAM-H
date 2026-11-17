@@ -29,7 +29,7 @@ function loadModule(path, imports, globals = {}) {
   return exports;
 }
 
-function setupRoute(streamGeminiChat, env = { OPENAI_API_KEY: "test-only" }) {
+function setupRoute(streamGeminiChat, env = { GEMINI_API_KEY: "test-only" }) {
   const timers = new Map();
   const logs = [];
   const hosts = loadModule("../src/lib/official/hosts.ts", {});
@@ -105,8 +105,8 @@ test("malformed requests fail before contacting the provider", async (t) => {
 test("missing key returns a retryable 503 without leaking configuration", async () => {
   for (const env of [
     {},
-    { GEMINI_API_KEY: "unselected-provider" },
-    { AI_PROVIDER: "gemini", OPENAI_API_KEY: "unselected-provider" },
+    { OPENAI_API_KEY: "unselected-provider" },
+    { AI_PROVIDER: "openai", GEMINI_API_KEY: "unselected-provider" },
     { AI_PROVIDER: "invalid", OPENAI_API_KEY: "test-only" },
   ]) {
     const { POST } = setupRoute(() => assert.fail("Provider should not be called"), env);
