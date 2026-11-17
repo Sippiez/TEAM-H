@@ -33,7 +33,7 @@
       body { line-height: 1.6; }
 
       a { color: inherit; }
-      a:focus-visible, summary:focus-visible {
+      a:focus-visible, summary:focus-visible, button:focus-visible {
         outline: 3px solid var(--page-yellow-ink);
         outline-offset: 3px;
         border-radius: 2px;
@@ -184,6 +184,29 @@
         user-select: text;
       }
 
+      .prompt-actions:not([hidden]) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 12px;
+        margin-top: 8px;
+      }
+
+      .copy-prompt {
+        min-height: 44px;
+        padding: 0 16px;
+        border: 1px solid var(--page-muted);
+        border-radius: var(--radius, 6px);
+        background: var(--page-card);
+        color: var(--page-ink);
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .copy-prompt:hover { background: var(--page-yellow); }
+      .copy-prompt:disabled { cursor: wait; opacity: 0.65; }
+
       mark {
         padding: 0 0.12em;
         background-color: var(--page-yellow);
@@ -228,6 +251,7 @@
         .running-order a { text-decoration: none; }
         .section { margin-bottom: 12px; }
         .say { font-size: 12.5pt; }
+        .prompt-actions { display: none !important; }
         a { color: inherit; }
       }
     </style>
@@ -275,7 +299,7 @@
       <section class="section" id="open-form" aria-labelledby="open-form-title">
         <div class="section-head"><span class="time">0:30–1:10</span><h2 id="open-form-title">Open a familiar example</h2></div>
         <div class="cue"><span class="cue-label do-label">DO</span><p class="do">Click “Adult passport application” under “Try a sample form.”</p></div>
-        <div class="cue"><span class="cue-label say-label">SAY</span><p class="say">This question asks for my parents’ surnames at birth. Does that mean their current names, or something different?</p></div>
+        <div class="cue"><span class="cue-label say-label">SAY</span><p class="say">This field asks for my parents’ surnames at birth. Does that mean their current names, or something different?</p></div>
         <div class="cue"><span class="cue-label do-label">DO</span><p class="do">Select “Surname of parent(s) at their birth” and let the explanation appear.</p></div>
       </section>
 
@@ -284,12 +308,28 @@
         <div class="cue"><span class="cue-label show-label">SHOW</span><p class="show">Question and explanation side by side.</p></div>
         <div class="cue"><span class="cue-label say-label">SAY</span><p class="say">The explanation sits beside the question and describes what information belongs here. If I need more help, I can ask a follow-up about this field.</p></div>
         <div class="cue"><span class="cue-label do-label">DO</span><p class="do">Click “Ask about this field.”</p></div>
-        <div class="cue"><span class="cue-label do-label">OPTIONAL PROMPT</span><p class="note">After the response appears, select and enter this prompt:</p><blockquote class="prompt">Explain that in one simple sentence.</blockquote></div>
+        <div class="cue">
+          <span class="cue-label do-label">OPTIONAL PROMPT</span>
+          <p class="note">After the response appears, copy and paste this prompt:</p>
+          <blockquote class="prompt">Explain that in one simple sentence.</blockquote>
+          <div class="prompt-actions" hidden>
+            <button class="copy-prompt" type="button" aria-label="Copy follow-up prompt">Copy prompt</button>
+            <span class="note" role="status"></span>
+          </div>
+        </div>
       </section>
 
       <section class="section" id="official-source" aria-labelledby="official-source-title">
         <div class="section-head"><span class="time">1:55–2:50</span><h2 id="official-source-title">Find the official next step</h2></div>
-        <div class="cue"><span class="cue-label do-label">DO</span><p class="do">Open the Ask tab and enter:</p><blockquote class="prompt">Where can I download the official version of this form?</blockquote></div>
+        <div class="cue">
+          <span class="cue-label do-label">DO</span>
+          <p class="do">Open the Ask tab and paste this prompt:</p>
+          <blockquote class="prompt">Where can I download the official version of this form?</blockquote>
+          <div class="prompt-actions" hidden>
+            <button class="copy-prompt" type="button" aria-label="Copy official form prompt">Copy prompt</button>
+            <span class="note" role="status"></span>
+          </div>
+        </div>
         <div class="cue"><span class="cue-label say-label">SAY · WHILE LOADING</span><p class="say">formER already knows which application we’re discussing, so I don’t need to repeat its name.</p></div>
         <div class="cue"><span class="cue-label do-label">DO</span><p class="do">Point to the official source. Open it briefly only if time allows.</p></div>
         <div class="cue"><span class="cue-label say-label">SAY</span><p class="say">This link lets me check the government source. formER’s help is not an approval decision or a replacement for official instructions.</p></div>
@@ -318,5 +358,26 @@
         <p class="do">Then continue the story. Don’t debug on stage.</p>
       </aside>
     </main>
+    <script>
+      document.querySelectorAll(".prompt-actions").forEach((actions) => {
+        const button = actions.querySelector(".copy-prompt");
+        const status = actions.querySelector('[role="status"]');
+        const prompt = actions.closest(".cue").querySelector(".prompt");
+        actions.hidden = false;
+
+        button.addEventListener("click", async () => {
+          status.textContent = "";
+          button.disabled = true;
+          try {
+            await navigator.clipboard.writeText(prompt.textContent.trim());
+            status.textContent = "Copied!";
+          } catch {
+            status.textContent = "Could not copy. Select the prompt text and copy it manually.";
+          } finally {
+            button.disabled = false;
+          }
+        });
+      });
+    </script>
   </body>
 </html>
