@@ -22,7 +22,7 @@ function load(path, imports) {
 
 const hosts = load("../src/lib/official/hosts.ts", {});
 const catalog = load("../src/lib/official/catalog.ts", { "./hosts": hosts });
-const { resolveLookupContext, resolveLookupQuestion } = load("../src/lib/official/context.ts", {
+const { isRephrase, resolveLookupContext, resolveLookupQuestion } = load("../src/lib/official/context.ts", {
   "./hosts": hosts,
   "./catalog": catalog,
 });
@@ -89,6 +89,29 @@ test("jurisdiction and rephrase replies recover user questions for synthesis", (
   const consecutive = [{ role: "user", text: "What are passport fees?" }, { role: "assistant", text: "Fees." }, { role: "user", text: rephrase }, { role: "assistant", text: "Simpler fees." }];
   assert.equal(resolveLookupQuestion("Explain that in one simple sentence", consecutive), "What are passport fees?\nExplain that in one simple sentence");
   assert.equal(resolveLookupQuestion("In simple terms, what are the passport fees?", consecutive), "In simple terms, what are the passport fees?");
+});
+
+test("short format-only follow-ups are rephrases but explicit new questions are not", () => {
+  for (const message of [
+    "explain in one line", "Explain that in one line.", "Can you explain it in one sentence?",
+    "Please summarize in a single sentence", "In one line, please.",
+    "Explique en une ligne", "Expliquez cela en une phrase", "En une ligne.",
+  ]) {
+    assert.equal(isRephrase(message), true, message);
+    assert.equal(resolveLookupQuestion(message, [
+      { role: "user", text: "What are passport fees?" }, { role: "assistant", text: "Fees." },
+    ]), `What are passport fees?\n${message}`);
+  }
+  for (const message of [
+    "Explain in one line what are the passport fees?",
+    "In one line, where can I download the form?",
+    "Explique en une ligne les frais du passeport",
+  ]) {
+    assert.equal(isRephrase(message), false, message);
+    assert.equal(resolveLookupQuestion(message, [
+      { role: "user", text: "What does this field mean?" }, { role: "assistant", text: "A name." },
+    ]), message);
+  }
 });
 
 test("passport mode is strict, retained for follow-ups, and removed on a subject switch", () => {

@@ -141,7 +141,11 @@ changing from a federal service to a health card asks for a province or territor
 Passport renewals retain their own routing and saved links through follow-ups.
 Typed public form references can appear in form/download questions; generic
 identifiers must be explicitly labeled as forms. Requests to rephrase an answer
-and jurisdiction replies retain the earlier user question for synthesis. The service dropdown has been
+and jurisdiction replies retain the earlier user question for synthesis.
+Short format-only follow-ups such as "explain in one line" keep the preceding
+selected-field explanation or service topic, in English and French, rather than
+starting a general form lookup. Explicit new questions still resolve their own topic.
+The service dropdown has been
 removed. An identifiable unregistered form starts discovery automatically,
 searching only the fourteen approved roots when its jurisdiction is unknown.
 Jurisdiction is established from admitted source URLs, not guessed from a

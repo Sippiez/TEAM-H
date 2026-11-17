@@ -165,6 +165,31 @@ test("OpenAI explanations and associations use strict JSON schemas and preserve 
   }
 });
 
+test("one-line field follow-up sends the selected field and preceding answer to OpenAI without official lookup", async () => {
+  const guarantor = { ...field, label: "Guarantor: passport date of issue", context: undefined };
+  const previousAnswer = "This field asks for the issue date of the guarantor's passport.";
+  const { load, calls } = setup({
+    fetch: async () => sse([
+      { type: "response.output_text.delta", delta: previousAnswer },
+      { type: "response.completed", response: completed(previousAnswer) },
+    ]),
+  });
+  const events = await Array.fromAsync(await load("lib/ai/gemini").streamGeminiChat({
+    message: "explain in one line", language: "en", selectedFieldId: guarantor.id,
+    form: { formNumber: "PPTC 153", pageCount: 1, fields: [guarantor] },
+    history: [
+      { role: "user", text: "What does this field mean?" },
+      { role: "assistant", text: previousAnswer },
+    ],
+  }));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].body.stream, true);
+  assert.match(calls[0].body.input, /Guarantor: passport date of issue/);
+  assert.ok(calls[0].body.input.includes(previousAnswer));
+  assert.match(calls[0].body.input, /CURRENT_USER_REQUEST:\nexplain in one line/);
+  assert.ok(events.every((event) => event.type === "delta"));
+});
+
 test("OpenAI lookup planning requires exactly the allowlisted function and parses its arguments", async () => {
   const args = { serviceId: "unknown", jurisdiction: "unknown", facetId: "unknown", language: "en" };
   const { load, calls } = setup({

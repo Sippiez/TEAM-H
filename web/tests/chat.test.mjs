@@ -402,6 +402,11 @@ test("field paraphrases preserve the last substantive user topic", async (t) => 
     ["Explain that again", "en", [...fieldHistory, { role: "user", text: "Explain that in one simple sentence" }, { role: "assistant", text: "A shorter explanation." }]],
     ["Can you explain that in simpler words?", "en", fieldHistory],
     ["Make it shorter", "en", fieldHistory],
+    ["Explain in one line", "en", fieldHistory],
+    ["Can you explain it in one sentence?", "en", fieldHistory],
+    ["In one line, please.", "en", fieldHistory],
+    ["Explique en une ligne", "fr", [{ role: "user", text: "Que signifie ce champ ?" }, { role: "assistant", text: "Une explication du champ." }]],
+    ["Explain that again", "en", [...fieldHistory, { role: "user", text: "explain in one line" }, { role: "assistant", text: "A one-line explanation." }]],
   ]) {
     await t.test(question, async () => {
       const { streamGeminiChat, calls, directAttempts, searchRequests } = setupGemini();
@@ -417,6 +422,8 @@ test("field paraphrases preserve the last substantive user topic", async (t) => 
     ["Explain that in one simple sentence", [...fieldHistory, { role: "user", text: "What are the passport fees?" }, { role: "assistant", text: "Fee information." }], selected],
     ["In simple terms, what are the passport fees?", fieldHistory, selected],
     ["Explain that simply: where can I download the form?", fieldHistory, selected],
+    ["Explain in one line what are the passport fees?", fieldHistory, selected],
+    ["In one line, where can I download the form?", fieldHistory, selected],
     ["Explain that in one simple sentence", [{ role: "user", text: "What are the passport fees?" }, { role: "assistant", text: "Fee information." }], {}],
     ["Explain that in one simple sentence", [], selected],
     ["Explain that in one simple sentence", [fieldHistory[0]], selected],
@@ -431,6 +438,45 @@ test("field paraphrases preserve the last substantive user topic", async (t) => 
       assert.equal(lookedUp, true);
     });
   }
+});
+
+test("one-line follow-up keeps the latest selected-field explanation instead of looking up passport overview", async () => {
+  const guarantor = { ...field, label: "Guarantor: passport date of issue" };
+  const { streamGeminiChat, calls, directAttempts, searchRequests } = setupGemini();
+  const history = [
+    { role: "user", text: "What does this field mean?" },
+    { role: "assistant", text: "Surname of parent(s) at their birth asks for their birth surnames." },
+    { role: "user", text: "What does this field mean?" },
+    { role: "assistant", text: "Guarantor: passport date of issue asks for the issue date of the guarantor's passport." },
+  ];
+  const events = await collect(await streamGeminiChat({
+    message: "explain in one line", language: "en", history,
+    form: { ...form, formNumber: "PPTC 153", fields: [guarantor] }, selectedFieldId: guarantor.id,
+    lookup: () => assert.fail("A one-line rephrase must not look up general passport guidance"),
+  }));
+  assert.deepEqual(calls.map((call) => call.kind), ["stream"]);
+  assert.match(calls[0].contents, /Guarantor: passport date of issue/);
+  assert.ok(calls[0].contents.includes(history.at(-1).text));
+  assert.match(calls[0].contents, /CURRENT_USER_REQUEST:\nexplain in one line/);
+  assert.equal(directAttempts.length + searchRequests.length, 0);
+  assert.ok(events.every((event) => !["lookup", "resources"].includes(event.type)));
+});
+
+test("one-line rephrases of live fee answers retain the fee topic despite an unrelated selected field", async () => {
+  const { streamGeminiChat, calls } = setupGemini();
+  let selection;
+  await collect(await streamGeminiChat({
+    message: "explain in one line", language: "en", form: { ...form, formNumber: "PPTC 153" },
+    selectedFieldId: field.id,
+    history: [{ role: "user", text: "What are passport fees?" }, { role: "assistant", text: "Fee information." }],
+    lookupContext: { serviceId: "passport", jurisdiction: "federal", facetId: "fees", formId: "pptc153" },
+    lookup: async (args) => {
+      selection = args;
+      return { outcome: { ...args, status: "unavailable", reason: "fetch_failed", partial: false }, sources: [] };
+    },
+  }));
+  assert.equal(selection.facetId, "fees");
+  assert.equal(calls.length, 0);
 });
 
 test("renewal mode reaches direct lookup, answer scope and subsequent fee questions", async () => {
