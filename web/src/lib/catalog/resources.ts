@@ -350,12 +350,14 @@ export function getServiceResources(
   serviceId: ServiceId,
   facetId?: FacetId,
   jurisdiction: JurisdictionId = "federal",
+  passportMode?: "new" | "renewal",
 ): Resource[] {
   if (serviceId === "student_aid") {
     return jurisdiction === "sk" ? getResources(["sk-student-aid-forms"]) : [];
   }
   if (jurisdiction !== "federal") return [];
   if (serviceId === "passport") {
+    if (passportMode === "renewal") return getResources(["passport-renew"]);
     if (facetId === "fees") return getResources(["passport-fees"]);
     if (facetId === "steps") return getResources(["passport-new-adult", "passport-submit"]);
     if (facetId === "documents") return getResources(["passport-get-form", "passport-required-docs"]);

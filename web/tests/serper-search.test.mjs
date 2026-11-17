@@ -207,3 +207,63 @@ test("clarification and cancellation never trigger search; in-flight work is bou
   assert.equal((await pending).outcome.reason, "deadline");
   assert.equal(stalled.requests.length, 1);
 });
+
+
+test("renewal uses the fixed page and retains the mode in both languages", async () => {
+  for (const [language, title, text] of [
+    ["en", "Renew your passport", "Renew your Canadian passport."],
+    ["fr", "Renouvellement du passeport", "Renouvelez votre passeport canadien."],
+  ]) {
+    const fetched = [];
+    const api = setup({ fetchPage: async (url) => {
+      fetched.push(url);
+      return { url, title, text, language: language === "fr" ? "fr-CA" : "en-CA" };
+    } });
+    const result = await api.lookupOfficialWithSerper({ serviceId: "passport", jurisdiction: "federal", facetId: "steps", language, passportMode: "renewal" });
+    assert.equal(result.outcome.status, "verified");
+    assert.equal(result.outcome.passportMode, "renewal");
+    assert.equal(api.requests.length, 0);
+    assert.equal(fetched.length, 1);
+    assert.match(fetched[0], /\/renew-adult-passport\.html$/);
+  }
+});
+
+test("new-application-only evidence triggers one renewal search", async () => {
+  const alternate = "https://www.canada.ca/en/immigration-refugees-citizenship/services/canadian-passports/renewal-info.html";
+  const fetched = [];
+  const api = setup({
+    response: async () => new Response(JSON.stringify({ organic: [{ link: alternate, snippet: "renewal is not evidence" }] })),
+    fetchPage: async (url) => {
+      fetched.push(url);
+      return url === alternate
+        ? { url, title: "Passport renewal", text: "Renew your Canadian passport.", language: "en-CA" }
+        : { url, title: "Apply for a new adult passport", text: "Apply for your first Canadian passport with PPTC 153.", language: "en-CA" };
+    },
+  });
+  const result = await api.lookupOfficialWithSerper({ serviceId: "passport", jurisdiction: "federal", facetId: "steps", language: "en", passportMode: "renewal" });
+  assert.equal(api.requests.length, 1);
+  assert.equal(fetched.length, 2);
+  assert.equal(result.outcome.status, "verified");
+  assert.equal(result.outcome.fallbackReason, "no_relevant_pages");
+  assert.equal(result.outcome.passportMode, "renewal");
+  assert.equal(result.sources[0].url, alternate);
+  const query = JSON.parse(api.requests[0].body).q;
+  assert.match(query, /renewal/);
+  assert.doesNotMatch(query, /PPTC 153/);
+});
+
+test("a new-application page mentioning renewal cannot satisfy a renewal lookup", async () => {
+  const wrong = "https://www.canada.ca/en/immigration-refugees-citizenship/services/canadian-passports/new-adult-passport.html";
+  const renewal = "https://www.canada.ca/en/immigration-refugees-citizenship/services/canadian-passports/renew-adult-passport/renew-how.html";
+  const api = setup({
+    response: async () => new Response(JSON.stringify({ organic: [{ link: wrong }, { link: renewal }] })),
+    fetchPage: async (url) => url === renewal
+      ? { url, title: "Renew your passport", text: "Passport renewal application steps.", language: "en-CA" }
+      : { url: wrong, title: "Apply for a new adult passport", text: "For passport renewal, see the separate renewal guide.", language: "en-CA" },
+  });
+  const result = await api.lookupOfficialWithSerper({ serviceId: "passport", jurisdiction: "federal", facetId: "steps", language: "en", passportMode: "renewal" });
+  assert.equal(api.requests.length, 1);
+  assert.equal(result.outcome.status, "verified");
+  assert.equal(result.sources.length, 1);
+  assert.equal(result.sources[0].url, renewal);
+});

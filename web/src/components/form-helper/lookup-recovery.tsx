@@ -67,7 +67,7 @@ export function LookupRecovery({
     );
   }
   const saved = outcome.serviceId && outcome.jurisdiction
-    ? getServiceResources(outcome.serviceId, outcome.facetId, outcome.jurisdiction)
+    ? getServiceResources(outcome.serviceId, outcome.facetId, outcome.jurisdiction, outcome.passportMode)
     : [];
   const jurisdiction = outcome.jurisdiction ? JURISDICTIONS[outcome.jurisdiction] : undefined;
   const resources: Resource[] = saved.length || !jurisdiction

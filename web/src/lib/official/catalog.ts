@@ -128,6 +128,7 @@ export function validatePublicForm(value: unknown): PublicFormIdentity | null {
 
 export interface LookupContext {
   serviceId?: ServiceId;
+  passportMode?: "new" | "renewal";
   jurisdiction?: JurisdictionId;
   facetId?: FacetId;
   formId?: PublicFormId;
@@ -139,7 +140,7 @@ export type LookupChoice = Pick<LookupContext, "serviceId" | "jurisdiction">;
 export function validateLookupChoice(value: unknown): LookupChoice | null {
   const context = validateLookupContext(value);
   if (!context || Object.keys(context).length === 0 ||
-    context.formId !== undefined || context.facetId !== undefined || context.publicForm !== undefined) return null;
+    context.formId !== undefined || context.facetId !== undefined || context.publicForm !== undefined || context.passportMode !== undefined) return null;
   return context;
 }
 
@@ -202,14 +203,14 @@ export type LookupSelection = {
   facetId: FacetId;
   language: "en" | "fr";
 } & (
-  { serviceId: ServiceId; jurisdiction: JurisdictionId; formId?: PublicFormId; publicForm?: never } |
-  { publicForm: PublicFormIdentity; jurisdiction?: JurisdictionId; serviceId?: never; formId?: never }
+  { serviceId: ServiceId; jurisdiction: JurisdictionId; formId?: PublicFormId; passportMode?: "new" | "renewal"; publicForm?: never } |
+  { publicForm: PublicFormIdentity; jurisdiction?: JurisdictionId; serviceId?: never; formId?: never; passportMode?: never }
 );
 
 export function validateLookupContext(value: unknown): LookupContext | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const object = value as Record<string, unknown>;
-  if (Object.keys(object).some((key) => !["serviceId", "jurisdiction", "facetId", "formId", "publicForm"].includes(key))) return null;
+  if (Object.keys(object).some((key) => !["serviceId", "jurisdiction", "facetId", "formId", "publicForm", "passportMode"].includes(key))) return null;
   const serviceId = SERVICE_IDS.find((id) => id === object.serviceId);
   const jurisdiction = JURISDICTION_IDS.find((id) => id === object.jurisdiction);
   const facetId = FACET_IDS.find((id) => id === object.facetId);
@@ -220,13 +221,17 @@ export function validateLookupContext(value: unknown): LookupContext | null {
     (object.jurisdiction !== undefined && !jurisdiction) ||
     (object.facetId !== undefined && !facetId) ||
     (object.formId !== undefined && !formId) ||
-    (object.publicForm !== undefined && (!publicForm || serviceId || formId))
+    (object.publicForm !== undefined && (!publicForm || serviceId || formId)) ||
+    (object.passportMode !== undefined && (serviceId !== "passport" ||
+      (object.passportMode !== "new" && object.passportMode !== "renewal") || !!publicForm ||
+      (object.passportMode === "renewal" && formId === "pptc153")))
   ) return null;
   return {
     ...(serviceId ? { serviceId } : {}),
     ...(jurisdiction ? { jurisdiction } : {}),
     ...(facetId ? { facetId } : {}),
     ...(formId ? { formId } : {}),
+    ...(object.passportMode === "new" || object.passportMode === "renewal" ? { passportMode: object.passportMode } : {}),
     ...(publicForm ? { publicForm } : {}),
   };
 }
@@ -249,7 +254,7 @@ export function validateLookupSelection(value: unknown): LookupSelection | null 
     };
   }
   if (
-    Object.keys(object).filter((key) => key !== "formId").sort().join(",") !==
+    Object.keys(object).filter((key) => key !== "formId" && key !== "passportMode").sort().join(",") !==
     ["facetId", "jurisdiction", "language", "serviceId"].sort().join(",") ||
     typeof object.serviceId !== "string" ||
     !SERVICE_IDS.includes(object.serviceId as ServiceId) ||
@@ -266,6 +271,7 @@ export function validateLookupSelection(value: unknown): LookupSelection | null 
     jurisdiction: object.jurisdiction,
     facetId: object.facetId,
     ...(object.formId !== undefined ? { formId: object.formId } : {}),
+    ...(object.passportMode !== undefined ? { passportMode: object.passportMode } : {}),
   });
   if (!context?.serviceId || !context.jurisdiction || !context.facetId) return null;
   if (context.formId) {
@@ -278,6 +284,7 @@ export function validateLookupSelection(value: unknown): LookupSelection | null 
     facetId: context.facetId,
     language: object.language,
     ...(context.formId ? { formId: context.formId } : {}),
+    ...(context.passportMode ? { passportMode: context.passportMode } : {}),
   };
 }
 
@@ -292,8 +299,9 @@ export function buildCanonicalQuery(selection: LookupSelection): string {
   const service = SERVICE_CATALOG[selection.serviceId];
   const jurisdiction = JURISDICTION_KEYWORDS[selection.jurisdiction];
   const terms = selection.language === "fr"
-    ? [jurisdiction.fr, ...service.keywordsFr, facet.fr]
-    : [jurisdiction.en, ...service.keywords, facet.en];
+    ? [jurisdiction.fr, ...service.keywordsFr.filter((term) => selection.passportMode !== "renewal" || term !== "PPTC 153"), facet.fr]
+    : [jurisdiction.en, ...service.keywords.filter((term) => selection.passportMode !== "renewal" || term !== "PPTC 153"), facet.en];
+  if (selection.passportMode === "renewal") terms.push(selection.language === "fr" ? "renouvellement" : "renewal");
   if (selection.formId) terms.push(PUBLIC_FORMS[selection.formId].formNumber);
   return terms.join(" ").replace(/\s+/g, " ").trim().slice(0, 240);
 }

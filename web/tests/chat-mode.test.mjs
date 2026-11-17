@@ -93,6 +93,8 @@ function mount({ language = "en", failPdf = false } = {}) {
       );
       streams.push({
         write: (text) => frame({ type: "delta", text }),
+        lookup: (outcome) => frame({ type: "lookup", outcome, sources: [] }),
+        interrupt: () => controller.close(),
         end: () => {
           frame({ type: "complete", complete: true });
           controller.close();
@@ -137,6 +139,86 @@ function mount({ language = "en", failPdf = false } = {}) {
     },
   };
 }
+
+test("lookup scope survives interrupted and metadata-only answers and changes with the topic", async () => {
+  const app = mount();
+  app.start();
+  app.component("ChatPanel").onSend("Passport fees");
+  await settle();
+  app.streams[0].lookup({ status: "verified", reason: "ok", partial: false, serviceId: "passport", jurisdiction: "federal", facetId: "fees", passportMode: "renewal" });
+  app.streams[0].end();
+  await settle();
+  app.render();
+  app.component("ChatPanel").onSend("What documents do I need?");
+  await settle();
+  app.streams[1].interrupt();
+  await settle();
+  app.render();
+  app.component("ChatPanel").onSend("What about the fees?");
+  await settle();
+  assert.deepEqual(app.calls[2].payload.lookupContext, { serviceId: "passport", jurisdiction: "federal", facetId: "fees", passportMode: "renewal" });
+  app.streams[2].lookup({ status: "clarification_required", reason: "invalid_selection", partial: false });
+  app.streams[2].end();
+  await settle();
+  app.render();
+  app.component("ChatPanel").onSend("Still passport?");
+  await settle();
+  assert.equal(app.calls[3].payload.lookupContext.serviceId, "passport");
+  app.streams[3].lookup({ status: "verified", reason: "ok", partial: false, serviceId: "pension", jurisdiction: "federal" });
+  app.streams[3].end();
+  await settle();
+  app.render();
+  app.component("ChatPanel").onSend("And fees?");
+  await settle();
+  assert.deepEqual(app.calls[4].payload.lookupContext, { serviceId: "pension", jurisdiction: "federal" });
+  app.reset();
+  app.start();
+  app.component("ChatPanel").onSend("A new question");
+  await settle();
+  assert.deepEqual(app.calls[5].payload.lookupContext, {});
+  app.reset();
+});
+
+test("lookup scopes migrate with conversations and remain isolated between documents", async () => {
+  const app = mount();
+  app.start();
+  app.component("ChatPanel").onSend("Passport fees");
+  await settle();
+  app.streams[0].lookup({ status: "verified", reason: "ok", partial: false, serviceId: "passport", jurisdiction: "federal" });
+  app.streams[0].end();
+  await settle();
+  app.render();
+  await app.upload();
+  assert.equal(app.calls[1].payload.lookupContext.serviceId, "passport");
+  app.streams[1].end();
+  await settle();
+  app.render();
+  const first = app.component("FormViewer").activeKey;
+  await app.component("FormViewer").onFile({ ...pdf, name: "other.pdf" });
+  app.render();
+  assert.deepEqual(app.calls[2].payload.lookupContext, {});
+  app.streams[2].lookup({ status: "verified", reason: "ok", partial: false, serviceId: "pension", jurisdiction: "federal" });
+  app.streams[2].end();
+  await settle();
+  app.render();
+  const second = app.component("FormViewer").activeKey;
+  app.component("FormViewer").onSwitch(first);
+  app.render();
+  app.component("ChatPanel").onSend("Follow up");
+  await settle();
+  assert.equal(app.calls[3].payload.lookupContext.serviceId, "passport");
+  app.streams[3].end();
+  await settle();
+  app.render();
+  app.component("FormViewer").onClose(second);
+  app.render();
+  app.component("FormViewer").onClose(first);
+  app.render();
+  app.component("ChatPanel").onSend("Back in chat");
+  await settle();
+  assert.equal(app.calls[4].payload.lookupContext.serviceId, "passport");
+  app.reset();
+});
 
 for (const language of ["en", "fr"]) {
   test(`header uses the formER name and localized home label in ${language}`, () => {

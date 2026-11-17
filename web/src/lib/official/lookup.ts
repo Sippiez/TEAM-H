@@ -87,11 +87,16 @@ const MAX_EVIDENCE_CHARS = 4_000;
 
 function isRelevantServicePage(
   selection: LookupSelection,
-  page: { title: string; text: string },
+  page: { url: string; title: string; text: string },
 ): boolean {
   const content = `${page.title} ${page.text}`;
   if (selection.publicForm) return publicFormMatchesText(selection.publicForm, content);
+  const newApplicationPath = /\/(?:new-adult-passport|nouveau-passeport-adulte)(?:\/|\.html|$)/i.test(
+    parseAllowedOfficialUrl(page.url)?.url.pathname ?? "",
+  );
   return serviceMatchesText(content, selection.serviceId) &&
+    (selection.passportMode !== "renewal" || !newApplicationPath) &&
+    (selection.passportMode !== "renewal" || /\b(?:renew(?:al|als|ed|ing)?|renouvel(?:lement|lements|er|ez|é|ée))(?!\p{L})/iu.test(content)) &&
     (!selection.formId || selection.facetId !== "documents" || publicFormReference(selection.formId, content) !== null);
 }
 
@@ -129,7 +134,17 @@ function asSource(
     ? publicFormMention(selection.publicForm, page.text)
     : selection.formId && selection.facetId === "documents"
       ? publicFormReference(selection.formId, page.text) : null;
-  const evidenceStart = formMention ? Math.max(0, formMention.index - 1_000) : 0;
+  // Prefer a concrete facet fact over navigation or introductory text. The fetched
+  // text is already bounded; these fixed patterns never include user input.
+  const cues = {
+    overview: [],
+    fees: [/\$\s*\d|\b\d[\d,.]*\s*(?:\$|dollars?\b)/i, /\b(?:fees?|costs?|frais|coûts?|tarifs?)\b/i],
+    documents: [/\b(?:documents?|forms?|photos?|formulaires?|pièces?)\b/i],
+    steps: [/\b(?:steps?|submit|apply|étapes?|soumettre|présenter)\b/i],
+  };
+  const cue = cues[selection.facetId].map((pattern) => pattern.exec(page.text)).find(Boolean);
+  const anchor = formMention?.index ?? cue?.index;
+  const evidenceStart = anchor === undefined ? 0 : Math.max(0, anchor - 1_000);
   return {
     id,
     title: page.title.slice(0, 240),
@@ -159,11 +174,12 @@ export async function lookupOfficialInformation(
     };
   }
   const jurisdiction = selection.jurisdiction;
-  const common: Pick<OfficialLookupSummary, "jurisdiction" | "serviceId" | "facetId" | "formId" | "publicForm" | "method"> = {
+  const common: Pick<OfficialLookupSummary, "jurisdiction" | "serviceId" | "facetId" | "formId" | "publicForm" | "passportMode" | "method"> = {
     jurisdiction,
     serviceId: selection.serviceId,
     facetId: selection.facetId,
     ...(selection.formId ? { formId: selection.formId } : {}),
+    ...(selection.passportMode ? { passportMode: selection.passportMode } : {}),
     ...(selection.publicForm ? { publicForm: selection.publicForm } : {}),
     method: selection.formId && selection.facetId === "documents" ? "official_page" : "search",
   };
@@ -348,6 +364,6 @@ export async function lookupOfficialWithFallback(
   const grounded = await fallback(argumentsValue, signal);
   return {
     ...grounded,
-    outcome: { ...grounded.outcome, fallbackReason: direct.outcome.reason },
+    outcome: { ...grounded.outcome, ...(direct.outcome.passportMode ? { passportMode: direct.outcome.passportMode } : {}), fallbackReason: direct.outcome.reason },
   };
 }

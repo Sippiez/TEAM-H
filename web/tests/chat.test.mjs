@@ -354,6 +354,71 @@ async function collect(stream) {
   return events;
 }
 
+test("renewal mode reaches direct lookup, answer scope and subsequent fee questions", async () => {
+  const { streamGeminiChat, calls, directAttempts } = setupGemini({
+    directPage: { title: "Renew your Canadian passport", text: "Passport renewal steps and fees are described here." },
+  });
+  const first = await collect(await streamGeminiChat({ message: "How do I renew my passport?", form: { ...form, formNumber: "PPTC 153" }, language: "en" }));
+  assert.equal(first[0].outcome.passportMode, "renewal");
+  assert.equal(first[0].outcome.formId, undefined);
+  assert.match(calls[0].contents, /"passportMode":"renewal"/);
+  await collect(await streamGeminiChat({ message: "What about the fees?", language: "en", lookupContext: {
+    serviceId: "passport", jurisdiction: "federal", facetId: "steps", passportMode: "renewal",
+  } }));
+  assert.equal(directAttempts.length, 2);
+  assert.ok(directAttempts.every((url) => url.endsWith("/renew-adult-passport.html")));
+  assert.match(calls[1].contents, /"passportMode":"renewal"/);
+});
+
+test("selected-field blank follow-ups retain printed instructions without masking live questions", async () => {
+  const signature = { ...field, label: "Signature", context: {
+    status: "resolved", source: "layout", question: "Signature",
+    instructions: ["Leave blank until an officer asks you to sign."],
+  } };
+  for (const [question, language] of [["Can I leave it blank?", "en"], ["Puis-je le laisser vide ?", "fr"]]) {
+    const { streamGeminiChat, calls } = setupGemini();
+    await collect(await streamGeminiChat({ message: question, language, selectedFieldId: signature.id,
+      form: { ...form, formNumber: "PPTC 153", fields: [signature] },
+      lookup: () => assert.fail("Field follow-up must not look up the passport overview"),
+    }));
+    assert.equal(calls[0].kind, "stream");
+    assert.match(calls[0].contents, /Leave blank until an officer asks you to sign/);
+  }
+  for (const question of ["What are the passport fees?", "Where can I download this form?", "How do I apply for a passport?"]) {
+    const { streamGeminiChat } = setupGemini();
+    let lookedUp = false;
+    await collect(await streamGeminiChat({ message: question, language: "en", selectedFieldId: signature.id,
+      form: { ...form, formNumber: "PPTC 153", fields: [signature] },
+      lookup: async (args) => { lookedUp = true; return { outcome: { ...args, status: "unavailable", reason: "fetch_failed", partial: false }, sources: [] }; },
+    }));
+    assert.equal(lookedUp, true, question);
+  }
+});
+
+test("route reports terminal generation status and retains partial metadata and official sources", async () => {
+  for (const reason of ["MAX_TOKENS", "STOP", "SAFETY"]) {
+    const { streamGeminiChat } = setupGemini({ finalChunks: [{ text: "Partial answer", candidates: [{ finishReason: reason }] }] });
+    const { POST } = setupRoute(streamGeminiChat);
+    const response = await POST(request({ message: "Explain this field", language: "en", form, selectedFieldId: field.id }));
+    const body = await response.text();
+    assert.match(body, /Partial answer/);
+    assert.match(body, reason === "STOP" ? /"complete":true/ : /"type":"error","code":"interrupted"/);
+    assert.match(body, reason === "STOP" ? /"complete":true/ : /"complete":false/);
+    if (reason !== "STOP") assert.doesNotMatch(body, /"complete":true/);
+  }
+  const { streamGeminiChat } = setupGemini({
+    finalChunks: [{ text: "Truncated [source:live-source-id]", candidates: [{ finishReason: "MAX_TOKENS" }] }],
+    directPage: { title: "Citizenship certificate CIT 0001", text: "Download the CIT 0001 application here." },
+  });
+  const { POST } = setupRoute(streamGeminiChat);
+  const body = await (await POST(request({ message: "Where do I download this form?", language: "en", form: { ...form, formNumber: "CIT 0001" } }))).text();
+  assert.match(body, /"type":"lookup"/);
+  assert.match(body, /live_official/);
+  assert.match(body, /"type":"error","code":"interrupted"/);
+  assert.match(body, /"complete":false/);
+  assert.doesNotMatch(body, /"complete":true/);
+});
+
 test("citizenship certificate download uses the open CIT 0001 form without asking which service", async () => {
   const { streamGeminiChat, calls } = setupGemini({
     functionArgs: { serviceId: "unknown", jurisdiction: "unknown", facetId: "documents", language: "en" },

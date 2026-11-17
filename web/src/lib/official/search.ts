@@ -48,7 +48,7 @@ export async function searchOfficialCandidates(
   signal: AbortSignal,
 ): Promise<SearchResult> {
   const pages = selection.serviceId
-    ? getServiceResources(selection.serviceId, selection.facetId, selection.jurisdiction).map(({ url }) => url)
+    ? getServiceResources(selection.serviceId, selection.facetId, selection.jurisdiction, selection.passportMode).map(({ url }) => url)
     : publicFormDirectoryPages(selection);
   if (pages.length > 0) {
     return {

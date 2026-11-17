@@ -21,6 +21,11 @@ Keep records brief and link to supporting [research](../research/).
   Accepted; removes the service-catalog gate for identifiable forms and the
   service dropdown, preserving direct verification and the approved roots.
 
+- [0008: Serper web search](0008-serper-web-search.md) - Accepted; direct-first
+  retrieval with verified Serper discovery.
+- [0009: Conversation scope and renewal routing](0009-conversation-scope-and-renewal-routing.md) -
+  Accepted; persistent scope, renewal evidence and incomplete-response handling.
+
 ## Template
 
 Copy this template into a new record when a decision is needed:

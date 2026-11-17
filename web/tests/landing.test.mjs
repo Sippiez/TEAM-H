@@ -74,9 +74,11 @@ for (const language of ["en", "fr"]) {
     assert.match(html, /<\/figure><section aria-labelledby="features-title"/);
     assert.equal(section.match(/<li>/g)?.length, 4);
     assert.match(section, language === "en" ? /What formER does/ : /Ce que fait formER/);
-    assert.match(section, /<details class="marginalia-data-details"><summary>/);
-    assert.match(section, /Google Gemini/);
-    assert.match(section, language === "en" ? /30 days/ : /30 jours/);
+    const details = html.match(/<details class="marginalia-data-details">[\s\S]*?<\/details>/)?.[0];
+    assert.ok(details, "Keep AI and search disclosures available on the landing page");
+    assert.match(details, /Google Gemini/);
+    assert.match(details, /Serper/);
+    assert.match(details, language === "en" ? /Search snippets are not evidence/ : /extraits de recherche ne sont pas des preuves/);
     assert.doesNotMatch(html, /Important information|Informations importantes/);
   });
 }

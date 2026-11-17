@@ -789,3 +789,38 @@ test("mapped personal income tax lookup works without a search key when direct f
     else process.env.SERPER_API_KEY = previous;
   }
 });
+
+
+test("facet evidence selects late facts within the budget and falls back deterministically", async () => {
+  const url = "https://www.canada.ca/en/services/taxes/income-tax.html";
+  const selection = { serviceId: "income_tax", jurisdiction: "federal", facetId: "fees", language: "en" };
+  const find = async (text, facetId = "fees") => lookup.lookupOfficialInformation(
+    { ...selection, facetId }, undefined, {
+      search: async () => ({ candidates: [{ url, sponsored: false }], rejectedSponsored: 0 }),
+      fetchPage: async () => ({ url, title: "Personal income tax", text, language: "en-CA" }),
+    },
+  );
+  const filler = "General information. ".repeat(280);
+  const result = await find(`${filler}The filing fee is $123. ${"More information. ".repeat(100)}`);
+  assert.equal(result.outcome.status, "verified");
+  assert.match(result.sources[0].evidence, /fee is \$123/);
+  assert.ok(result.sources[0].evidence.length <= 4000);
+  const noMatch = `${filler}End of page.`;
+  const fallback = await find(noMatch);
+  assert.equal(fallback.sources[0].evidence, noMatch.slice(0, 4000));
+  const steps = await find(`${filler}Submit your application by mail.`, "steps");
+  assert.match(steps.sources[0].evidence, /Submit your application/);
+  const documents = await find(`${filler}Documents required include a photo.`, "documents");
+  assert.match(documents.sources[0].evidence, /Documents required/);
+});
+
+test("document evidence remains anchored at the exact form reference", async () => {
+  const url = catalog.PUBLIC_FORMS.sk154091.url;
+  const text = `${"General student aid information. ".repeat(180)}154091 Full-Time Saskatchewan Student Aid application.`;
+  const result = await lookup.lookupOfficialInformation(studentSelection, undefined, {
+    fetchPage: async () => ({ url, title: "Student aid", text, language: "en-CA" }),
+  });
+  assert.equal(result.outcome.status, "verified");
+  assert.match(result.sources[0].evidence, /154091/);
+  assert.ok(result.sources[0].evidence.length <= 4000);
+});

@@ -33,8 +33,9 @@ The MVP lives in [web/](web/) (Next.js 16, TypeScript, Tailwind CSS v4,
 shadcn/ui). See [docs/mvp-design.md](docs/mvp-design.md) and
 [decision 0001](docs/decisions/0001-web-stack-and-ui-kit.md).
 
-- **Prerequisites:** Node.js 20.9 or later and npm (verified with the Node
-  version managed by nvm in WSL Ubuntu 24.04).
+- **Prerequisites:** Node.js 22.13 or later and its matching npm (verified with
+  Node.js 24.22.2). The PDF renderer and other locked dependencies require a
+  newer runtime than Next.js's minimum.
 - **Install:** `cd web && npm ci`
 - **Run locally:** `npm run dev`, then open <http://localhost:3000>. Choose
   **Adult passport application** under **Try a sample form** to use the bundled adult passport
@@ -42,6 +43,8 @@ shadcn/ui). See [docs/mvp-design.md](docs/mvp-design.md) and
 - **Checks:** `npm test`, `npm run typecheck`, `npm run lint` and `npm run build`.
 - **Deployment:** TODO.
 
+`pretypecheck` generates Next.js route types, so `npm run typecheck` also works
+before the first development server or build has run.
 `predev` and `prebuild` copy the matching pdf.js worker and standard fonts
 (including their licenses) into `web/public/`; these generated assets are
 gitignored. PDF rendering uses the bundled fonts rather than relying on system
@@ -129,7 +132,14 @@ Review Serper's credits, limits and data handling before deployment; see
 
 Recognized form IDs and conversation-scoped service selections resolve questions
 such as "Where do I download this form?" and "What about the fees?". Federal
-programs do not require users to repeat "federal". The service dropdown has been
+programs do not require users to repeat "federal". Lookup scope survives failed
+and field-only answers, follows each document's conversation, and clears on
+**New session**. A new explicitly named form replaces the previous service;
+changing from a federal service to a health card asks for a province or territory.
+Passport renewals retain their own routing and saved links through follow-ups.
+Typed public form references can appear in form/download questions; generic
+identifiers must be explicitly labeled as forms. Requests to rephrase an answer
+and jurisdiction replies retain the earlier user question for synthesis. The service dropdown has been
 removed. An identifiable unregistered form starts discovery automatically,
 searching only the fourteen approved roots when its jurisdiction is unknown.
 Jurisdiction is established from admitted source URLs, not guessed from a

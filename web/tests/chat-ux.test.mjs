@@ -59,6 +59,15 @@ function render(message, language = "en", props = {}) {
   }));
 }
 
+test("saved links retain renewal scope when live lookup is unavailable", () => {
+  const html = render({ lookup: {
+    status: "unavailable", reason: "fetch_failed", partial: false,
+    serviceId: "passport", jurisdiction: "federal", facetId: "steps", passportMode: "renewal",
+  } });
+  assert.match(html, /\/renew-adult-passport\.html/);
+  assert.doesNotMatch(html, /\/new-adult-passport/);
+});
+
 test("complete direct lookups keep source provenance without a redundant success sentence", () => {
   for (const language of ["en", "fr"]) {
     const html = render({

@@ -22,7 +22,7 @@ function load(path, imports) {
 
 const hosts = load("../src/lib/official/hosts.ts", {});
 const catalog = load("../src/lib/official/catalog.ts", { "./hosts": hosts });
-const { resolveLookupContext } = load("../src/lib/official/context.ts", {
+const { resolveLookupContext, resolveLookupQuestion } = load("../src/lib/official/context.ts", {
   "./hosts": hosts,
   "./catalog": catalog,
 });
@@ -30,6 +30,91 @@ const forms = load("../src/lib/catalog/forms.ts", {
   "@/lib/official/catalog": catalog,
 });
 const plain = (value) => JSON.parse(JSON.stringify(value));
+
+test("service switches require a compatible jurisdiction and preserve provincial regions", () => {
+  const passport = resolveLookupContext({ message: "Passport fees?", language: "en" });
+  const health = resolveLookupContext({ message: "What about a health card?", lookupContext: passport.context, language: "en" });
+  assert.equal(health.reason, "missing_jurisdiction");
+  assert.equal(health.context.jurisdiction, undefined);
+  const provincial = resolveLookupContext({ message: "Health card in Ontario", language: "en" });
+  const switched = resolveLookupContext({ message: "What about a driver licence?", lookupContext: provincial.context, language: "en" });
+  assert.equal(switched.selection.jurisdiction, "on");
+});
+
+test("embedded public form references are bounded and ambiguous or private numbers are ignored", () => {
+  const result = resolveLookupContext({ message: "Where can I download form CIT 0001? PERSONAL-CANARY", language: "en" });
+  assert.equal(result.selection.publicForm.number, "CIT 0001");
+  assert.equal(result.selection.facetId, "documents");
+  assert.doesNotMatch(catalog.buildCanonicalQuery(result.selection), /PERSONAL-CANARY/);
+  for (const message of ["Where can I download CIT 0001 in Canada?", "Download form IMM 5257B in Canada", "Où télécharger le formulaire CIT 0001 au Canada ?"]) {
+    assert.ok(resolveLookupContext({ message, language: "en" }).selection?.publicForm, message);
+  }
+  const labelled = resolveLookupContext({ message: "Where can I download form ABC 123? PERSONAL-CANARY", language: "en" });
+  assert.equal(labelled.selection.publicForm.number, "ABC 123");
+  assert.doesNotMatch(catalog.buildCanonicalQuery(labelled.selection), /PERSONAL-CANARY/);
+  for (const message of ["Download my reference ABC 123", "The form is 0001 pages", "Download form ABC 123 or form DEF 456"]) {
+    assert.equal(resolveLookupContext({ message, language: "en" }).selection, null, message);
+  }
+  for (const message of ["Download form CIT 0001 or IMM 5257", "Download form CIT 0001 for 123456", "Download https://example.test/CIT0001", "My reference CIT 0001 is private"]) {
+    assert.equal(resolveLookupContext({ message, language: "en" }).selection, null);
+  }
+  const privateNumber = resolveLookupContext({ message: "Download form SIN 123456789", language: "en" });
+  assert.equal(privateNumber.selection.publicForm, undefined);
+  assert.doesNotMatch(catalog.buildCanonicalQuery(privateNumber.selection), /123456789/);
+});
+
+test("an explicit embedded form identity replaces the previous service scope", () => {
+  for (const message of ["Where can I download CIT 0001 in Canada?", "Where can I download form ABC 123?"]) {
+    const result = resolveLookupContext({ message, language: "en",
+      lookupContext: { serviceId: "health_card", jurisdiction: "on", facetId: "overview" },
+      history: [{ role: "user", text: "Ontario" }],
+    });
+    assert.ok(result.selection.publicForm, message);
+    assert.equal(result.selection.serviceId, undefined);
+    assert.equal(result.selection.jurisdiction, undefined);
+    assert.equal(result.selection.facetId, "documents");
+  }
+});
+
+test("jurisdiction and rephrase replies recover user questions for synthesis", () => {
+  const healthQuestion = "How do I apply for a health card?";
+  const history = [{ role: "user", text: healthQuestion }, { role: "assistant", text: "Untrusted claim" }];
+  assert.equal(resolveLookupQuestion("Ontario", history), healthQuestion);
+  const passport = resolveLookupContext({ message: "What are passport fees?", language: "en" });
+  const rephrase = "Can you explain that in simpler words?";
+  const followup = resolveLookupContext({ message: rephrase, lookupContext: passport.context, language: "en" });
+  assert.equal(followup.selection.serviceId, "passport");
+  assert.equal(followup.selection.facetId, "fees");
+  assert.equal(resolveLookupQuestion(rephrase, [{ role: "user", text: "What are passport fees?" }, ...history.slice(1)]), `What are passport fees?\n${rephrase}`);
+});
+
+test("passport mode is strict, retained for follow-ups, and removed on a subject switch", () => {
+  for (const message of ["How do I renew my passport?", "Comment renouveler mon passeport ?"]) {
+    const first = resolveLookupContext({ message, formNumber: "PPTC 153", language: "en" });
+    assert.equal(first.selection.passportMode, "renewal");
+    assert.equal(first.selection.formId, undefined);
+    assert.match(catalog.buildCanonicalQuery(first.selection), /renewal/);
+    assert.doesNotMatch(catalog.buildCanonicalQuery(first.selection), /PPTC 153/);
+    const fees = resolveLookupContext({ message: "What about fees?", lookupContext: first.context, formNumber: "PPTC 153", language: "en" });
+    assert.equal(fees.selection.passportMode, "renewal");
+    assert.equal(fees.selection.formId, undefined);
+    const documents = resolveLookupContext({ message: "And what documents?", lookupContext: fees.context, language: "en" });
+    assert.equal(documents.selection.passportMode, "renewal");
+    const switched = resolveLookupContext({ message: "What about a health card?", lookupContext: documents.context, language: "en" });
+    assert.equal(switched.context.passportMode, undefined);
+    const fresh = resolveLookupContext({ message: "How do I get a new passport?", lookupContext: documents.context, language: "en" });
+    assert.equal(fresh.selection.passportMode, "new");
+  }
+  for (const context of [{ passportMode: "renewal" }, { serviceId: "health_card", passportMode: "renewal" }, { serviceId: "passport", passportMode: "evil" }, { publicForm: { number: "CIT 0001" }, passportMode: "renewal" }]) {
+    assert.equal(catalog.validateLookupContext(context), null);
+  }
+  assert.equal(catalog.validateLookupContext({ serviceId: "passport", passportMode: "renewal", formId: "pptc153" }), null);
+  assert.equal(catalog.validateLookupSelection({ serviceId: "passport", passportMode: "renewal", formId: "pptc153", jurisdiction: "federal", facetId: "documents", language: "en" }), null);
+  assert.equal(catalog.validateLookupChoice({ serviceId: "passport", passportMode: "renewal" }), null);
+  assert.equal(catalog.validateLookupSelection({ serviceId: "passport", jurisdiction: "federal", facetId: "fees", language: "en", passportMode: "renewal", query: "PRIVATE" }), null);
+  const fromHistory = resolveLookupContext({ message: "What about fees?", history: [{ role: "user", text: "How do I renew my passport?" }], language: "en" });
+  assert.equal(fromHistory.selection.passportMode, "renewal");
+});
 
 test("uncatalogued public form identities bypass service planning and survive follow-ups", () => {
   const first = resolveLookupContext({

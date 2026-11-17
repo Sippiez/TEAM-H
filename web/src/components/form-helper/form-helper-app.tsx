@@ -81,6 +81,7 @@ export function FormHelperApp() {
   const navMessagesRef = useRef<ChatMessage[]>([]);
   const docsRef = useRef<DocSession[]>([]);
   const chatRequests = useRef(new Map<string, AbortController>());
+  const lookupScopes = useRef(new Map<string, LookupContext>());
   const contextRequests = useRef(new Map<string, AbortController>());
 
   useEffect(() => {
@@ -252,14 +253,7 @@ export function FormHelperApp() {
       const currentMessages = target
         ? docsRef.current.find((doc) => doc.key === target.key)?.messages ?? []
         : navMessagesRef.current;
-      const lastLookup = [...currentMessages].reverse().find((message) => message.role === "assistant")?.lookup;
-      const lookupContext = options?.lookupContext ?? {
-        ...(lastLookup?.serviceId ? { serviceId: lastLookup.serviceId } : {}),
-        ...(lastLookup?.jurisdiction ? { jurisdiction: lastLookup.jurisdiction } : {}),
-        ...(lastLookup?.facetId ? { facetId: lastLookup.facetId } : {}),
-        ...(lastLookup?.formId ? { formId: lastLookup.formId } : {}),
-        ...(lastLookup?.publicForm ? { publicForm: lastLookup.publicForm } : {}),
-      };
+      const lookupContext = options?.lookupContext ?? lookupScopes.current.get(requestKey) ?? {};
 
       const push = (message: ChatMessage) => {
         if (!isCurrent()) return;
@@ -410,6 +404,20 @@ export function FormHelperApp() {
             updateMessage(assistantMessageId, { text: completeText });
           } else if (event.type === "lookup") {
             lookupReceived = true;
+            if (isCurrent()) {
+              const { serviceId, jurisdiction, facetId, formId, publicForm, passportMode } = event.outcome;
+              const scope = {
+                ...(serviceId !== undefined && { serviceId }),
+                ...(jurisdiction !== undefined && { jurisdiction }),
+                ...(facetId !== undefined && { facetId }),
+                ...(formId !== undefined && { formId }),
+                ...(publicForm !== undefined && { publicForm }),
+                ...(passportMode !== undefined && { passportMode }),
+              };
+              if (Object.keys(scope).length) {
+                lookupScopes.current.set(target?.key ?? navigatorDocKey.current ?? "navigator", scope);
+              }
+            }
             updateMessage(assistantMessageId, {
               lookup: event.outcome,
               resources: event.sources,
@@ -496,6 +504,9 @@ export function FormHelperApp() {
         tab: fromChat ? "ask" : "field",
       };
       if (fromChat) {
+        const scope = lookupScopes.current.get("navigator");
+        if (scope) lookupScopes.current.set(key, scope);
+        lookupScopes.current.delete("navigator");
         navigatorDocKey.current = key;
         setNavPending(false);
       }
@@ -564,6 +575,9 @@ export function FormHelperApp() {
     const rest = docs.filter((d) => d.key !== key);
     const neighbour = rest[Math.min(idx, rest.length - 1)];
     if (rest.length === 0 && chatOnly) {
+      const scope = lookupScopes.current.get(key);
+      if (scope) lookupScopes.current.set("navigator", scope);
+      else lookupScopes.current.delete("navigator");
       const messages = docs[idx].pending
         ? docs[idx].messages.filter((message, index, all) => index !== all.length - 1 || message.role !== "assistant")
         : docs[idx].messages;
@@ -571,6 +585,7 @@ export function FormHelperApp() {
       setNavMessages(messages);
       setNavPending(false);
     }
+    lookupScopes.current.delete(key);
     setDocs(rest);
     if (activeKey === key) activate(neighbour?.key ?? null);
     requestAnimationFrame(() => {
@@ -584,6 +599,7 @@ export function FormHelperApp() {
   const reset = () => {
     for (const controller of chatRequests.current.values()) controller.abort();
     chatRequests.current.clear();
+    lookupScopes.current.clear();
     for (const controller of contextRequests.current.values()) controller.abort();
     contextRequests.current.clear();
     navMessagesRef.current = [];
