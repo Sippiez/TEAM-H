@@ -200,7 +200,9 @@ be wrong; verify government requirements using the linked official guide.
 **Ask about this field** sends only the selected field's metadata and document
 identity (form number, filename and page count), without other fields or earlier
 chat messages. Regular chat follow-ups and form overviews retain the broader
-form context.
+form context. Requests to simplify a field explanation keep that field and the
+recent conversation in context; new fee or download questions still use official
+lookup.
 
 You can keep up to five PDFs open as document tabs. **Add PDF** opens
 another, and each tab has its own close button. The button to the left of

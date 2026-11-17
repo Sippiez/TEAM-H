@@ -86,6 +86,9 @@ test("jurisdiction and rephrase replies recover user questions for synthesis", (
   assert.equal(followup.selection.serviceId, "passport");
   assert.equal(followup.selection.facetId, "fees");
   assert.equal(resolveLookupQuestion(rephrase, [{ role: "user", text: "What are passport fees?" }, ...history.slice(1)]), `What are passport fees?\n${rephrase}`);
+  const consecutive = [{ role: "user", text: "What are passport fees?" }, { role: "assistant", text: "Fees." }, { role: "user", text: rephrase }, { role: "assistant", text: "Simpler fees." }];
+  assert.equal(resolveLookupQuestion("Explain that in one simple sentence", consecutive), "What are passport fees?\nExplain that in one simple sentence");
+  assert.equal(resolveLookupQuestion("In simple terms, what are the passport fees?", consecutive), "In simple terms, what are the passport fees?");
 });
 
 test("passport mode is strict, retained for follow-ups, and removed on a subject switch", () => {

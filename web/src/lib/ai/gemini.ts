@@ -27,7 +27,7 @@ import {
   type LookupContext,
   type LookupChoice,
 } from "@/lib/official/catalog";
-import { resolveLookupContext, resolveLookupQuestion } from "@/lib/official/context";
+import { isRephrase, resolveLookupContext, resolveLookupQuestion } from "@/lib/official/context";
 import { lookupOfficialWithSerper, type OfficialLookupResult } from "@/lib/official/lookup";
 
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
@@ -274,16 +274,23 @@ export interface StreamChatInput {
   lookupChoice?: LookupChoice;
 }
 
+function isSelectedFieldQuestion(message: string): boolean {
+  return /^(?:what should i enter in (?:this|the selected) field|what does (?:this|the selected) field mean|explain (?:this|the selected) field|can i leave (?:it|this|this field) blank|que signifie (?:ce champ|le champ selectionne)|expliquez? (?:ce champ|le champ selectionne)|que dois-je saisir dans (?:ce champ|le champ selectionne)|puis-je (?:le |la |ce champ )?laisser (?:vide|en blanc))\s*[?.!]*$/.test(normalizedRequest(message).trim());
+}
+
 function needsCurrentLookup(input: StreamChatInput): boolean {
   if (input.intent === "overview" || input.intent === "field") return false;
   const message = normalizedRequest(input.message ?? "").trim();
   if (input.form && /^(?:give me an overview of this form|what is this form|explain this form|donne[z]?-moi un apercu de ce formulaire|presente ce formulaire)\s*[?.!]*$/.test(message)) return false;
   if (input.form && /^where (?:do i put|can i find|is) (?:my|the) (?:address|date of birth|name|signature)(?: field)?\s*[?.!]*$/.test(message)) return false;
   if (
-    input.selectedFieldId &&
-    /^(?:what should i enter in (?:this|the selected) field|what does (?:this|the selected) field mean|explain (?:this|the selected) field|can i leave (?:it|this|this field) blank|que signifie (?:ce champ|le champ selectionne)|expliquez? (?:ce champ|le champ selectionne)|que dois-je saisir dans (?:ce champ|le champ selectionne)|puis-je (?:le |la |ce champ )?laisser (?:vide|en blanc))\s*[?.!]*$/.test(
-      message,
-    )
+    input.form?.fields.some((field) => field.id === input.selectedFieldId) &&
+    (isSelectedFieldQuestion(message) || (isRephrase(message) && (() => {
+      const history = sanitizedHistory(input.history);
+      const index = history.findLastIndex((turn) => turn.role === "user" && !isRephrase(turn.text));
+      return index >= 0 && isSelectedFieldQuestion(history[index].text) &&
+        history.slice(index + 1).some((turn) => turn.role === "assistant");
+    })()))
   ) {
     return false;
   }

@@ -70,8 +70,9 @@ function isJurisdictionReply(message: string): boolean {
       .some((label) => normalizedText(label) === text);
 }
 
-function isRephrase(message: string): boolean {
-  return /\b(?:explain|say|put|describe) (?:that|it|this) (?:again |in )?(?:simpler|simple|plain|different|other)\b|\b(?:simplify|rephrase) (?:that|it|this)\b|\b(?:expliquer|reformuler) (?:cela|ca|ceci)\b/.test(normalizedText(message));
+export function isRephrase(message: string): boolean {
+  const text = normalizedText(message).trim();
+  return /^(?:(?:(?:can|could|would) you |please )?(?:(?:explain|say|put|describe) (?:that|it|this) (?:again|simply|more simply|in (?:(?:one|a) )?(?:simpler|simple|plain|different|other)(?: words| terms| sentence)?)|(?:simplify|rephrase) (?:that|it|this)|(?:make it |say it )shorter)|(?:(?:peux-tu|pouvez-vous|pourrais-tu) )?(?:explique(?:r|z)?|reformule(?:r|z)?) (?:cela|ca|ceci|le)(?: (?:encore|de nouveau|plus simplement|en (?:une phrase simple|termes simples|mots simples)))?|(?:plus court|plus simplement))\s*[?.!]*$/.test(text);
 }
 
 function passportModeIn(text: string): "new" | "renewal" | undefined {

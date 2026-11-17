@@ -354,6 +354,64 @@ async function collect(stream) {
   return events;
 }
 
+test("selected field simple sentence follow-up stays in metadata routing", async () => {
+  const surname = { ...field, label: "Surname of parent(s) at their birth" };
+  const { streamGeminiChat, calls, directAttempts, searchRequests } = setupGemini();
+  const events = await collect(await streamGeminiChat({
+    message: "Explain that in one simple sentence", language: "en",
+    form: { ...form, formNumber: "PPTC 153", fields: [surname] }, selectedFieldId: surname.id,
+    history: [{ role: "user", text: "What does this field mean?" }, { role: "assistant", text: "It asks for a parent's birth surname." }],
+    lookup: () => assert.fail("Field paraphrase must not invoke lookup"),
+  }));
+  assert.deepEqual(calls.map((call) => call.kind), ["stream"]);
+  assert.match(calls[0].contents, /Surname of parent\(s\) at their birth/);
+  assert.match(calls[0].contents, /What does this field mean\?/);
+  assert.match(calls[0].contents, /It asks for a parent's birth surname/);
+  assert.equal(directAttempts.length, 0);
+  assert.equal(searchRequests.length, 0);
+  assert.ok(events.every((event) => !["lookup", "resources"].includes(event.type)));
+});
+
+test("field paraphrases preserve the last substantive user topic", async (t) => {
+  const surname = { ...field, label: "Surname of parent(s) at their birth" };
+  const selected = { form: { ...form, formNumber: "PPTC 153", fields: [surname] }, selectedFieldId: surname.id };
+  const fieldHistory = [{ role: "user", text: "What does this field mean?" }, { role: "assistant", text: "A field explanation." }];
+  for (const [question, language, history] of [
+    ["Explique cela en une phrase simple", "fr", [{ role: "user", text: "Que signifie ce champ ?" }, { role: "assistant", text: "Une explication du champ." }]],
+    ["Explain that again", "en", [...fieldHistory, { role: "user", text: "Explain that in one simple sentence" }, { role: "assistant", text: "A shorter explanation." }]],
+    ["Can you explain that in simpler words?", "en", fieldHistory],
+    ["Make it shorter", "en", fieldHistory],
+  ]) {
+    await t.test(question, async () => {
+      const { streamGeminiChat, calls, directAttempts, searchRequests } = setupGemini();
+      const events = await collect(await streamGeminiChat({ ...selected, message: question, language, history, lookup: () => assert.fail("Unexpected lookup") }));
+      assert.deepEqual(calls.map((call) => call.kind), ["stream"]);
+      assert.match(calls[0].contents, /Surname of parent\(s\) at their birth/);
+      for (const turn of history) assert.ok(calls[0].contents.includes(turn.text));
+      assert.equal(directAttempts.length + searchRequests.length, 0);
+      assert.ok(events.every((event) => !["lookup", "resources"].includes(event.type)));
+    });
+  }
+  for (const [question, history, selection] of [
+    ["Explain that in one simple sentence", [...fieldHistory, { role: "user", text: "What are the passport fees?" }, { role: "assistant", text: "Fee information." }], selected],
+    ["In simple terms, what are the passport fees?", fieldHistory, selected],
+    ["Explain that simply: where can I download the form?", fieldHistory, selected],
+    ["Explain that in one simple sentence", [{ role: "user", text: "What are the passport fees?" }, { role: "assistant", text: "Fee information." }], {}],
+    ["Explain that in one simple sentence", [], selected],
+    ["Explain that in one simple sentence", [fieldHistory[0]], selected],
+    ["Explain that in one simple sentence", fieldHistory, { ...selected, selectedFieldId: "missing" }],
+  ]) {
+    await t.test(question + " " + JSON.stringify(selection), async () => {
+      const { streamGeminiChat } = setupGemini();
+      let lookedUp = false;
+      await collect(await streamGeminiChat({ ...selection, message: question, language: "en", history,
+        lookup: async (args) => { lookedUp = true; return { outcome: { ...args, status: "unavailable", reason: "fetch_failed", partial: false }, sources: [] }; },
+      }));
+      assert.equal(lookedUp, true);
+    });
+  }
+});
+
 test("renewal mode reaches direct lookup, answer scope and subsequent fee questions", async () => {
   const { streamGeminiChat, calls, directAttempts } = setupGemini({
     directPage: { title: "Renew your Canadian passport", text: "Passport renewal steps and fees are described here." },
