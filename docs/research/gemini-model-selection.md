@@ -23,6 +23,26 @@ in these notes.
 Google lists 3.1 Flash-Lite's shutdown date as 2027-05-07. Model availability,
 prices and lifecycle dates may change; verify them again before deployment.
 
+## Official-answer streaming latency (2026-11-17)
+
+The official-answer path buffered all model chunks before sanitizing and sending
+text. Field explanations did not have this extra wait. Replacing the whole-answer
+buffer with incremental filtering preserves verified citations and removes
+model-written URLs, including constructs split across provider chunks.
+
+Three runs before and after used the actual chat generator with a synthetic
+100 ms lookup and four model chunks spaced 100 ms apart. No live API was called.
+
+| Metric | Whole-answer buffer | Incremental filter |
+| --- | --- | --- |
+| First visible official-answer text | 539–557 ms | 217–232 ms |
+| Time withholding text after the provider's first text chunk | 317–336 ms | 0–1 ms |
+
+Keep the incremental filter. A deterministic regression test requires text to
+reach the consumer before the provider resumes generation. These fixture timings
+measure application buffering, not live model or government-page latency;
+official-source verification still precedes answer generation.
+
 ## Official sources
 
 - [3.1 Flash-Lite: model ID, stable version and thinking support](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite)

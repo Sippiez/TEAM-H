@@ -183,7 +183,10 @@ failures: if discovered pages also cannot be verified, the lookup reports that
 failure instead of answering from search snippets.
 Interrupted responses preserve partial text and sources, mark the answer
 incomplete, and provide retry; missing setup is not disguised as a retryable
-network problem. Suggestions and recovery controls follow the interface language.
+network problem. After official pages are verified, generated answers stream as
+complete words and citation/link constructs arrive rather than waiting for the
+whole answer. Unverified citations and model-written URLs are filtered before
+text is sent. Suggestions and recovery controls follow the interface language.
 Starter suggestions yield space after the first question. Expandable AI/search
 privacy details and a scrollable panel preserve a readable mobile answer area;
 the personal-information warning remains visible in the shared header, rather

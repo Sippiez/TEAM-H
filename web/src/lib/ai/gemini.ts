@@ -375,8 +375,37 @@ function cleanGroundedAnswer(text: string, sourceIds: Set<string>): string {
     .replace(/\[[^\]]+\]\((?:https?:\/\/|www\.)[^)]+\)/gi, "")
     .replace(/https?:\/\/\S+/gi, "")
     .replace(/\bwww\.[a-z0-9.-]+\.[a-z]{2,}(?:\/\S*)?/gi, "")
-    .replace(/\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/\S*)?/gi, "")
-    .trim();
+    .replace(/\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/\S*)?/gi, "");
+}
+
+function createGroundedAnswerFilter(sourceIds: Set<string>) {
+  let pending = "";
+  let whitespace = "";
+  let started = false;
+  return (chunk: string, final = false): string => {
+    pending += chunk;
+    let boundary = final ? pending.length : 0;
+    if (!final) {
+      let brackets = 0;
+      let parentheses = 0;
+      // Keep unfinished words, citations and Markdown links out of visible text.
+      for (let index = 0; index < pending.length; index++) {
+        const char = pending[index];
+        if (char === "[") brackets++;
+        else if (char === "]" && brackets > 0) brackets--;
+        else if (char === "(") parentheses++;
+        else if (char === ")" && parentheses > 0) parentheses--;
+        if (/\s/.test(char) && brackets === 0 && parentheses === 0) boundary = index + 1;
+      }
+    }
+    const cleaned = whitespace + cleanGroundedAnswer(pending.slice(0, boundary), sourceIds);
+    pending = pending.slice(boundary);
+    const text = started ? cleaned : cleaned.trimStart();
+    const output = text.trimEnd();
+    whitespace = final ? "" : text.slice(output.length);
+    if (output) started = true;
+    return output;
+  };
 }
 
 function publicSource(source: OfficialLookupResult["sources"][number]): Resource {
@@ -520,7 +549,7 @@ async function* streamOfficialAnswer(
   if (result.sources.length === 0) {
     throw new Error("The official-source answer or its sources were empty");
   }
-  let answer = result.answer;
+  const answer = result.answer;
   if (answer === undefined) {
     if (result.sources.some((source) => source.provenance.kind !== "live_official" || !source.evidence?.trim())) {
       throw new Error("The official-source answer or its sources were empty");
@@ -542,11 +571,23 @@ async function* streamOfficialAnswer(
         abortSignal: input.signal,
       },
     });
-    let text = "";
+    const filter = createGroundedAnswerFilter(new Set(result.sources.map((source) => source.id)));
+    let hasAnswer = false;
     for await (const chunk of stream) {
-      if (chunk.text) text += chunk.text;
+      if (!chunk.text) continue;
+      const text = filter(chunk.text);
+      if (text) {
+        hasAnswer = true;
+        yield { version: 1, type: "delta", text };
+      }
     }
-    answer = cleanGroundedAnswer(text, new Set(result.sources.map((source) => source.id)));
+    const tail = filter("", true);
+    if (tail) {
+      hasAnswer = true;
+      yield { version: 1, type: "delta", text: tail };
+    }
+    if (!hasAnswer) throw new Error("The official-source answer was empty");
+    return;
   }
   if (!answer.trim()) throw new Error("The official-source answer was empty");
   for (let offset = 0; offset < answer.length; offset += 240) {

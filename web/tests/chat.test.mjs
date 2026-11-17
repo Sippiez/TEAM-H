@@ -334,7 +334,7 @@ function setupGemini({
           generateContentStream: async (input) => {
             calls.push({ kind: "stream", ...input });
             return (async function* () {
-              for (const chunk of finalChunks) yield chunk;
+              for await (const chunk of finalChunks) yield chunk;
               if (streamError) throw streamError;
             })();
           },
@@ -472,6 +472,7 @@ test("route reports terminal generation status and retains partial metadata and 
   const body = await (await POST(request({ message: "Where do I download this form?", language: "en", form: { ...form, formNumber: "CIT 0001" } }))).text();
   assert.match(body, /"type":"lookup"/);
   assert.match(body, /live_official/);
+  assert.match(body, /"type":"delta","text":"Truncated"/);
   assert.match(body, /"type":"error","code":"interrupted"/);
   assert.match(body, /"complete":false/);
   assert.doesNotMatch(body, /"complete":true/);
@@ -731,6 +732,65 @@ test("a successful default direct lookup synthesizes verified excerpts without c
   const answer = events.filter((event) => event.type === "delta").map((event) => event.text).join("");
   assert.match(answer, /\[1\]/);
   assert.doesNotMatch(answer, /forged-id|https?:\/\//);
+});
+
+test("official answer text reaches the consumer before generation finishes", async () => {
+  let generationResumed = false;
+  const { streamGeminiChat } = setupGemini({
+    finalChunks: (async function* () {
+      yield { text: "Use the official page " };
+      generationResumed = true;
+      yield { text: "[source:live-example]." };
+    })(),
+  });
+  const stream = await streamGeminiChat({
+    message: "What size passport photo do I need?", language: "en",
+    form: { ...form, formNumber: "PPTC 153" },
+    lookup: async (args) => ({
+      outcome: { ...args, status: "verified", reason: "none", partial: false },
+      sources: [{
+        id: "live-example", title: "Passport photos", url: "https://www.canada.ca/",
+        provenance: { kind: "live_official", retrievedAt: "2026-11-17T00:00:00Z" },
+        evidence: "Use the official passport photo requirements.",
+      }],
+    }),
+  });
+  assert.equal((await stream.next()).value.type, "lookup");
+  const firstText = (await stream.next()).value;
+  assert.equal(firstText.type, "delta");
+  assert.equal(firstText.text, "Use the official page");
+  assert.equal(generationResumed, false, "Do not drain the provider before forwarding text");
+  const rest = await collect(stream);
+  assert.equal(firstText.text + rest.map((event) => event.text).join(""), "Use the official page [1].");
+});
+
+test("official streaming filters URLs and citations split across provider chunks", async () => {
+  const text = "  Read [source:live-example] now.\n"
+    + "Ignore [source:forged-id] and [unsafe label](https://evil.example/path).\n"
+    + "Links: https://evil.example/path www.evil.example/path evil.example/path\n"
+    + "Done.  ";
+  const { streamGeminiChat } = setupGemini({
+    finalChunks: Array.from(text, (text) => ({ text })),
+  });
+  const stream = await streamGeminiChat({
+    message: "What size passport photo do I need?", language: "en",
+    form: { ...form, formNumber: "PPTC 153" },
+    lookup: async (args) => ({
+      outcome: { ...args, status: "verified", reason: "none", partial: false },
+      sources: [{
+        id: "live-example", title: "Passport photos", url: "https://www.canada.ca/",
+        provenance: { kind: "live_official", retrievedAt: "2026-11-17T00:00:00Z" },
+        evidence: "Use the official passport photo requirements.",
+      }],
+    }),
+  });
+  let visible = "";
+  for await (const event of stream) {
+    if (event.type !== "delta") continue;
+    visible += event.text;
+    assert.doesNotMatch(visible, /source:|forged|unsafe label|https?:|www\.|evil/);
+  }
+  assert.equal(visible, "Read [1] now.\nIgnore  and .\nLinks:   \nDone.");
 });
 
 test("metadata-only Gemini prompt bounds context and excludes PDF bytes and field values", async () => {

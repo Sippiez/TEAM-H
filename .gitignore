@@ -18,3 +18,4 @@ Desktop.ini
 # Add stack-specific dependency, cache, and build paths after stack selection.
 codebase-context.txt
 .vscode/
+node_modules
