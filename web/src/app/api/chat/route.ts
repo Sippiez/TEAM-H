@@ -15,7 +15,7 @@ const MAX_MESSAGE = 1_000;
 const MAX_FIELDS = 2_000;
 const MAX_HISTORY = 12;
 const MAX_HISTORY_TEXT = 1_000;
-const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 60_000;
 
 function isFormContext(value: unknown): value is FormContext {
   if (!value || typeof value !== "object") return false;

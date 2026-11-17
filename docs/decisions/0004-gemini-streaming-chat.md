@@ -7,7 +7,8 @@
 
 Replace prototype chat replies without changing the PDF reader or deterministic
 field explanations. Preserve document isolation, selected-field context,
-English/French answers, cancellation and a 30-second deadline. The team requested
+English/French answers, cancellation and a 60-second deadline (increased from
+30 seconds on 2026-11-17). The team requested
 the cheapest stable model with reasoning, rather than a preview or larger model.
 
 ## Decision

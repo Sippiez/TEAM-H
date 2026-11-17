@@ -168,7 +168,7 @@ The application admits only approved URLs and the requested jurisdiction before
 fetching. Sign-in pages, arbitrary redirects and excluded `.gc.ca` sources
 remain blocked.
 
-The total chat deadline remains 30 seconds. Direct lookup has a 10-second
+The total chat deadline is 60 seconds in both the browser and server. Direct lookup has a 10-second
 sub-budget, at most five candidates, three page requests, two concurrent requests
 and three redirects per page. A Serper fallback gets a separate 10-second
 search-and-verification budget under the same overall deadline. There is at most
@@ -280,7 +280,7 @@ Next.js loads `.env*` from `web/`, with `.env.local` taking precedence over
 credentials. The root [.env.example](.env.example) lists the same variable names
 for reference; the running app does not load environment files from the root.
 
-Chat has a 30-second deadline. Missing `GEMINI_API_KEY` returns 503; a Gemini
+Chat has a 60-second deadline. Missing `GEMINI_API_KEY` returns 503; a Gemini
 startup failure before streaming returns 502, and deadline expiry before
 streaming returns 504. After a failed direct attempt, Google search quota
 exhaustion produces an explicit `grounding_quota` state with the original

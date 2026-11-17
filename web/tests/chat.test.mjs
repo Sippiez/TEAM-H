@@ -40,7 +40,7 @@ function setupRoute(streamGeminiChat, env = { GEMINI_API_KEY: "test-only" }) {
     process: { env },
     console: { error: (...args) => logs.push(args) },
     setTimeout(callback, delay) {
-      assert.equal(delay, 30_000);
+      assert.equal(delay, 60_000);
       const id = Symbol();
       timers.set(id, callback);
       return id;

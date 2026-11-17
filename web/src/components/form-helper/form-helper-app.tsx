@@ -343,7 +343,7 @@ export function FormHelperApp() {
 
       const timeout = window.setTimeout(
         () => controller.abort(),
-        30_000,
+        60_000,
       );
 
       let responseError: ChatMessage["error"] = "connection";
