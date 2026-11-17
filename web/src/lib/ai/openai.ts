@@ -11,6 +11,25 @@ export interface ModelClient {
   };
 }
 
+export class OpenAIRequestError extends Error {
+  constructor(readonly status: number, readonly retryAt?: number) {
+    super(`OpenAI request failed (HTTP ${status})`);
+    this.name = "OpenAIRequestError";
+  }
+}
+
+function retryAfterTime(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  const retryAt = /^\d+$/.test(trimmed)
+    ? Date.now() + Number(trimmed) * 1_000
+    : Date.parse(trimmed);
+  if (!Number.isSafeInteger(retryAt)) return undefined;
+  // Date.parse also accepts non-HTTP values such as negative numbers.
+  if (!/^\d+$/.test(trimmed) && new Date(retryAt).toUTCString() !== trimmed) return undefined;
+  return retryAt > Date.now() ? retryAt : undefined;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -98,8 +117,9 @@ export function createOpenAIClient(apiKey: string): ModelClient {
       }),
     });
     if (!response.ok) {
+      const retryAt = response.status === 429 ? retryAfterTime(response.headers.get("Retry-After")) : undefined;
       await response.body?.cancel();
-      throw new Error(`OpenAI request failed (HTTP ${response.status})`);
+      throw new OpenAIRequestError(response.status, retryAt);
     }
     return response;
   }

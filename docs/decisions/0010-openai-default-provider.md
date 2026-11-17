@@ -13,8 +13,19 @@ GPT-6 Luna.
 
 Default `AI_PROVIDER` to `openai` and `OPENAI_MODEL` to `gpt-6-luna`. Read
 `OPENAI_API_KEY` only on the server. Keep Gemini available through the explicit
-`AI_PROVIDER=gemini` setting and its existing key/model variables. Never silently
-switch vendors when credentials or an upstream request fail.
+`AI_PROVIDER=gemini` setting and its existing key/model variables. Do not switch
+vendors unless the operator explicitly enables the quota fallback below.
+
+An exhausted OpenAI daily quota caused both field explanations and chat to
+return generic provider failures despite valid local field context. At the
+user's request, support `AI_FALLBACK_PROVIDER=gemini` with a configured
+`GEMINI_API_KEY` as an opt-in fallback while keeping OpenAI primary. Only OpenAI
+HTTP 429 responses trigger fallback. Use Gemini's configured model and preserve
+the request's prompts, structured schemas, tool restrictions and abort signal.
+Honor valid `Retry-After` delays for subsequent requests to the same primary
+credentials/model. Do not switch after any primary stream output has been
+emitted, or on authentication, parsing, refusal, cancellation or other failures.
+Fallback failures remain explicit; they never become canned successful answers.
 
 Use the OpenAI Responses REST API with native fetch, low reasoning effort,
 bounded output tokens and `store: false`, without adding dependencies. Support
@@ -29,7 +40,12 @@ to the configured provider.
 
 - Existing Gemini deployments must explicitly set `AI_PROVIDER=gemini`, or
   supply an OpenAI API key to use the new default.
-- Chat, field explanations and context association all use the same provider.
+- Chat, field explanations and context association share provider selection and
+  the opt-in quota-fallback policy.
+- With quota fallback enabled, each generation may use Gemini while OpenAI is
+  rate-limited. Both vendors receive only the existing bounded context, never
+  PDF bytes or entered values. Without opt-in, vendor failures never switch
+  providers automatically.
 - OpenAI receives the same bounded context previously sent to Gemini; PDF bytes
   and entered field values remain local. Privacy copy identifies both vendors.
 - The default model ID is user-requested, not a claim of verified API access.

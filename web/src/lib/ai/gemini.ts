@@ -8,7 +8,7 @@ import {
 } from "@google/genai";
 import type { AssociationRequest } from "@/lib/context-association";
 import { getAIConfig } from "./config";
-import { createOpenAIClient, type ModelClient, type ModelResponse } from "./openai";
+import { createOpenAIClient, OpenAIRequestError, type ModelClient, type ModelResponse } from "./openai";
 
 import type {
   ChatHistoryMessage,
@@ -36,22 +36,87 @@ const MAX_HISTORY_MESSAGE_LENGTH = 1_000;
 const MAX_FIELDS_IN_PROMPT = 250;
 const LOOKUP_TOOL = "lookup_official_information";
 
-let cachedClient: GoogleGenAI | null = null;
+let cachedClient: { apiKey: string; client: GoogleGenAI } | null = null;
+type QuotaCooldown = {
+  apiKey: string;
+  model: string;
+  fallbackKey: string;
+  fallbackModel: string;
+  retryAt: number;
+};
+let quotaCooldown: QuotaCooldown | undefined;
+const clientConfigurations = new WeakMap<ModelClient, {
+  provider: "openai" | "gemini";
+  cooldown?: QuotaCooldown;
+}>();
 let nextLogId = 0;
 
-function startDevLog(operation: string, details: Record<string, unknown>) {
+function startDevLog(
+  operation: string,
+  details: Record<string, unknown>,
+  provider = getAIConfig().provider,
+) {
   const enabled = process.env.NODE_ENV === "development";
   const id = enabled ? ++nextLogId : 0;
   const started = Date.now();
   const log = (event: string, data: Record<string, unknown> = {}) => {
     if (enabled) {
-      console.info(`[${getAIConfig().provider}]`, {
+      console.info(`[${provider}]`, {
         id, operation, event, elapsedMs: Date.now() - started, ...data,
       });
     }
   };
   log("start", details);
   return log;
+}
+
+function getGeminiClient(apiKey: string): ModelClient {
+  if (cachedClient?.apiKey !== apiKey) {
+    cachedClient = { apiKey, client: new GoogleGenAI({ apiKey }) };
+  }
+  return cachedClient.client;
+}
+
+type GenerationRequest = {
+  ai: ModelClient;
+  params: GenerateContentParameters;
+  provider: "openai" | "gemini";
+  cooldown?: QuotaCooldown;
+  fallbackReason?: "openai_http_429" | "openai_cooldown";
+};
+
+function* generationRequests(ai: ModelClient, params: GenerateContentParameters): Generator<GenerationRequest> {
+  const { provider, cooldown } = clientConfigurations.get(ai)!;
+  if (!cooldown) {
+    yield { ai, params, provider };
+    return;
+  }
+  const coolingDown = cooldown.retryAt > Date.now();
+  if (!coolingDown) yield { ai, params, provider: "openai", cooldown };
+  params.config?.abortSignal?.throwIfAborted();
+  const model = cooldown.fallbackModel;
+  yield {
+    ai: getGeminiClient(cooldown.fallbackKey),
+    provider: "gemini",
+    fallbackReason: coolingDown ? "openai_cooldown" : "openai_http_429",
+    params: {
+      ...params,
+      model,
+      config: {
+        ...params.config,
+        thinkingConfig: model.startsWith("gemini-2.5-")
+          ? { thinkingBudget: 512 }
+          : { thinkingLevel: ThinkingLevel.LOW },
+      },
+    },
+  };
+}
+
+function recoverQuota(request: GenerationRequest, error: unknown): boolean {
+  if (!request.cooldown || request.params.config?.abortSignal?.aborted ||
+      !(error instanceof OpenAIRequestError) || error.status !== 429) return false;
+  request.cooldown.retryAt = Math.max(request.cooldown.retryAt, error.retryAt ?? 0);
+  return true;
 }
 
 function requestLogDetails(params: GenerateContentParameters) {
@@ -100,17 +165,22 @@ async function generateLogged(
   operation: string,
   params: GenerateContentParameters,
 ): Promise<ModelResponse> {
-  const log = startDevLog(operation, requestLogDetails(params));
-  try {
-    const response = await ai.models.generateContent(params);
-    if (process.env.NODE_ENV === "development") {
-      log("complete", responseLogDetails(response));
+  for (const request of generationRequests(ai, params)) {
+    const log = startDevLog(operation, {
+      ...requestLogDetails(request.params), fallbackReason: request.fallbackReason,
+    }, request.provider);
+    try {
+      const response = await request.ai.models.generateContent(request.params);
+      if (process.env.NODE_ENV === "development") {
+        log("complete", responseLogDetails(response));
+      }
+      return response;
+    } catch (error) {
+      log("error", { name: error instanceof Error ? error.name : "UnknownError" });
+      if (!recoverQuota(request, error)) throw error;
     }
-    return response;
-  } catch (error) {
-    log("error", { name: error instanceof Error ? error.name : "UnknownError" });
-    throw error;
   }
+  throw new Error("The AI service did not return a response");
 }
 
 async function* streamLogged(
@@ -118,45 +188,63 @@ async function* streamLogged(
   operation: string,
   params: GenerateContentParameters,
 ): AsyncGenerator<ModelResponse> {
-  const log = startDevLog(operation, requestLogDetails(params));
-  let chunks = 0;
-  let completed = false;
-  let failed = false;
-  let unsuccessfulFinish = false;
-  try {
-    const stream = await ai.models.generateContentStream(params);
-    for await (const chunk of stream) {
-      chunks++;
-      for (const candidate of chunk.candidates ?? []) {
-        if (candidate.finishReason && candidate.finishReason !== "STOP") unsuccessfulFinish = true;
+  for (const request of generationRequests(ai, params)) {
+    const log = startDevLog(operation, {
+      ...requestLogDetails(request.params), fallbackReason: request.fallbackReason,
+    }, request.provider);
+    let chunks = 0;
+    let completed = false;
+    let failed = false;
+    let unsuccessfulFinish = false;
+    try {
+      const stream = await request.ai.models.generateContentStream(request.params);
+      for await (const chunk of stream) {
+        chunks++;
+        for (const candidate of chunk.candidates ?? []) {
+          if (candidate.finishReason && candidate.finishReason !== "STOP") unsuccessfulFinish = true;
+        }
+        if (process.env.NODE_ENV === "development") {
+          log("response", responseLogDetails(chunk));
+        }
+        yield chunk;
       }
-      if (process.env.NODE_ENV === "development") {
-        log("response", responseLogDetails(chunk));
-      }
-      yield chunk;
+      if (unsuccessfulFinish) throw new Error("The AI generation did not finish successfully");
+      completed = true;
+      log("complete", { chunks });
+      return;
+    } catch (error) {
+      failed = true;
+      log("error", { chunks, name: error instanceof Error ? error.name : "UnknownError" });
+      if (chunks || !recoverQuota(request, error)) throw error;
+    } finally {
+      if (!completed && !failed) log("cancelled", { chunks });
     }
-    if (unsuccessfulFinish) throw new Error("The AI generation did not finish successfully");
-    completed = true;
-    log("complete", { chunks });
-  } catch (error) {
-    failed = true;
-    log("error", { chunks, name: error instanceof Error ? error.name : "UnknownError" });
-    throw error;
-  } finally {
-    if (!completed && !failed) log("cancelled", { chunks });
   }
 }
 
 function getClient(): ModelClient {
-  const { provider, apiKey } = getAIConfig();
+  const config = getAIConfig();
+  const { provider, apiKey } = config;
 
-  if (!apiKey) {
+  if (!apiKey?.trim()) {
     throw new Error("The AI service is not configured");
   }
 
-  if (provider === "openai") return createOpenAIClient(apiKey);
-  cachedClient ??= new GoogleGenAI({ apiKey });
-  return cachedClient;
+  if (config.provider === "openai" && config.fallback) {
+    if (!quotaCooldown || quotaCooldown.apiKey !== apiKey || quotaCooldown.model !== config.model ||
+        quotaCooldown.fallbackKey !== config.fallback.apiKey || quotaCooldown.fallbackModel !== config.fallback.model) {
+      quotaCooldown = {
+        apiKey, model: config.model,
+        fallbackKey: config.fallback.apiKey, fallbackModel: config.fallback.model, retryAt: 0,
+      };
+    }
+  } else {
+    quotaCooldown = undefined;
+  }
+  const ai = provider === "openai" ? createOpenAIClient(apiKey) : getGeminiClient(apiKey);
+  // Capture the state before any awaits, including deferred streaming iteration.
+  clientConfigurations.set(ai, { provider, cooldown: quotaCooldown });
+  return ai;
 }
 
 function cleanText(value: string, maxLength: number): string {

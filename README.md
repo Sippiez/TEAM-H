@@ -83,6 +83,13 @@ can select another compatible OpenAI Responses API model; model availability
 depends on the account. The configured account's `gpt-6-luna` chat was verified
 live, including conversational follow-ups and official-source answers.
 Gemini defaults to `gemini-3.1-flash-lite` when explicitly selected.
+To keep OpenAI primary but recover from its quota/rate limits, set
+`AI_FALLBACK_PROVIDER=gemini` and provide `GEMINI_API_KEY`. This opt-in fallback
+applies to chat, field explanations and field-context association on OpenAI
+HTTP 429 responses only. It uses `GEMINI_MODEL` (or its default), respects a
+valid OpenAI `Retry-After` delay, and never switches providers after an answer
+has started streaming. Other errors and cancellation still fail explicitly.
+Without this setting, providers never switch automatically.
 See [decision 0010](docs/decisions/0010-openai-default-provider.md).
 Field-panel explanations also use the selected provider and require its key. They use the
 selected field's printed question and instructions, plus curated guidance when
