@@ -155,6 +155,29 @@ test("direct mapped pages cost no search credits; failure searches Serper once a
   assert.equal(result.sources[0].url, alternate);
 });
 
+test("guarantor fallback keeps the specific topic when the mapped page lacks guarantor guidance", async () => {
+  const alternate = "https://www.canada.ca/en/passport-guarantor-info";
+  const api = setup({
+    response: async () => Response.json({ organic: [{ link: alternate }] }),
+    fetchPage: async (url) => ({
+      url, language: "en-CA", title: "Canadian passport information",
+      text: url === alternate
+        ? "A passport guarantor confirms your identity and signs the application."
+        : "Apply for a Canadian passport and find general travel information.",
+    }),
+  });
+  const result = await api.lookupOfficialWithSerper({
+    serviceId: "passport", jurisdiction: "federal", facetId: "guarantor", language: "en", formId: "pptc153",
+  });
+  assert.equal(api.requests.length, 1);
+  assert.match(JSON.parse(api.requests[0].body).q, /guarantor role and requirements/);
+  assert.equal(result.outcome.status, "verified");
+  assert.equal(result.outcome.fallbackReason, "no_relevant_pages");
+  assert.equal(result.sources.length, 1);
+  assert.equal(result.sources[0].url, alternate);
+  assert.match(result.sources[0].evidence, /guarantor confirms your identity/);
+});
+
 test("unapproved URLs and snippets never bypass official-page verification", async () => {
   let fetches = 0;
   const blocked = setup({

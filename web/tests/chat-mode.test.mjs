@@ -29,7 +29,7 @@ vm.runInNewContext(compile("../src/components/form-helper/i18n.ts") + "\nexports
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 const pdf = { name: "test.pdf", size: 8, arrayBuffer: async () => new TextEncoder().encode("%PDF-1.7").buffer };
 
-function mount({ language = "en", failPdf = false } = {}) {
+function mount({ language = "en", failPdf = false, fields = [] } = {}) {
   const slots = [];
   let cursor = 0;
   let effects = [];
@@ -67,7 +67,7 @@ function mount({ language = "en", failPdf = false } = {}) {
     "@/lib/field-context": { summarizeField: (field) => field },
     "@/lib/pdf/extract": { loadForm: async (_data, fileName) => {
       if (failPdf) throw new Error("Unreadable PDF");
-      return { fileName, pageCount: 1, fields: [], doc: { loadingTask: { destroy() {} } } };
+      return { fileName, pageCount: 1, fields, doc: { loadingTask: { destroy() {} } } };
     } },
     "./i18n": { useI18n: () => ({ lang: language, t: translations.dicts[language] }), setLang() {} },
     "./styles": {},
@@ -84,6 +84,7 @@ function mount({ language = "en", failPdf = false } = {}) {
     window: { setTimeout, clearTimeout, scrollTo() {}, matchMedia: () => ({ matches: true }) },
     requestAnimationFrame: (fn) => fn(),
     fetch: async (url, options) => {
+      if (url === "/api/explain") return { ok: true, json: async () => ({ meaning: "Field explanation." }) };
       calls.push({ url, ...options, payload: JSON.parse(options.body) });
       let controller;
       const body = new ReadableStream({ start(value) { controller = value; } });
@@ -139,6 +140,43 @@ function mount({ language = "en", failPdf = false } = {}) {
     },
   };
 }
+
+test("asking about new fields retains history and clearing field context does not reset conversation", async () => {
+  const fields = ["Name", "Signature"].map((label, index) => ({
+    id: `field-${index}`, label, type: "text", page: 1, section: "",
+    context: { status: "resolved", source: "layout", question: label, instructions: [] },
+  }));
+  const app = mount({ fields });
+  app.start();
+  await app.upload();
+  app.streams[0].write("A form overview.");
+  app.streams[0].end();
+  await settle();
+  app.render();
+  for (const [index, field] of fields.entries()) {
+    app.component("FieldPanel").onAsk(field);
+    await settle();
+    const payload = app.calls[index + 1].payload;
+    assert.equal(payload.intent, "field");
+    assert.equal(payload.selectedFieldId, field.id);
+    assert.deepEqual(payload.form.fields.map((item) => item.id), [field.id]);
+    assert.ok(payload.history.some((turn) => turn.text === "A form overview."));
+    if (index) assert.ok(payload.history.some((turn) => turn.text === "Previous field explanation."));
+    app.streams[index + 1].write("Previous field explanation.");
+    app.streams[index + 1].end();
+    await settle();
+    app.render();
+  }
+  app.component("ChatPanel").onClearAsking();
+  app.render();
+  app.component("ChatPanel").onSend("Switch topics: what is a guarantor?");
+  await settle();
+  assert.equal(app.calls[3].payload.selectedFieldId, undefined);
+  assert.ok(app.calls[3].payload.history.some((turn) => turn.text === "Previous field explanation."));
+  app.streams[3].end();
+  await settle();
+  app.reset();
+});
 
 test("lookup scope survives interrupted and metadata-only answers and changes with the topic", async () => {
   const app = mount();

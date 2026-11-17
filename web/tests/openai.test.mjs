@@ -5,8 +5,9 @@ import test from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
 
-function setup({ env = { OPENAI_API_KEY: "test-key" }, fetch: fetchImpl } = {}) {
+function setup({ env = { OPENAI_API_KEY: "test-key" }, fetch: fetchImpl, routing = "official_lookup" } = {}) {
   const calls = [];
+  const routeCalls = [];
   const cache = new Map();
   function load(path) {
     if (cache.has(path)) return cache.get(path);
@@ -20,7 +21,15 @@ function setup({ env = { OPENAI_API_KEY: "test-key" }, fetch: fetchImpl } = {}) 
       exports, Error, DOMException, AbortController, TextDecoder,
       process: { env },
       fetch: async (url, init) => {
-        calls.push({ url, ...init, body: JSON.parse(init.body) });
+        const body = JSON.parse(init.body);
+        if (body.text?.format.schema.properties.mode) {
+          routeCalls.push({ url, ...init, body });
+          return Response.json(completed(JSON.stringify({
+            mode: routing,
+            question: JSON.parse(body.input).message,
+          })));
+        }
+        calls.push({ url, ...init, body });
         assert.ok(fetchImpl, "Unexpected provider call");
         return fetchImpl(url, init);
       },
@@ -41,7 +50,7 @@ function setup({ env = { OPENAI_API_KEY: "test-key" }, fetch: fetchImpl } = {}) 
     }, { filename: path });
     return exports;
   }
-  return { load, calls };
+  return { load, calls, routeCalls };
 }
 
 function completed(text = "Bonjour") {
@@ -96,7 +105,8 @@ test("provider selection defaults to OpenAI Luna, supports overrides, and never 
 
 test("default chat streams OpenAI UTF-8 SSE across arbitrary byte boundaries with the request signal", async () => {
   const signal = new AbortController().signal;
-  const { load, calls } = setup({
+  const { load, calls, routeCalls } = setup({
+    routing: "conversation",
     fetch: async () => sse([
       { type: "response.created" },
       { type: "response.output_text.delta", delta: "Prénom " },
@@ -107,6 +117,7 @@ test("default chat streams OpenAI UTF-8 SSE across arbitrary byte boundaries wit
   const stream = await load("lib/ai/gemini").streamGeminiChat({
     intent: "field", message: "Explain the selected field", language: "fr",
     form: { pageCount: 1, fields: [field] }, selectedFieldId: field.id, signal,
+    history: [{ role: "user", text: "Earlier question" }, { role: "assistant", text: "Earlier answer" }],
   });
   const events = await Array.fromAsync(stream);
   assert.deepEqual(events.map((event) => event.text), ["Prénom ", "légal."]);
@@ -123,6 +134,15 @@ test("default chat streams OpenAI UTF-8 SSE across arbitrary byte boundaries wit
   assert.match(call.body.input, /Full legal name/);
   assert.match(call.body.instructions, /French/);
   assert.equal(call.body.tools, undefined);
+  assert.match(call.body.input, /Earlier question[\s\S]*Earlier answer/);
+  assert.equal(routeCalls.length, 1);
+  const routing = routeCalls[0];
+  assert.equal(routing.body.model, "gpt-6-luna");
+  assert.equal(routing.body.stream, false);
+  assert.equal(routing.body.text.format.strict, true);
+  assert.equal(routing.body.store, false);
+  assert.equal(routing.signal, signal);
+  assert.match(routing.body.input, /Earlier question[\s\S]*Earlier answer/);
 });
 
 test("OpenAI explanations and associations use strict JSON schemas and preserve existing parsing", async () => {
@@ -169,6 +189,7 @@ test("one-line field follow-up sends the selected field and preceding answer to 
   const guarantor = { ...field, label: "Guarantor: passport date of issue", context: undefined };
   const previousAnswer = "This field asks for the issue date of the guarantor's passport.";
   const { load, calls } = setup({
+    routing: "conversation",
     fetch: async () => sse([
       { type: "response.output_text.delta", delta: previousAnswer },
       { type: "response.completed", response: completed(previousAnswer) },

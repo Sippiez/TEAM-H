@@ -2,6 +2,9 @@
 
 - Date: 2026-11-16
 - Status: Accepted
+- Updated by: [0011](0011-natural-conversation-and-official-verification.md) for
+  optional field context and model-driven conversational routing. Public lookup
+  scope, renewal mode and retrieval safeguards remain in effect.
 
 ## Context
 

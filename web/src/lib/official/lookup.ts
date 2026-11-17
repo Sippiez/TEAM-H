@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { abortable } from "@/lib/abortable";
 import {
   allowedRootsForSelection,
+  facetMatchesText,
   PUBLIC_FORMS,
   publicFormReference,
   publicFormMatchesText,
@@ -90,6 +91,7 @@ function isRelevantServicePage(
   page: { url: string; title: string; text: string },
 ): boolean {
   const content = `${page.title} ${page.text}`;
+  if (selection.facetId === "guarantor" && !facetMatchesText(content, "guarantor")) return false;
   if (selection.publicForm) return publicFormMatchesText(selection.publicForm, content);
   const newApplicationPath = /\/(?:new-adult-passport|nouveau-passeport-adulte)(?:\/|\.html|$)/i.test(
     parseAllowedOfficialUrl(page.url)?.url.pathname ?? "",
@@ -141,9 +143,15 @@ function asSource(
     fees: [/\$\s*\d|\b\d[\d,.]*\s*(?:\$|dollars?\b)/i, /\b(?:fees?|costs?|frais|coûts?|tarifs?)\b/i],
     documents: [/\b(?:documents?|forms?|photos?|formulaires?|pièces?)\b/i],
     steps: [/\b(?:steps?|submit|apply|étapes?|soumettre|présenter)\b/i],
+    guarantor: [
+      /\b(?:what your guarantor|who can be (?:a |your )?guarantor|guarantor (?:needs|requirements)|qui peut [eê]tre (?:un |votre )?r[ée]pondant|r[ée]pondant doit)\b/i,
+      /\b(?:guarantors?|r[ée]pondant(?:e)?s?|garant(?:e)?s?)\b/i,
+    ],
   };
   const cue = cues[selection.facetId].map((pattern) => pattern.exec(page.text)).find(Boolean);
-  const anchor = formMention?.index ?? cue?.index;
+  const anchor = selection.facetId === "guarantor"
+    ? cue?.index ?? formMention?.index
+    : formMention?.index ?? cue?.index;
   const evidenceStart = anchor === undefined ? 0 : Math.max(0, anchor - 1_000);
   return {
     id,

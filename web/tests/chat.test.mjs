@@ -161,7 +161,7 @@ test("text is streamed incrementally with bounded history and selected context",
   assert.equal(timers.size, 0);
 });
 
-test("field intent validates the selection, drops history and preserves streaming", async () => {
+test("field intent validates the selection, retains history and preserves streaming", async () => {
   let input;
   const { POST, timers } = setupRoute(async (value) => {
     input = value;
@@ -185,7 +185,8 @@ test("field intent validates the selection, drops history and preserves streamin
   assert.equal(input.intent, "field");
   assert.equal(input.selectedFieldId, field.id);
   assert.equal(input.language, "fr");
-  assert.equal(input.history.length, 0);
+  assert.equal(input.history.length, 1);
+  assert.equal(input.history[0].text, "Unrelated earlier conversation");
   assert.equal(timers.size, 0);
 });
 
@@ -293,9 +294,14 @@ function setupGemini({
   streamError,
   searchUrls = [],
   searchStatus = 200,
+  routing = "official_lookup",
+  routingQuestion,
+  routingResponse,
+  routingError,
 } = {}) {
   env = { ...env, AI_PROVIDER: "gemini" };
   const calls = [];
+  const routeCalls = [];
   const logs = [];
   const directAttempts = [];
   const searchRequests = [];
@@ -341,6 +347,14 @@ function setupGemini({
       GoogleGenAI: class {
         models = {
           generateContent: async (input) => {
+            if (input.config.responseJsonSchema?.properties?.mode) {
+              routeCalls.push(input);
+              if (routingError) throw routingError;
+              return { text: routingResponse === undefined ? JSON.stringify({
+                mode: routing,
+                question: routingQuestion ?? JSON.parse(input.contents).message,
+              }) : routingResponse };
+            }
             calls.push({ kind: "planner", ...input });
             if (generationError) throw generationError;
             if (input.config.responseMimeType === "application/json") {
@@ -366,7 +380,7 @@ function setupGemini({
     "@/lib/official/context": officialContext,
     "@/lib/official/lookup": officialLookup,
   }, { process: { env }, console: { info: (...args) => logs.push(args) } });
-  return { streamGeminiChat, calls, directAttempts, searchRequests, logs };
+  return { streamGeminiChat, calls, routeCalls, directAttempts, searchRequests, logs };
 }
 
 async function collect(stream) {
@@ -375,9 +389,149 @@ async function collect(stream) {
   return events;
 }
 
+test("general explanations and natural follow-ups work without a form or a selected field", async () => {
+  const { streamGeminiChat, calls, routeCalls } = setupGemini({
+    routing: "conversation",
+    finalChunks: [{ text: "A general explanation." }],
+  });
+  const history = [];
+  for (const message of [
+    "Who is a guarantor?",
+    "Could you put that another way, with an everyday example?",
+    "Now explain the difference between a witness and a reference.",
+  ]) {
+    const events = await collect(await streamGeminiChat({
+      message, history: [...history], language: "en",
+      lookup: () => assert.fail("General conversation must not require official lookup"),
+    }));
+    assert.ok(events.every((event) => event.type === "delta"));
+    const prompt = calls.at(-1).contents;
+    assert.ok(prompt.endsWith(message));
+    for (const turn of history) assert.ok(prompt.includes(turn.text));
+    const routed = JSON.parse(routeCalls.at(-1).contents);
+    assert.equal(routed.form.selectedField, null);
+    assert.deepEqual(routed.history, history);
+    history.push({ role: "user", text: message }, { role: "assistant", text: "A general explanation." });
+  }
+});
+
+test("selected-field context does not replace a general question or an explicit topic change", async () => {
+  const { streamGeminiChat, calls, routeCalls } = setupGemini({ routing: "conversation" });
+  const history = [
+    { role: "user", text: "Explain the date-of-issue field." },
+    { role: "assistant", text: "It means the date that document was issued." },
+  ];
+  for (const message of ["Who is a guarantor?", "Switch topics: what does self-employed mean?"]) {
+    await collect(await streamGeminiChat({
+      message, history, form, selectedFieldId: field.id, language: "en",
+      lookup: () => assert.fail("A selected field must not force a government-rule lookup"),
+    }));
+    assert.ok(calls.at(-1).contents.endsWith(message));
+    assert.equal(JSON.parse(routeCalls.at(-1).contents).form.selectedField.id, field.id);
+  }
+});
+
+test("an indirect rephrase uses the latest concept rather than jumping back to the selected field", async () => {
+  const resolvedQuestion = "Explain the general role of a guarantor in one friendly sentence.";
+  const { streamGeminiChat, calls } = setupGemini({ routing: "conversation", routingQuestion: resolvedQuestion });
+  await collect(await streamGeminiChat({
+    message: "Say that like you would to a friend, in one line.", language: "en",
+    form, selectedFieldId: field.id,
+    history: [
+      { role: "user", text: "What does this field mean?" },
+      { role: "assistant", text: "It means the issue date on the guarantor's passport." },
+      { role: "user", text: "Who is a guarantor?" },
+      { role: "assistant", text: "A guarantor is someone who vouches for another person." },
+    ],
+    lookup: () => assert.fail("A general role rephrase is conversational"),
+  }));
+  assert.ok(calls[0].contents.includes(`RESOLVED_CONVERSATION_REQUEST:\n${resolvedQuestion}`));
+  assert.match(calls[0].contents, /CURRENT_USER_REQUEST:\nSay that like you would to a friend, in one line\./);
+});
+
+test("semantic official follow-ups resolve their subject without leaking rewritten public form identities", async () => {
+  const question = "What are the Employment Insurance fees? Answer in one short sentence.";
+  const { streamGeminiChat, calls, routeCalls } = setupGemini({
+    routingQuestion: question,
+    directPage: { title: "Employment Insurance fees", text: "Employment Insurance fee information." },
+  });
+  const events = await collect(await streamGeminiChat({
+    message: "What'll that set me back? Keep it tiny.", language: "en",
+    history: [
+      { role: "user", text: "Tell me about Employment Insurance." },
+      { role: "assistant", text: "STALE-AMOUNT-CANARY" },
+    ],
+    form: { ...form, formNumber: "PPTC 153" }, selectedFieldId: field.id,
+  }));
+  assert.equal(events[0].outcome.serviceId, "employment_insurance");
+  assert.equal(events[0].outcome.facetId, "fees");
+  assert.ok(calls[0].contents.includes(question));
+  assert.doesNotMatch(calls[0].contents, /STALE-AMOUNT-CANARY/);
+  assert.match(routeCalls[0].contents, /STALE-AMOUNT-CANARY/);
+
+  const rewritten = setupGemini({ routingQuestion: "Where do I download form PRIVATE 1234 in Ontario?" });
+  let selection;
+  await collect(await rewritten.streamGeminiChat({
+    message: "Where do I download form CIT 0001?", language: "en",
+    lookup: async (args) => {
+      selection = args;
+      return { outcome: { ...args, status: "unavailable", reason: "fetch_failed", partial: false }, sources: [] };
+    },
+  }));
+  assert.equal(selection.publicForm.number, "CIT 0001");
+  assert.equal(selection.jurisdiction, undefined);
+  assert.doesNotMatch(JSON.stringify(selection), /PRIVATE|1234/);
+});
+
+test("field and overview hints cannot bypass verification for a government-rule request", async () => {
+  for (const intent of ["field", "overview"]) {
+    const { streamGeminiChat, calls, routeCalls } = setupGemini();
+    let selection;
+    const events = await collect(await streamGeminiChat({
+      message: "Explain guarantors and who qualifies for a Canadian passport.", intent,
+      form: { ...form, formNumber: "PPTC 153" }, selectedFieldId: field.id, language: "en",
+      lookup: async (args) => {
+        selection = args;
+        return { outcome: { ...args, status: "unavailable", reason: "fetch_failed", partial: false }, sources: [] };
+      },
+    }));
+    assert.equal(routeCalls.length, 1);
+    assert.equal(selection.serviceId, "passport");
+    assert.equal(selection.facetId, "guarantor");
+    assert.equal(events[0].outcome.status, "unavailable");
+    assert.equal(calls.length, 0, "Failed verification must not become a model-memory answer");
+  }
+});
+
+test("invalid or failed routing never silently falls back to a general answer", async () => {
+  for (const routingResponse of [
+    "", "not JSON", "null", "[]",
+    JSON.stringify({ mode: "unknown", question: "" }),
+    JSON.stringify({ mode: "official_lookup", question: " " }),
+    JSON.stringify({ mode: "official_lookup", question: "\u0000" }),
+    JSON.stringify({ mode: "official_lookup", question: "x".repeat(1_001) }),
+    JSON.stringify({ mode: "conversation", question: "" }),
+    JSON.stringify({ mode: "conversation", question: 42 }),
+    JSON.stringify({ mode: "conversation", question: "", query: "PRIVATE-CANARY" }),
+  ]) {
+    const { streamGeminiChat, calls, directAttempts, searchRequests } = setupGemini({ routingResponse });
+    await assert.rejects(streamGeminiChat({ message: "Passport fees?", language: "en" }));
+    assert.equal(calls.length + directAttempts.length + searchRequests.length, 0);
+  }
+  const { streamGeminiChat, calls, logs } = setupGemini({
+    routingError: new Error("PRIVATE-PROVIDER-ERROR"), env: { GEMINI_API_KEY: "test", NODE_ENV: "development" },
+  });
+  const { POST } = setupRoute(streamGeminiChat);
+  const response = await POST(request({ message: "Passport fees?", language: "en" }));
+  assert.equal(response.status, 502);
+  assert.doesNotMatch(await response.text(), /PRIVATE-/);
+  assert.doesNotMatch(JSON.stringify(logs), /PRIVATE-/);
+  assert.equal(calls.length, 0);
+});
+
 test("selected field simple sentence follow-up stays in metadata routing", async () => {
   const surname = { ...field, label: "Surname of parent(s) at their birth" };
-  const { streamGeminiChat, calls, directAttempts, searchRequests } = setupGemini();
+  const { streamGeminiChat, calls, directAttempts, searchRequests } = setupGemini({ routing: "conversation" });
   const events = await collect(await streamGeminiChat({
     message: "Explain that in one simple sentence", language: "en",
     form: { ...form, formNumber: "PPTC 153", fields: [surname] }, selectedFieldId: surname.id,
@@ -409,7 +563,7 @@ test("field paraphrases preserve the last substantive user topic", async (t) => 
     ["Explain that again", "en", [...fieldHistory, { role: "user", text: "explain in one line" }, { role: "assistant", text: "A one-line explanation." }]],
   ]) {
     await t.test(question, async () => {
-      const { streamGeminiChat, calls, directAttempts, searchRequests } = setupGemini();
+      const { streamGeminiChat, calls, directAttempts, searchRequests } = setupGemini({ routing: "conversation" });
       const events = await collect(await streamGeminiChat({ ...selected, message: question, language, history, lookup: () => assert.fail("Unexpected lookup") }));
       assert.deepEqual(calls.map((call) => call.kind), ["stream"]);
       assert.match(calls[0].contents, /Surname of parent\(s\) at their birth/);
@@ -425,9 +579,6 @@ test("field paraphrases preserve the last substantive user topic", async (t) => 
     ["Explain in one line what are the passport fees?", fieldHistory, selected],
     ["In one line, where can I download the form?", fieldHistory, selected],
     ["Explain that in one simple sentence", [{ role: "user", text: "What are the passport fees?" }, { role: "assistant", text: "Fee information." }], {}],
-    ["Explain that in one simple sentence", [], selected],
-    ["Explain that in one simple sentence", [fieldHistory[0]], selected],
-    ["Explain that in one simple sentence", fieldHistory, { ...selected, selectedFieldId: "missing" }],
   ]) {
     await t.test(question + " " + JSON.stringify(selection), async () => {
       const { streamGeminiChat } = setupGemini();
@@ -442,7 +593,7 @@ test("field paraphrases preserve the last substantive user topic", async (t) => 
 
 test("one-line follow-up keeps the latest selected-field explanation instead of looking up passport overview", async () => {
   const guarantor = { ...field, label: "Guarantor: passport date of issue" };
-  const { streamGeminiChat, calls, directAttempts, searchRequests } = setupGemini();
+  const { streamGeminiChat, calls, directAttempts, searchRequests } = setupGemini({ routing: "conversation" });
   const history = [
     { role: "user", text: "What does this field mean?" },
     { role: "assistant", text: "Surname of parent(s) at their birth asks for their birth surnames." },
@@ -479,6 +630,31 @@ test("one-line rephrases of live fee answers retain the fee topic despite an unr
   assert.equal(calls.length, 0);
 });
 
+test("guarantor eligibility follow-up retrieves the passport requirements rather than a general passport overview", async () => {
+  const guarantor = { ...field, label: "Guarantor: surname in passport" };
+  const requirementsUrl = "https://www.canada.ca/en/immigration-refugees-citizenship/services/canadian-passports/new-adult-passport/required-documents-photos.html";
+  const evidence = "You need a guarantor to confirm your identity and information by signing the guarantor section of your passport application.";
+  const { streamGeminiChat, calls, directAttempts, searchRequests } = setupGemini({
+    directPage: (url) => ({
+      url, language: "en-CA",
+      title: url === requirementsUrl ? "What you need to apply for a passport" : "Canadian passports and other travel documents",
+      text: url === requirementsUrl ? evidence : "Find how to apply for a Canadian passport and other travel documents.",
+    }),
+  });
+  const events = await collect(await streamGeminiChat({
+    message: "Who can be a guarantor for a Canadian passport?", language: "en",
+    form: { ...form, formNumber: "PPTC 153", fields: [guarantor] }, selectedFieldId: guarantor.id,
+    history: [
+      { role: "user", text: "What does this field mean?" },
+      { role: "assistant", text: "Guarantor: surname in passport asks for the guarantor's surname as shown in their passport." },
+    ],
+  }));
+  assert.ok(directAttempts.includes(requirementsUrl), "Retrieve the page explaining the guarantor's role");
+  assert.equal(searchRequests.length, 0);
+  assert.ok(calls[0].contents.includes(evidence), "Give the model evidence that answers the question");
+  assert.ok(events[0].sources.some((source) => source.url === requirementsUrl));
+});
+
 test("renewal mode reaches direct lookup, answer scope and subsequent fee questions", async () => {
   const { streamGeminiChat, calls, directAttempts } = setupGemini({
     directPage: { title: "Renew your Canadian passport", text: "Passport renewal steps and fees are described here." },
@@ -501,7 +677,7 @@ test("selected-field blank follow-ups retain printed instructions without maskin
     instructions: ["Leave blank until an officer asks you to sign."],
   } };
   for (const [question, language] of [["Can I leave it blank?", "en"], ["Puis-je le laisser vide ?", "fr"]]) {
-    const { streamGeminiChat, calls } = setupGemini();
+    const { streamGeminiChat, calls } = setupGemini({ routing: "conversation" });
     await collect(await streamGeminiChat({ message: question, language, selectedFieldId: signature.id,
       form: { ...form, formNumber: "PPTC 153", fields: [signature] },
       lookup: () => assert.fail("Field follow-up must not look up the passport overview"),
@@ -522,7 +698,7 @@ test("selected-field blank follow-ups retain printed instructions without maskin
 
 test("route reports terminal generation status and retains partial metadata and official sources", async () => {
   for (const reason of ["MAX_TOKENS", "STOP", "SAFETY"]) {
-    const { streamGeminiChat } = setupGemini({ finalChunks: [{ text: "Partial answer", candidates: [{ finishReason: reason }] }] });
+    const { streamGeminiChat } = setupGemini({ routing: "conversation", finalChunks: [{ text: "Partial answer", candidates: [{ finishReason: reason }] }] });
     const { POST } = setupRoute(streamGeminiChat);
     const response = await POST(request({ message: "Explain this field", language: "en", form, selectedFieldId: field.id }));
     const body = await response.text();
@@ -678,7 +854,7 @@ test("invalid planner arguments are diagnosable without logging arbitrary values
     functionArgs: { serviceId: "unknown", jurisdiction: "PRIVATE-LOCATION", facetId: "documents", language: "en", query: "PRIVATE-QUERY" },
   });
   await collect(await streamGeminiChat({ message: "PRIVATE-QUESTION", language: "en" }));
-  const call = logs.find(([, event]) => event.event === "complete")[1].functionCalls[0];
+  const call = logs.find(([, event]) => event.operation === "lookup-planning" && event.event === "complete")[1].functionCalls[0];
   assert.equal(call.selection, null);
   assert.equal(call.argumentStatus, "unknown_or_invalid_selection");
   assert.equal(call.arguments.serviceId, "unknown");
@@ -860,9 +1036,10 @@ test("official streaming filters URLs and citations split across provider chunks
   assert.equal(visible, "Read [1] now.\nIgnore  and .\nLinks:   \nDone.");
 });
 
-test("metadata-only Gemini prompt bounds context and excludes PDF bytes and field values", async () => {
-  const { streamGeminiChat, calls } = setupGemini({
+test("conversation routing and answers bound context and exclude PDF bytes and field values", async () => {
+  const { streamGeminiChat, calls, routeCalls } = setupGemini({
     env: { GEMINI_API_KEY: "test-only", GEMINI_MODEL: "configured-model" },
+    routing: "conversation",
   });
   const fields = Array.from({ length: 251 }, (_, i) => ({
     ...field, id: `field-${i}`, label: "\u0000" + "L".repeat(300),
@@ -875,6 +1052,14 @@ test("metadata-only Gemini prompt bounds context and excludes PDF bytes and fiel
     history: Array(20).fill({ role: "user", text: "H".repeat(1500) }),
   });
   const events = await collect(stream);
+  const routing = routeCalls[0];
+  assert.equal(routing.config.abortSignal, signal);
+  assert.doesNotMatch(routing.contents, /private-field-value|private-pdf-bytes|\\u0000/);
+  const routed = JSON.parse(routing.contents);
+  assert.equal(routed.history.length, 12);
+  assert.equal(routed.history[0].text.length, 1_000);
+  assert.equal(routed.form.fields.length, 250);
+  assert.equal(routed.form.selectedField.id, "field-250");
   const call = calls.find((item) => item.kind === "stream");
   assert.equal(call.model, "configured-model");
   assert.equal(call.config.abortSignal, signal);
@@ -900,7 +1085,7 @@ test("metadata-only Gemini prompt bounds context and excludes PDF bytes and fiel
 });
 
 test("overview remains metadata-only and missing Gemini configuration remains explicit", async () => {
-  const { streamGeminiChat, calls } = setupGemini();
+  const { streamGeminiChat, calls } = setupGemini({ routing: "conversation" });
   const stream = await streamGeminiChat({ intent: "overview", form, language: "en" });
   await collect(stream);
   const call = calls.find((item) => item.kind === "stream");
@@ -917,6 +1102,7 @@ test("overview remains metadata-only and missing Gemini configuration remains ex
 test("a Gemini 2.5 override uses its supported nonzero thinking budget", async () => {
   const { streamGeminiChat, calls } = setupGemini({
     env: { GEMINI_API_KEY: "test-only", GEMINI_MODEL: "gemini-2.5-flash" },
+    routing: "conversation",
   });
   const stream = await streamGeminiChat({
     message: "What should I enter in this field?",
@@ -1116,7 +1302,7 @@ test("plain field-meaning questions remain metadata-only in both languages", asy
     ["fr", "Que signifie ce champ ?"],
   ]) {
     await t.test(language, async () => {
-      const { streamGeminiChat, calls } = setupGemini();
+      const { streamGeminiChat, calls } = setupGemini({ routing: "conversation" });
       const stream = await streamGeminiChat({
         message: messageText,
         selectedFieldId: field.id,
@@ -1164,7 +1350,7 @@ test("unresolved or repeated planner calls produce guided clarification", async 
 });
 
 test("full structured context is kept for the selected field without multiplying instructions across the catalogue", async () => {
-  const { streamGeminiChat, calls } = setupGemini();
+  const { streamGeminiChat, calls } = setupGemini({ routing: "conversation" });
   const detailed = {
     ...field,
     context: {
@@ -1187,8 +1373,8 @@ test("full structured context is kept for the selected field without multiplying
   assert.doesNotMatch(calls[0].contents, /private-answer|private-candidate-not-for-chat/);
 });
 
-test("field intent sends only the selected field and document metadata to Gemini", async (t) => {
-  const { streamGeminiChat, calls } = setupGemini();
+test("field intent focuses metadata without losing the conversation", async (t) => {
+  const { streamGeminiChat, calls } = setupGemini({ routing: "conversation" });
   const selected = {
     ...field,
     context: {
@@ -1217,7 +1403,8 @@ test("field intent sends only the selected field and document metadata to Gemini
   assert.equal(context.selectedField.id, selected.id);
   assert.deepEqual(context.selectedField.context, selected.context);
   assert.match(calls[1].config.systemInstruction, /Answer in French/);
-  assert.doesNotMatch(focused, /Unrelated field|Unrelated earlier conversation/);
+  assert.doesNotMatch(focused, /Unrelated field/);
+  assert.match(focused, /Unrelated earlier conversation/);
   assert.ok(focused.length < regular.length / 5, "Focused prompt must be at least 80% smaller for a 251-field form");
   t.diagnostic(`Prompt size: ${regular.length} -> ${focused.length} characters (${Math.round((1 - focused.length / regular.length) * 100)}% smaller)`);
   const minimal = { ...input, form: { ...form, fields: [fields[0], selected] } };
@@ -1226,7 +1413,7 @@ test("field intent sends only the selected field and document metadata to Gemini
 });
 
 test("explicit field intent uses focused metadata without depending on the question wording", async () => {
-  const { streamGeminiChat, calls } = setupGemini();
+  const { streamGeminiChat, calls } = setupGemini({ routing: "conversation" });
   const events = await collect(await streamGeminiChat({
     message: "Help me understand the selected question.",
     intent: "field",
@@ -1242,5 +1429,5 @@ test("explicit field intent uses focused metadata without depending on the quest
   const context = JSON.parse(calls[0].contents.split("FORM_CONTEXT:\n")[1].split("\n\nRECENT_CONVERSATION:")[0]);
   assert.equal(context.selectedField.id, field.id);
   assert.deepEqual(context.fields, []);
-  assert.doesNotMatch(calls[0].contents, /Unrelated earlier conversation/);
+  assert.match(calls[0].contents, /Unrelated earlier conversation/);
 });

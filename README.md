@@ -80,13 +80,34 @@ than only `selection: null`. Unregistered form labels are redacted from logs.
 These logs are disabled outside development.
 The default model is `gpt-6-luna`, with low reasoning effort. `OPENAI_MODEL`
 can select another compatible OpenAI Responses API model; model availability
-depends on the account and has not been verified with a live API call.
+depends on the account. The configured account's `gpt-6-luna` chat was verified
+live, including conversational follow-ups and official-source answers.
 Gemini defaults to `gemini-3.1-flash-lite` when explicitly selected.
 See [decision 0010](docs/decisions/0010-openai-default-provider.md).
 Field-panel explanations also use the selected provider and require its key. They use the
 selected field's printed question and instructions, plus curated guidance when
 available. PDF loading and local field-context extraction do not require a key;
 ambiguous contexts can be associated on demand using the selected provider.
+
+Chat is conversational with or without a PDF or selected field. A structured,
+model-driven routing step uses the recent conversation and optional form context
+to distinguish general explanations from questions needing official verification;
+it resolves indirect questions to their latest conversational subject for either
+path, without requiring specific follow-up phrases. General concepts, examples and
+rephrasing can use model knowledge, which is not verified official guidance.
+Government rules, eligibility, fees, deadlines, required documents, downloads
+and application procedures still require verified official sources. For example,
+"Who is a guarantor?" can receive a general explanation; "Who qualifies as a
+guarantor for a Canadian passport?" requires official verification. Rephrasing
+government rules also requires verification, not reuse of an old answer as
+evidence. Invalid routing output or provider errors fail explicitly rather than
+silently switching to an unverified answer.
+The routing step adds a bounded model request under the existing 60-second
+deadline. Its rewritten question is conversational reference, not a search query:
+only validated catalog hints can influence public service/topic routing, and
+model-inferred provinces need support in the user's public context. Model text
+cannot introduce a public form identity or a discovery URL.
+See [decision 0011](docs/decisions/0011-natural-conversation-and-official-verification.md).
 
 Service navigation uses **direct official-page lookup first**, with **Serper
 for web search**. Recognized download questions, mapped services and known
@@ -142,9 +163,13 @@ Passport renewals retain their own routing and saved links through follow-ups.
 Typed public form references can appear in form/download questions; generic
 identifiers must be explicitly labeled as forms. Requests to rephrase an answer
 and jurisdiction replies retain the earlier user question for synthesis.
-Short format-only follow-ups such as "explain in one line" keep the preceding
-selected-field explanation or service topic, in English and French, rather than
-starting a general form lookup. Explicit new questions still resolve their own topic.
+Follow-ups such as "explain in one line" keep their conversational topic in
+English and French, with or without a selected field. Explicit new questions
+resolve their own topic rather than remaining bound to the selected field.
+Government-specific guarantor questions retain a distinct public lookup topic. For passports, they
+fetch the official requirements page and select its guarantor section rather
+than using the general passport overview or the form-download page. A generic
+page without guarantor information cannot end that lookup successfully.
 The service dropdown has been
 removed. An identifiable unregistered form starts discovery automatically,
 searching only the fourteen approved roots when its jurisdiction is unknown.
@@ -207,11 +232,12 @@ in chat, filenames or field labels. Responses are not official guidance and can
 be wrong; verify government requirements using the linked official guide.
 
 **Ask about this field** sends only the selected field's metadata and document
-identity (form number, filename and page count), without other fields or earlier
-chat messages. Regular chat follow-ups and form overviews retain the broader
-form context. Requests to simplify a field explanation keep that field and the
-recent conversation in context; new fee or download questions still use official
-lookup.
+identity (form number, title, filename and page count), plus the bounded recent
+conversation, without other fields. It focuses the newly selected field without
+discarding history. Regular chat and form overviews retain the broader form
+context. The **Field context** badge is optional reference: clear it without
+resetting the conversation, or ask about a different subject while it remains
+selected. New government-rule questions still use official lookup.
 
 You can keep up to five PDFs open as document tabs. **Add PDF** opens
 another, and each tab has its own close button. The button to the left of

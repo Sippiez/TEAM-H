@@ -358,6 +358,7 @@ export function getServiceResources(
   if (jurisdiction !== "federal") return [];
   if (serviceId === "passport") {
     if (passportMode === "renewal") return getResources(["passport-renew"]);
+    if (facetId === "guarantor") return getResources(["passport-required-docs"]);
     if (facetId === "fees") return getResources(["passport-fees"]);
     if (facetId === "steps") return getResources(["passport-new-adult", "passport-submit"]);
     if (facetId === "documents") return getResources(["passport-get-form", "passport-required-docs"]);

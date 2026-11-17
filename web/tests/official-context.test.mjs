@@ -41,6 +41,33 @@ test("service switches require a compatible jurisdiction and preserve provincial
   assert.equal(switched.selection.jurisdiction, "on");
 });
 
+test("conversation hints resolve arbitrary follow-ups without overriding explicit services or inventing provinces", () => {
+  const hint = { serviceId: "health_card", jurisdiction: "on", facetId: "fees" };
+  const missing = resolveLookupContext({
+    message: "What'll that set me back?", conversationHint: hint, language: "en",
+  });
+  assert.equal(missing.reason, "missing_jurisdiction");
+  const scoped = resolveLookupContext({
+    message: "What'll that set me back?", conversationHint: hint, language: "en",
+    formNumber: "PPTC 153",
+    history: [
+      { role: "user", text: "I am asking about a health card in Ontario." },
+      { role: "assistant", text: "What would you like to know?" },
+      { role: "user", text: "Let me think." },
+    ],
+  });
+  assert.equal(scoped.selection.serviceId, "health_card");
+  assert.equal(scoped.selection.jurisdiction, "on");
+  assert.equal(scoped.selection.facetId, "fees");
+  assert.equal(scoped.selection.formId, undefined);
+  const explicit = resolveLookupContext({
+    message: "Passport documents", conversationHint: hint, language: "en",
+  });
+  assert.equal(explicit.selection.serviceId, "passport");
+  assert.equal(explicit.selection.jurisdiction, "federal");
+  assert.equal(explicit.selection.facetId, "documents");
+});
+
 test("embedded public form references are bounded and ambiguous or private numbers are ignored", () => {
   const result = resolveLookupContext({ message: "Where can I download form CIT 0001? PERSONAL-CANARY", language: "en" });
   assert.equal(result.selection.publicForm.number, "CIT 0001");
@@ -111,6 +138,25 @@ test("short format-only follow-ups are rephrases but explicit new questions are 
     assert.equal(resolveLookupQuestion(message, [
       { role: "user", text: "What does this field mean?" }, { role: "assistant", text: "A name." },
     ]), message);
+  }
+});
+
+test("guarantor questions retain their topic within the open form without leaking question text into search", () => {
+  for (const [message, language] of [
+    ["who is a guarantor? PRIVATE-CANARY", "en"],
+    ["Who can be a guarantor?", "en"],
+    ["Qui peut être répondant ?", "fr"],
+  ]) {
+    const result = resolveLookupContext({ message, formNumber: "PPTC 153", language });
+    assert.equal(result.selection.serviceId, "passport");
+    assert.equal(result.selection.facetId, "guarantor");
+    const query = catalog.buildCanonicalQuery(result.selection);
+    assert.match(query, language === "fr" ? /répondant/ : /guarantor/);
+    assert.doesNotMatch(query, /PRIVATE-CANARY|who is|Who can|Qui peut/);
+    const rephrase = resolveLookupContext({
+      message: "explain in one line", language, lookupContext: result.context,
+    });
+    assert.equal(rephrase.selection.facetId, "guarantor");
   }
 });
 

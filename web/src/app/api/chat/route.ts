@@ -206,7 +206,7 @@ export async function POST(request: Request) {
       intent: body.intent,
       form: body.form,
       selectedFieldId: body.selectedFieldId,
-      history: body.intent === "field" ? [] : sanitizeHistory(body.history),
+      history: sanitizeHistory(body.history),
       language: body.language ?? "en",
       signal: timeoutController.signal,
       lookupContext: body.lookupContext,

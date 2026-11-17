@@ -30,6 +30,7 @@ function loadModule(path) {
         ThinkingLevel: { LOW: "LOW" },
         GoogleGenAI: class {
           models = {
+            generateContent: async (call) => ({ text: JSON.stringify({ mode: "conversation", question: JSON.parse(call.contents).message }) }),
             generateContentStream: async (call) => {
               chatCall = call;
               return (async function* () { yield { text: "Field explanation." }; })();

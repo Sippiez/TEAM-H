@@ -104,6 +104,7 @@ export function resolveLookupContext(input: {
   lookupChoice?: LookupChoice;
   language: "en" | "fr";
   serviceHint?: ServiceId;
+  conversationHint?: Pick<LookupContext, "serviceId" | "jurisdiction" | "facetId" | "passportMode">;
 }): {
   context: LookupContext;
   selection: LookupSelection | null;
@@ -115,6 +116,7 @@ export function resolveLookupContext(input: {
   const previousJurisdictions = jurisdictionsIn(previous);
   const previousForms = publicFormsInText(previous);
   const supplied = validateLookupContext(input.lookupContext ?? {}) ?? {};
+  const hint = validateLookupContext(input.conversationHint ?? {}) ?? {};
   const prior: LookupContext = {
     ...(previousServices.length === 1 ? { serviceId: previousServices[0] } : {}),
     ...(previousServices.length === 1 && previousServices[0] === "passport" && passportModeIn(normalizedText(previous))
@@ -152,13 +154,17 @@ export function resolveLookupContext(input: {
   const publicForm = typedForm ??
     (usePriorScope ? prior.publicForm : undefined) ??
     (!form ? validatePublicForm({ number: input.formNumber, title: input.formTitle }) : undefined);
+  const questionFacet = requestedFacet(question);
+  const fallbackFacet = jurisdictionReply || (isRephrase(input.message) && question === input.message) ||
+    (formReply && question === input.message && questionFacet === "overview")
+    ? prior.facetId ?? "overview" : questionFacet;
+  const facetId = requestedFacet(input.message) !== "overview" ? requestedFacet(input.message)
+    : hint.facetId && hint.facetId !== "overview" ? hint.facetId : fallbackFacet;
   if (publicForm && services.length === 0 && !choice?.serviceId && !form &&
+    (!hint.serviceId || typedForm || refersToOpenForm) &&
     (!followupService || refersToOpenForm || typedForm)) {
     const jurisdiction = choice?.jurisdiction ?? (jurisdictions.length === 1
       ? jurisdictions[0] : publicForm === prior.publicForm ? prior.jurisdiction : undefined);
-    const facetId = jurisdictionReply || (isRephrase(input.message) && question === input.message) ||
-      (formReply && question === input.message && requestedFacet(question) === "overview")
-      ? prior.facetId ?? "overview" : requestedFacet(question);
     const context: LookupContext = { publicForm, facetId, ...(jurisdiction ? { jurisdiction } : {}) };
     return {
       context,
@@ -169,22 +175,27 @@ export function resolveLookupContext(input: {
   const serviceId = choice?.serviceId ?? (services.length === 1
     ? services[0]
     : services.length === 0
-      ? followupService ?? form?.serviceId ?? input.serviceHint
+      ? hint.serviceId ?? followupService ?? form?.serviceId ?? input.serviceHint
       : undefined);
   const sameService = serviceId === prior.serviceId;
   const passportMode = serviceId === "passport"
-    ? passportModeIn(text) ?? (sameService ? prior.passportMode : undefined) : undefined;
+    ? passportModeIn(text) ?? hint.passportMode ?? (sameService ? prior.passportMode : undefined) : undefined;
+  // Model hints are catalog identifiers, never public form identities. A model
+  // jurisdiction must also be grounded in user-supplied public context.
+  const candidateJurisdiction = hint.jurisdiction;
+  const hintedJurisdiction = candidateJurisdiction && (
+    supplied.jurisdiction === candidateJurisdiction ||
+    input.history?.some((turn) => turn.role === "user" && jurisdictionsIn(turn.text).includes(candidateJurisdiction)) ||
+    (form && form.serviceId === serviceId && form.jurisdiction === candidateJurisdiction)
+  ) ? candidateJurisdiction : undefined;
   const jurisdiction = serviceId && FEDERAL_SERVICES.has(serviceId)
     ? "federal"
     : choice?.jurisdiction ?? (jurisdictions.length === 1
       ? jurisdictions[0]
-      : refersToOpenForm && form && form.serviceId === serviceId
+      : hintedJurisdiction ?? (refersToOpenForm && form && form.serviceId === serviceId
         ? form.jurisdiction
         : ((refersBack || jurisdictionReply || sameService) && prior.jurisdiction !== "federal" ? prior.jurisdiction : undefined) ??
-          (form && form.serviceId === serviceId ? form.jurisdiction : undefined));
-  const facetId = jurisdictionReply || (isRephrase(input.message) && question === input.message) || (formReply && question === input.message && requestedFacet(question) === "overview")
-    ? prior.facetId ?? "overview"
-    : requestedFacet(question);
+          (form && form.serviceId === serviceId ? form.jurisdiction : undefined)));
   const context: LookupContext = {
     ...(serviceId ? { serviceId } : {}),
     ...(jurisdiction ? { jurisdiction } : {}),

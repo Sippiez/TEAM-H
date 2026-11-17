@@ -70,7 +70,7 @@ export const SERVICE_CATALOG = {
 } as const;
 
 export type ServiceId = keyof typeof SERVICE_CATALOG;
-export type FacetId = "overview" | "steps" | "fees" | "documents";
+export type FacetId = "overview" | "steps" | "fees" | "documents" | "guarantor";
 
 export const PUBLIC_FORMS = {
   pptc153: {
@@ -169,6 +169,7 @@ const FACETS: Record<FacetId, { en: string; fr: string }> = {
   steps: { en: "how to apply application steps", fr: "comment présenter une demande étapes" },
   fees: { en: "fees costs", fr: "frais coûts" },
   documents: { en: "required documents forms", fr: "formulaires documents requis" },
+  guarantor: { en: "guarantor role and requirements", fr: "rôle et exigences du répondant" },
 };
 
 const FACET_CUES: Record<FacetId, string[]> = {
@@ -176,6 +177,7 @@ const FACET_CUES: Record<FacetId, string[]> = {
   steps: ["how to", "how do", "apply", "application steps", "renew", "steps", "comment", "demande", "renouvel", "étapes"],
   fees: ["fee", "fees", "cost", "price", "how much", "pay", "frais", "coût", "cout", "prix", "combien"],
   documents: ["document", "form", "proof", "what do i need", "required", "documents", "formulaire", "preuve", "pièce", "requis", "download", "télécharger", "téléchargement"],
+  guarantor: ["guarantor", "guarantors", "répondant", "répondants", "répondante", "répondantes", "garant", "garants", "garante", "garantes"],
 };
 
 const JURISDICTION_KEYWORDS: Record<JurisdictionId, { en: string; fr: string }> = {
@@ -315,12 +317,16 @@ export function containsPhrase(text: string, phrase: string): boolean {
   return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`).test(text);
 }
 
+export function facetMatchesText(message: string, facetId: FacetId): boolean {
+  const text = normalizedText(message);
+  return FACET_CUES[facetId].some((cue) => containsPhrase(text, cue));
+}
+
 export function requestedFacet(message: string): FacetId {
   const text = normalizedText(message);
   if (/\b(download|telecharger|telechargement)\b/.test(text)) return "documents";
-  const matches = FACET_IDS.filter((id) => id !== "overview" &&
-    FACET_CUES[id].some((cue) => containsPhrase(text, cue)),
-  );
+  if (facetMatchesText(text, "guarantor")) return "guarantor";
+  const matches = FACET_IDS.filter((id) => id !== "overview" && facetMatchesText(text, id));
   return matches.length === 1 ? matches[0] : "overview";
 }
 
@@ -340,9 +346,7 @@ export function selectionIsExplicit(
   const mentionedServices = SERVICE_IDS.filter((serviceId) =>
     serviceMatchesText(text, serviceId),
   );
-  const matchingFacets = FACET_IDS.filter((facetId) =>
-    FACET_CUES[facetId].some((cue) => containsPhrase(text, cue)),
-  );
+  const matchingFacets = FACET_IDS.filter((facetId) => facetMatchesText(text, facetId));
   return mentionedServices.length === 1 &&
     mentionedServices[0] === selection.serviceId &&
     matchingFacets.length === 1 &&

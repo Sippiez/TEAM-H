@@ -65,6 +65,40 @@ const lookupImports = {
 };
 const lookup = loadModule("../src/lib/official/lookup.ts", lookupImports);
 
+test("guarantor lookup rejects generic service pages and keeps the relevant section of long official pages", async () => {
+  const selection = { serviceId: "passport", jurisdiction: "federal", facetId: "guarantor", language: "en", formId: "pptc153" };
+  const url = "https://www.canada.ca/en/immigration-refugees-citizenship/services/canadian-passports/new-adult-passport/required-documents-photos.html";
+  const evidence = "What your guarantor needs to do and who can be one. A guarantor confirms your identity for the passport application.";
+  const dependencies = {
+    search: async () => ({ candidates: [{ url, sponsored: false }], rejectedSponsored: 0 }),
+    fetchPage: async () => ({
+      url, title: "What you need to apply for a passport", language: "en-CA",
+      text: "Form ABC 123. You need documents, photos and a guarantor. " + "General passport application information. ".repeat(200) + evidence,
+    }),
+  };
+  const result = await lookup.lookupOfficialInformation(selection, undefined, dependencies);
+  assert.equal(result.outcome.status, "verified");
+  assert.ok(result.sources[0].evidence.includes(evidence), "Keep the guarantor section instead of clipping it out");
+  assert.ok(result.sources[0].evidence.length <= 4_000);
+  const irrelevant = await lookup.lookupOfficialInformation(selection, undefined, {
+    ...dependencies,
+    fetchPage: async () => ({
+      url, title: "Canadian passports", text: "Apply for a Canadian passport and find application information.", language: "en-CA",
+    }),
+  });
+  assert.equal(irrelevant.outcome.status, "no_verified_results");
+  assert.equal(irrelevant.outcome.reason, "no_relevant_pages");
+  const publicSelection = { publicForm: { number: "ABC 123" }, facetId: "guarantor", language: "en" };
+  const publicResult = await lookup.lookupOfficialInformation(publicSelection, undefined, dependencies);
+  assert.equal(publicResult.outcome.status, "verified");
+  assert.ok(publicResult.sources[0].evidence.includes(evidence));
+  const genericFormPage = await lookup.lookupOfficialInformation(publicSelection, undefined, {
+    ...dependencies,
+    fetchPage: async () => ({ url, title: "ABC 123 application", text: "Download ABC 123 here.", language: "en-CA" }),
+  });
+  assert.equal(genericFormPage.outcome.reason, "no_relevant_pages");
+});
+
 test("uncatalogued forms directly verify matching pages without assuming a jurisdiction", async () => {
   const selection = {
     publicForm: { number: "CIT 0001", title: "Application for citizenship certificate for adults and minors" },

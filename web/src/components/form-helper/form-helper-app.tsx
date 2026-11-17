@@ -365,7 +365,7 @@ export function FormHelperApp() {
                 )
               : undefined,
             selectedFieldId: fieldId ?? undefined,
-            history: intent === "field" ? undefined : history,
+            history,
             language: lang,
             lookupContext,
             lookupChoice: options?.lookupChoice,
