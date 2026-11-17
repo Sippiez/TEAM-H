@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>formER / Live demo script</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page-ink: var(--foreground, #22262b);
+        --page-muted: var(--muted-foreground, #4a525c);
+        --page-card: var(--card, #fff);
+        --page-border: var(--border, #cdd3da);
+        --page-yellow: var(--primary, #ffe94d);
+        --page-yellow-ink: var(--foreground, #8a6e00);
+        --page-wash: var(--secondary, #fffbe0);
+        --page-desk: var(--secondary, #f3f5f7);
+        color: var(--page-ink);
+        background: transparent;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        color: var(--page-ink);
+        background: transparent;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body { line-height: 1.6; }
+
+      a { color: inherit; }
+      a:focus-visible, summary:focus-visible {
+        outline: 3px solid var(--page-yellow-ink);
+        outline-offset: 3px;
+        border-radius: 2px;
+      }
+
+      .page {
+        width: min(100%, 920px);
+        margin: 0 auto;
+        padding: 8px 0 32px;
+      }
+
+      .measure { max-width: 65ch; }
+
+      .eyebrow, .cue-label, .time, .eyebrow-note {
+        font-size: 0.78rem;
+        font-weight: 750;
+        letter-spacing: 0.055em;
+        line-height: 1.35;
+        text-transform: uppercase;
+      }
+
+      .eyebrow, .eyebrow-note { color: var(--page-muted); }
+      .eyebrow { margin: 0 0 8px; }
+
+      h1, h2, h3, p { margin-top: 0; }
+      h1 {
+        margin-bottom: 4px;
+        font-size: clamp(2rem, 6vw, 2.65rem);
+        letter-spacing: -0.035em;
+        line-height: 1.08;
+      }
+
+      .subtitle {
+        margin-bottom: 8px;
+        color: var(--page-muted);
+        font-size: clamp(1.05rem, 3vw, 1.25rem);
+      }
+
+      .intro { margin: 16px 0 24px; font-size: 1rem; }
+
+      .running-order {
+        margin: 0 0 24px;
+        padding: 16px;
+        border: 1px solid var(--page-border);
+        border-radius: var(--radius, 6px);
+        background: var(--page-card);
+      }
+
+      .running-order h2, .preflight summary {
+        margin: 0 0 10px;
+        font-size: 1rem;
+        line-height: 1.35;
+      }
+
+      .running-order ol {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .running-order li { min-width: 100px; }
+      .running-order a {
+        display: inline-flex;
+        gap: 7px;
+        align-items: baseline;
+        text-decoration-thickness: 1px;
+        text-underline-offset: 3px;
+      }
+
+      .running-order time { font-variant-numeric: tabular-nums; font-weight: 750; }
+
+      .preflight {
+        margin-bottom: 28px;
+        padding: 16px;
+        border: 1px solid var(--page-border);
+        border-radius: var(--radius, 6px);
+        background: var(--page-card);
+      }
+
+      .preflight summary { cursor: pointer; font-weight: 750; }
+      .preflight ul { margin: 8px 0 0; padding-left: 1.25rem; }
+      .preflight li + li { margin-top: 5px; }
+
+      .section {
+        margin: 0 0 20px;
+        padding: 18px 16px 16px;
+        border: 1px solid var(--page-border);
+        border-radius: var(--radius, 6px);
+        background: var(--page-card);
+        scroll-margin-top: 12px;
+      }
+
+      .section-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 4px 12px;
+        margin-bottom: 14px;
+      }
+
+      .section h2 { margin: 0; font-size: clamp(1.25rem, 4vw, 1.55rem); line-height: 1.2; }
+      .time { color: var(--page-muted); font-variant-numeric: tabular-nums; }
+
+      .cue {
+        margin: 12px 0;
+        max-width: 65ch;
+      }
+
+      .cue-label {
+        display: inline-block;
+        margin: 0 0 5px;
+        padding: 2px 7px;
+        border-radius: 3px;
+      }
+
+      .say-label { background: var(--page-yellow); color: var(--primary-foreground, #22262b); }
+      .do-label { border: 1px solid var(--page-border); background: var(--page-desk); color: var(--page-ink); }
+      .show-label { border: 1px solid var(--page-border); background: var(--page-card); color: var(--page-muted); }
+      .aside-label { background: var(--page-wash); color: var(--page-yellow-ink); }
+
+      .say {
+        margin: 0;
+        max-width: 65ch;
+        font-size: clamp(1.125rem, 2.7vw, 1.28rem);
+        line-height: 1.6;
+      }
+
+      .do, .show, .aside-copy, .note {
+        margin: 0;
+        color: var(--page-muted);
+        font-size: 1rem;
+        line-height: 1.55;
+      }
+
+      .prompt {
+        overflow-wrap: anywhere;
+        margin: 8px 0 0;
+        padding: 12px 14px;
+        border-left: 4px solid var(--page-yellow);
+        border-radius: 2px var(--radius, 6px) var(--radius, 6px) 2px;
+        background: var(--page-wash);
+        color: var(--page-ink);
+        font-size: 1rem;
+        line-height: 1.5;
+        user-select: text;
+      }
+
+      mark {
+        padding: 0 0.12em;
+        background-color: var(--page-yellow);
+        color: var(--primary-foreground, #22262b);
+      }
+
+      .note { margin-top: 8px; font-size: 0.92rem; }
+
+      .fallback {
+        margin: 28px 0 0;
+        padding: 16px;
+        border: 1px solid var(--page-border);
+        border-left: 5px solid var(--page-yellow);
+        border-radius: var(--radius, 6px);
+        background: var(--page-wash);
+        color: var(--page-ink);
+      }
+
+      .fallback h2 { margin-bottom: 8px; font-size: 1.15rem; }
+      .fallback .say { font-size: clamp(1.08rem, 2.6vw, 1.2rem); }
+      .fallback .do { margin-top: 8px; color: var(--page-muted); }
+      .endnote { margin: 20px 0 0; color: var(--page-muted); font-size: 0.9rem; }
+
+      @media (min-width: 760px) {
+        .page { padding-top: 16px; }
+        .section { padding: 20px 22px 18px; }
+      }
+
+      @media (max-width: 420px) {
+        .page { padding-top: 4px; }
+        .running-order ol { gap: 7px 12px; }
+        .running-order li { min-width: calc(50% - 6px); }
+        .section { padding: 15px 13px; }
+      }
+
+      @media print {
+        :root, html, body { color-scheme: light; }
+        .page { width: 100%; max-width: none; padding: 0; }
+        .running-order, .preflight, .section, .fallback { break-inside: avoid; box-shadow: none; }
+        .preflight:not([open]) > *:not(summary) { display: block !important; }
+        .preflight summary { list-style: none; }
+        .running-order a { text-decoration: none; }
+        .section { margin-bottom: 12px; }
+        .say { font-size: 12.5pt; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="measure">
+        <p class="eyebrow">Presenter notes · Non-technical audience</p>
+        <h1>formER / Live demo script</h1>
+        <p class="subtitle">Four minutes. One person. One clear next step.</p>
+        <p class="intro">Read the Say lines aloud. Follow the Do cues silently. If you are running late, skip the optional follow-up.</p>
+      </header>
+
+      <nav class="running-order" aria-label="Demo running order">
+        <h2>Running order</h2>
+        <ol>
+          <li><a href="#problem"><time>0:00</time> Problem</a></li>
+          <li><a href="#open-form"><time>0:30</time> Open form</a></li>
+          <li><a href="#explain-field"><time>1:10</time> Explain field</a></li>
+          <li><a href="#official-source"><time>1:55</time> Official source</a></li>
+          <li><a href="#language"><time>2:50</time> Language</a></li>
+          <li><a href="#close"><time>3:20</time> Close</a></li>
+          <li><a href="#buffer"><time>3:45</time> Buffer</a></li>
+        </ol>
+      </nav>
+
+      <details class="preflight">
+        <summary>Preflight checklist</summary>
+        <ul>
+          <li>Have the app ready before the slot; do not set up or log in on stage.</li>
+          <li>Use the blank Adult passport application sample.</li>
+          <li>Locate “Surname of parent(s) at their birth” before starting.</li>
+          <li>Test the exact prompts on the presentation network.</li>
+          <li>Keep clearly labelled rehearsal screenshots ready as backup.</li>
+          <li>Never enter real personal information.</li>
+        </ul>
+      </details>
+
+      <section class="section" id="problem" aria-labelledby="problem-title">
+        <div class="section-head"><span class="time">0:00–0:30</span><h2 id="problem-title">Start with the problem</h2></div>
+        <div class="cue"><span class="cue-label show-label">SHOW</span><p class="show">Landing page.</p></div>
+        <div class="cue"><span class="cue-label say-label">SAY</span><p class="say">A government form can be straightforward to the department that created it and still be confusing to the person completing it. A single unfamiliar question can leave someone searching websites or asking for help. We built formER to help people understand what a form is asking and find the official information they need to move forward.</p></div>
+      </section>
+
+      <section class="section" id="open-form" aria-labelledby="open-form-title">
+        <div class="section-head"><span class="time">0:30–1:10</span><h2 id="open-form-title">Open a familiar example</h2></div>
+        <div class="cue"><span class="cue-label do-label">DO</span><p class="do">Click “Adult passport application” under “Try a sample form.”</p></div>
+        <div class="cue"><span class="cue-label say-label">SAY</span><p class="say">Let’s take a familiar example: applying for a passport. Rather than explaining the whole application at once, formER lets me focus on the particular question that’s stopping me. Here, it asks for my parents’ surnames at birth. Does that mean their current names, or something different?</p></div>
+        <div class="cue"><span class="cue-label do-label">DO</span><p class="do">Select “Surname of parent(s) at their birth” and let the explanation appear.</p></div>
+      </section>
+
+      <section class="section" id="explain-field" aria-labelledby="explain-field-title">
+        <div class="section-head"><span class="time">1:10–1:55</span><h2 id="explain-field-title">Make the question understandable</h2></div>
+        <div class="cue"><span class="cue-label show-label">SHOW</span><p class="show">Question and explanation side by side.</p></div>
+        <div class="cue"><span class="cue-label say-label">SAY</span><p class="say">The explanation sits beside the form, so I can see exactly which question it refers to. It helps me understand what information belongs here, rather than leaving me to interpret the wording on my own. And if the explanation still isn’t clear enough, I can ask a follow-up.</p></div>
+        <div class="cue"><span class="cue-label do-label">DO</span><p class="do">Click “Ask about this field.”</p></div>
+        <div class="cue"><span class="cue-label do-label">OPTIONAL PROMPT</span><p class="note">After the response appears, select and enter this prompt:</p><blockquote class="prompt">Explain that in one simple sentence.</blockquote></div>
+        <div class="cue"><span class="cue-label say-label">SAY</span><p class="say">The important part is that the help follows the question I’m working on. I don’t have to start from scratch each time.</p></div>
+        <p class="note">If the response is slow, skip the optional follow-up and continue.</p>
+      </section>
+
+      <section class="section" id="official-source" aria-labelledby="official-source-title">
+        <div class="section-head"><span class="time">1:55–2:50</span><h2 id="official-source-title">Find the official next step</h2></div>
+        <div class="cue"><span class="cue-label do-label">DO</span><p class="do">Open the Ask tab and enter:</p><blockquote class="prompt">Where can I download the official version of this form?</blockquote></div>
+        <div class="cue"><span class="cue-label say-label">SAY · WHILE LOADING</span><p class="say">Understanding the question is only part of the journey. People also need to know where to get the right information. Here, I’m asking for the official form without having to repeat which application we’re discussing.</p></div>
+        <div class="cue"><span class="cue-label do-label">DO</span><p class="do">Point to the official source. Open it briefly only if time allows.</p></div>
+        <div class="cue"><span class="cue-label say-label">SAY</span><p class="say">The answer provides a route back to the government source, so the person can check the original information. This is assistance—not an approval decision or a replacement for official instructions.</p></div>
+      </section>
+
+      <section class="section" id="language" aria-labelledby="language-title">
+        <div class="section-head"><span class="time">2:50–3:20</span><h2 id="language-title">Offer a language choice</h2></div>
+        <div class="cue"><span class="cue-label do-label">DO</span><p class="do">Switch the interface to French. Do not wait for another generated response.</p></div>
+        <div class="cue"><span class="cue-label say-label">SAY</span><p class="say">People also need help in a language they’re comfortable using. We can switch the interface between English and French, and new explanations use the selected language. That changes the assistance; it doesn’t translate the original PDF.</p></div>
+      </section>
+
+      <section class="section" id="close" aria-labelledby="close-title">
+        <div class="section-head"><span class="time">3:20–3:45</span><h2 id="close-title">Close on the value</h2></div>
+        <div class="cue"><span class="cue-label say-label">SAY</span><p class="say">We’ve opened a form, explained a confusing question, and found the official next step. The potential is less uncertainty for applicants and fewer routine questions for staff. formER doesn’t complete or submit applications. It helps people move from <mark>“What does this mean?” to “I know what to do next.”</mark></p></div>
+      </section>
+
+      <section class="section" id="buffer" aria-labelledby="buffer-title">
+        <div class="section-head"><span class="time">3:45–4:00</span><h2 id="buffer-title">Leave room to breathe</h2></div>
+        <div class="cue"><span class="cue-label show-label">SHOW</span><p class="show">No extra feature. Use the remaining 15 seconds for delays.</p></div>
+      </section>
+
+      <aside class="fallback" aria-labelledby="fallback-title">
+        <h2 id="fallback-title">If a live answer fails</h2>
+        <p class="eyebrow-note">SAY</p>
+        <p class="say">The live answer hasn’t completed, so I won’t present it as verified. Here’s a screenshot from our rehearsal showing this same step.</p>
+        <p class="do">Then continue the story. Don’t debug on stage.</p>
+      </aside>
+      <p class="endnote">Keep the demo focused on assistance and the official next step—not on an approval decision or completing the application.</p>
+    </main>
+  </body>
+</html>
