@@ -7,7 +7,7 @@ import type { FormField, OfficialLookupSummary } from "@/lib/types";
 export type Lang = "en" | "fr";
 
 /*
- * Curated field explanations remain in English. Gemini chat uses the interface
+ * Curated field explanations remain in English. AI chat uses the interface
  * language at request time, recorded on each message.
  * The French copy is a draft and needs review by a fluent speaker (see decision 0003).
  */
@@ -67,8 +67,8 @@ const en = {
   limits: ["PDF only", "Up to 10 MB", "Up to 5 open at once", "Fillable forms"],
   supported: "Use blank, fillable PDFs. Scanned, flattened, password-protected and XFA-only forms aren't supported for field explanations.",
   privacyRest:
-    "The PDF is read in your browser and isn't uploaded. Chat sends the filename, form and field metadata, and recent messages to Google Gemini, not PDF bytes or entered field values. Official lookup checks known pages first and uses Serper to discover other official pages when needed. Serper receives catalog keywords or the public title and number read from a blank form, plus the information topic, interface language and jurisdiction when known — never chat history, filenames or field values. Use blank forms only.",
-  rulesNotAi: "Chat uses Google Gemini for answers, not its built-in Google Search tool. Official lookup checks known pages first and uses Serper for web search when needed. Serper receives catalog keywords or the public title and number read from a blank form, plus the information topic, interface language and jurisdiction when known, not chat history, filenames or field values. Use blank forms only. Search snippets are not evidence: the app must fetch and verify official pages before using their text in an answer.",
+    "The PDF is read in your browser and isn't uploaded. Chat sends the filename, form and field metadata, and recent messages to the configured AI provider (OpenAI by default, or Google Gemini), not PDF bytes or entered field values. Official lookup checks known pages first and uses Serper to discover other official pages when needed. Serper receives catalog keywords or the public title and number read from a blank form, plus the information topic, interface language and jurisdiction when known — never chat history, filenames or field values. Use blank forms only.",
+  rulesNotAi: "Chat uses the configured AI provider (OpenAI by default, or Google Gemini) for answers, without built-in web search. Official lookup checks known pages first and uses Serper for web search when needed. Serper receives catalog keywords or the public title and number read from a blank form, plus the information topic, interface language and jurisdiction when known, not chat history, filenames or field values. Use blank forms only. Search snippets are not evidence: the app must fetch and verify official pages before using their text in an answer.",
   aiPrivacyDetails: "AI and search privacy",
   featuresTitle: "What formER does",
   features: [
@@ -364,8 +364,8 @@ const fr: Dict = {
   limits: ["PDF seulement", "Jusqu'à 10 Mo", "Jusqu'à 5 ouverts à la fois", "Formulaires à remplir"],
   supported: "Utilisez des PDF vierges avec des champs à remplir. Les formulaires numérisés, aplatis, protégés par mot de passe ou uniquement XFA ne permettent pas d'expliquer les champs.",
   privacyRest:
-    "Le PDF est lu dans votre navigateur et n'est pas téléversé. Le clavardage transmet le nom du fichier, les métadonnées et les messages récents à Google Gemini, pas le PDF ni les valeurs saisies. L'application vérifie d'abord les pages connues et utilise Serper pour trouver d'autres pages officielles au besoin. Serper reçoit les mots-clés du catalogue ou le titre public et le numéro lus sur un formulaire vierge, le sujet, la langue de l'interface et le territoire si connu, jamais l'historique, le nom du fichier ni les valeurs saisies. Utilisez uniquement des formulaires vierges.",
-  rulesNotAi: "Le clavardage utilise Google Gemini pour les réponses, pas son outil Google Search intégré. L'application vérifie d'abord les pages connues et utilise Serper pour la recherche Web au besoin. Serper reçoit les mots-clés du catalogue ou le titre public et le numéro lus sur un formulaire vierge, le sujet, la langue de l'interface et le territoire si connu, pas l'historique, le nom du fichier ni les valeurs saisies. Utilisez uniquement des formulaires vierges. Les extraits de recherche ne sont pas des preuves : l'application doit consulter et vérifier les pages officielles avant d'utiliser leur contenu dans une réponse.",
+    "Le PDF est lu dans votre navigateur et n'est pas téléversé. Le clavardage transmet le nom du fichier, les métadonnées et les messages récents au fournisseur d'IA configuré (OpenAI par défaut, ou Google Gemini), pas le PDF ni les valeurs saisies. L'application vérifie d'abord les pages connues et utilise Serper pour trouver d'autres pages officielles au besoin. Serper reçoit les mots-clés du catalogue ou le titre public et le numéro lus sur un formulaire vierge, le sujet, la langue de l'interface et le territoire si connu, jamais l'historique, le nom du fichier ni les valeurs saisies. Utilisez uniquement des formulaires vierges.",
+  rulesNotAi: "Le clavardage utilise le fournisseur d'IA configuré (OpenAI par défaut, ou Google Gemini) pour les réponses, sans recherche Web intégrée. L'application vérifie d'abord les pages connues et utilise Serper pour la recherche Web au besoin. Serper reçoit les mots-clés du catalogue ou le titre public et le numéro lus sur un formulaire vierge, le sujet, la langue de l'interface et le territoire si connu, pas l'historique, le nom du fichier ni les valeurs saisies. Utilisez uniquement des formulaires vierges. Les extraits de recherche ne sont pas des preuves : l'application doit consulter et vérifier les pages officielles avant d'utiliser leur contenu dans une réponse.",
   aiPrivacyDetails: "Confidentialité : IA et recherche",
   featuresTitle: "Ce que fait formER",
   features: [

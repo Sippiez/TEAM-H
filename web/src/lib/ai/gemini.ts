@@ -5,9 +5,10 @@ import {
   GoogleGenAI,
   ThinkingLevel,
   type GenerateContentParameters,
-  type GenerateContentResponse,
 } from "@google/genai";
 import type { AssociationRequest } from "@/lib/context-association";
+import { getAIConfig } from "./config";
+import { createOpenAIClient, type ModelClient, type ModelResponse } from "./openai";
 
 import type {
   ChatHistoryMessage,
@@ -30,7 +31,6 @@ import {
 import { isRephrase, resolveLookupContext, resolveLookupQuestion } from "@/lib/official/context";
 import { lookupOfficialWithSerper, type OfficialLookupResult } from "@/lib/official/lookup";
 
-const DEFAULT_MODEL = "gemini-3.1-flash-lite";
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_HISTORY_MESSAGE_LENGTH = 1_000;
 const MAX_FIELDS_IN_PROMPT = 250;
@@ -45,7 +45,7 @@ function startDevLog(operation: string, details: Record<string, unknown>) {
   const started = Date.now();
   const log = (event: string, data: Record<string, unknown> = {}) => {
     if (enabled) {
-      console.info("[gemini]", {
+      console.info(`[${getAIConfig().provider}]`, {
         id, operation, event, elapsedMs: Date.now() - started, ...data,
       });
     }
@@ -65,7 +65,7 @@ function requestLogDetails(params: GenerateContentParameters) {
   };
 }
 
-function responseLogDetails(response: GenerateContentResponse) {
+function responseLogDetails(response: ModelResponse) {
   return {
     functionCalls: (response.functionCalls ?? []).map((call) => {
       const selection = call.name === LOOKUP_TOOL ? validateLookupSelection(call.args) : null;
@@ -96,10 +96,10 @@ function responseLogDetails(response: GenerateContentResponse) {
 }
 
 async function generateLogged(
-  ai: GoogleGenAI,
+  ai: ModelClient,
   operation: string,
   params: GenerateContentParameters,
-): Promise<GenerateContentResponse> {
+): Promise<ModelResponse> {
   const log = startDevLog(operation, requestLogDetails(params));
   try {
     const response = await ai.models.generateContent(params);
@@ -114,10 +114,10 @@ async function generateLogged(
 }
 
 async function* streamLogged(
-  ai: GoogleGenAI,
+  ai: ModelClient,
   operation: string,
   params: GenerateContentParameters,
-): AsyncGenerator<GenerateContentResponse> {
+): AsyncGenerator<ModelResponse> {
   const log = startDevLog(operation, requestLogDetails(params));
   let chunks = 0;
   let completed = false;
@@ -147,13 +147,14 @@ async function* streamLogged(
   }
 }
 
-function getClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
+function getClient(): ModelClient {
+  const { provider, apiKey } = getAIConfig();
 
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured");
+    throw new Error("The AI service is not configured");
   }
 
+  if (provider === "openai") return createOpenAIClient(apiKey);
   cachedClient ??= new GoogleGenAI({ apiKey });
   return cachedClient;
 }
@@ -416,7 +417,7 @@ function publicSource(source: OfficialLookupResult["sources"][number]): Resource
 
 async function* streamMetadataAnswer(
   input: StreamChatInput,
-  ai: GoogleGenAI,
+  ai: ModelClient,
   model: string,
 ): AsyncGenerator<ChatStreamEvent> {
   const currentRequest =
@@ -459,7 +460,7 @@ async function* streamMetadataAnswer(
 
 async function* streamOfficialAnswer(
   input: StreamChatInput,
-  ai: GoogleGenAI,
+  ai: ModelClient,
   model: string,
 ): AsyncGenerator<ChatStreamEvent> {
   const contextInput = {
@@ -604,7 +605,7 @@ export async function streamGeminiChat(
   input: StreamChatInput,
 ): Promise<AsyncGenerator<ChatStreamEvent>> {
   const ai = getClient();
-  const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+  const { model } = getAIConfig();
   if (!cleanText(input.message ?? "", 1_000) && input.intent !== "overview") {
     throw new Error("A message or supported intent is required");
   }
@@ -616,7 +617,7 @@ export async function streamGeminiChat(
 }
 
 export async function associateFieldContext(input: AssociationRequest, signal: AbortSignal): Promise<unknown> {
-  const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+  const { model } = getAIConfig();
   const response = await generateLogged(getClient(), "field-context", {
     model,
     contents: JSON.stringify({
@@ -669,7 +670,7 @@ export async function generateGeminiFieldExplanation(input: {
   curated: FieldExplanation;
   signal: AbortSignal;
 }): Promise<GeneratedFieldExplanation> {
-  const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+  const { model } = getAIConfig();
   const curatedGuidance = input.curated.grounded
     ? {
         meaning: input.curated.meaning,

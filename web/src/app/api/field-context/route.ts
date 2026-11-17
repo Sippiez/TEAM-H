@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { associateFieldContext } from "@/lib/ai/gemini";
+import { isAIConfigured } from "@/lib/ai/config";
 import { isAssociationRequest, resolveAssociation } from "@/lib/context-association";
 
 export async function POST(request: Request) {
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
   if (!isAssociationRequest(input)) return NextResponse.json({ error: "Invalid field context" }, { status: 400 });
-  if (!process.env.GEMINI_API_KEY) return NextResponse.json({ error: "The AI service is not configured" }, { status: 503 });
+  if (!isAIConfigured()) return NextResponse.json({ error: "The AI service is not configured" }, { status: 503 });
 
   const controller = new AbortController();
   let timedOut = false;

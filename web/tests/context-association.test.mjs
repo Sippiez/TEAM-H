@@ -12,6 +12,10 @@ function loadModule(path, imports = {}, globals = {}) {
   vm.runInNewContext(outputText, {
     exports, Error, DOMException, AbortController, setTimeout, clearTimeout,
     require(name) {
+      if (name === "./config" || name === "@/lib/ai/config") {
+        return loadModule("../src/lib/ai/config.ts", {}, globals);
+      }
+      if (name === "./openai") return { createOpenAIClient: () => assert.fail("Unexpected OpenAI call") };
       assert.ok(Object.hasOwn(imports, name), `Unexpected import: ${name}`);
       return imports[name];
     },
@@ -41,7 +45,7 @@ const selection = {
   instructionBlockIds: ["i"], optionBlockIds: ["yes", "no"],
 };
 
-function setupRoute(provider, { env = { GEMINI_API_KEY: "test-only" }, fakeTimers = false } = {}) {
+function setupRoute(provider, { env = { OPENAI_API_KEY: "test-only" }, fakeTimers = false } = {}) {
   const timers = new Map();
   const logs = [];
   return {
@@ -196,7 +200,7 @@ test("AI sees bounded block evidence, not PDF bytes, entered values or arbitrary
         };
       },
     },
-  }, { process: { env: { GEMINI_API_KEY: "test-only" } } });
+  }, { process: { env: { AI_PROVIDER: "gemini", GEMINI_API_KEY: "test-only" } } });
   await associateFieldContext({
     ...input, pdfBytes: "private-pdf",
     candidates: {

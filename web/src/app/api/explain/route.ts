@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { generateGeminiFieldExplanation } from "@/lib/ai/gemini";
+import { isAIConfigured } from "@/lib/ai/config";
 import { explainField } from "@/lib/explain";
 import { isFieldSummary } from "@/lib/field-context";
 import type { ExplainRequest } from "@/lib/types";
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
   if (body.language !== undefined && body.language !== "en" && body.language !== "fr") {
     return NextResponse.json({ error: "Unsupported language" }, { status: 400 });
   }
-  if (!process.env.GEMINI_API_KEY) {
+  if (!isAIConfigured()) {
     return NextResponse.json({ error: "The AI service is not configured" }, { status: 503 });
   }
 

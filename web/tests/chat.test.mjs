@@ -15,6 +15,10 @@ function loadModule(path, imports, globals = {}) {
   vm.runInNewContext(outputText, {
     exports,
     require(name) {
+      if (name === "./config" || name === "@/lib/ai/config") {
+        return loadModule("../src/lib/ai/config.ts", {}, globals);
+      }
+      if (name === "./openai") return { createOpenAIClient: () => assert.fail("Unexpected OpenAI call") };
       assert.ok(Object.hasOwn(imports, name), `Unexpected import: ${name}`);
       return imports[name];
     },
@@ -25,7 +29,7 @@ function loadModule(path, imports, globals = {}) {
   return exports;
 }
 
-function setupRoute(streamGeminiChat, env = { GEMINI_API_KEY: "test-only" }) {
+function setupRoute(streamGeminiChat, env = { OPENAI_API_KEY: "test-only" }) {
   const timers = new Map();
   const logs = [];
   const hosts = loadModule("../src/lib/official/hosts.ts", {});
@@ -99,10 +103,26 @@ test("malformed requests fail before contacting the provider", async (t) => {
 });
 
 test("missing key returns a retryable 503 without leaking configuration", async () => {
-  const { POST } = setupRoute(() => assert.fail("Provider should not be called"), {});
+  for (const env of [
+    {},
+    { GEMINI_API_KEY: "unselected-provider" },
+    { AI_PROVIDER: "gemini", OPENAI_API_KEY: "unselected-provider" },
+    { AI_PROVIDER: "invalid", OPENAI_API_KEY: "test-only" },
+  ]) {
+    const { POST } = setupRoute(() => assert.fail("Provider should not be called"), env);
+    const response = await POST(request(message));
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { error: "The AI service is not configured" });
+  }
+});
+
+test("explicit Gemini configuration remains available without an OpenAI key", async () => {
+  const { POST } = setupRoute(async () => (async function* () {
+    yield { version: 1, type: "delta", text: "Gemini answer" };
+  })(), { AI_PROVIDER: "gemini", GEMINI_API_KEY: "test-only" });
   const response = await POST(request(message));
-  assert.equal(response.status, 503);
-  assert.deepEqual(await response.json(), { error: "The AI service is not configured" });
+  assert.equal(response.status, 200);
+  assert.match(await response.text(), /Gemini answer/);
 });
 
 test("text is streamed incrementally with bounded history and selected context", async () => {
@@ -274,6 +294,7 @@ function setupGemini({
   searchUrls = [],
   searchStatus = 200,
 } = {}) {
+  env = { ...env, AI_PROVIDER: "gemini" };
   const calls = [];
   const logs = [];
   const directAttempts = [];

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { streamGeminiChat } from "@/lib/ai/gemini";
+import { isAIConfigured } from "@/lib/ai/config";
 import { abortable } from "@/lib/abortable";
 import { validateLookupChoice, validateLookupContext, validatePublicForm } from "@/lib/official/catalog";
 import { isFieldSummary } from "@/lib/field-context";
@@ -172,7 +173,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!process.env.GEMINI_API_KEY) {
+  if (!isAIConfigured()) {
     return NextResponse.json(
       {
         error: "The AI service is not configured",
@@ -297,7 +298,7 @@ export async function POST(request: Request) {
 
     const missingKey =
       error instanceof Error &&
-      error.message === "GEMINI_API_KEY is not configured";
+      error.message === "The AI service is not configured";
 
     console.error("AI chat request failed", {
       name: error instanceof Error ? error.name : "UnknownError",

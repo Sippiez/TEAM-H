@@ -258,7 +258,7 @@ test("starter suggestions yield space to answers while privacy details remain ac
   const initial = render({ text: "Overview" }, "en", { suggestions });
   assert.match(initial, /Download this form/);
   assert.match(initial, /<summary[^>]*>.*AI and search privacy<\/summary>/);
-  assert.match(initial, /Chat uses Google Gemini/);
+  assert.match(initial, /Chat uses the configured AI provider \(OpenAI by default, or Google Gemini\)/);
   assert.match(initial, /Serper/);
   assert.match(initial, /Search snippets are not evidence/);
   assert.doesNotMatch(initial, /using Brave|Google Search grounding is the fallback/);
@@ -274,7 +274,7 @@ test("starter suggestions yield space to answers while privacy details remain ac
   });
   assert.doesNotMatch(conversation, /Download this form/);
   assert.match(conversation, /Confidentialité : IA et recherche/);
-  assert.match(conversation, /Le clavardage utilise Google Gemini/);
+  assert.match(conversation, /Le clavardage utilise le fournisseur d&#x27;IA configuré \(OpenAI par défaut, ou Google Gemini\)/);
   assert.match(conversation, /Serper/);
   assert.doesNotMatch(conversation, /Le clavardage partage les métadonnées/);
 });

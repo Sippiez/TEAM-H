@@ -65,8 +65,9 @@ verification:
 export NODE_EXTRA_CA_CERTS=/path/to/your-root-ca.pem
 ```
 
-Chat uses server-side Gemini streaming and needs `GEMINI_API_KEY` (see below).
-During `npm run dev`, the server terminal prints `[gemini]` events for API
+Chat uses server-side OpenAI streaming by default and needs `OPENAI_API_KEY`
+(see below). Set `AI_PROVIDER=gemini` to use the existing Gemini integration.
+During `npm run dev`, the server terminal prints `[openai]` or `[gemini]` events for API
 requests, streaming responses, completion/errors, and official-information tool
 execution. Logs include the model, enabled tools, validated public lookup
 selections, source counts, token usage when provided, and elapsed time. They
@@ -77,21 +78,22 @@ Invalid planner calls show allowlisted
 argument values (including `unknown`) and an argument-validation status rather
 than only `selection: null`. Unregistered form labels are redacted from logs.
 These logs are disabled outside development.
-The default is the stable `gemini-3.1-flash-lite`, with low reasoning effort
-to limit cost and latency. It is the cheapest stable thinking model verified
-accessible with the configured account; older 2.5 models returned 404.
-See [decision 0004](docs/decisions/0004-gemini-streaming-chat.md).
-Field-panel explanations also use Gemini and require a key. They use the
+The default model is `gpt-6-luna`, with low reasoning effort. `OPENAI_MODEL`
+can select another compatible OpenAI Responses API model; model availability
+depends on the account and has not been verified with a live API call.
+Gemini defaults to `gemini-3.1-flash-lite` when explicitly selected.
+See [decision 0010](docs/decisions/0010-openai-default-provider.md).
+Field-panel explanations also use the selected provider and require its key. They use the
 selected field's printed question and instructions, plus curated guidance when
 available. PDF loading and local field-context extraction do not require a key;
-ambiguous contexts can be associated on demand using Gemini.
+ambiguous contexts can be associated on demand using the selected provider.
 
 Service navigation uses **direct official-page lookup first**, with **Serper
 for web search**. Recognized download questions, mapped services and known
 IRCC form-directory entries try their official pages without spending search
 credits. If a mapped page cannot be verified, or no mapping exists, the server
 uses `SERPER_API_KEY` to discover candidate pages. It fetches and verifies each
-admitted candidate before ordinary Gemini synthesizes an answer from excerpts.
+admitted candidate before the selected model synthesizes an answer from excerpts.
 Neither Gemini's built-in Google Search tool nor Brave is used. No new SDK or
 dependency is needed.
 
@@ -269,21 +271,27 @@ only if you do not already have `.env.local`:
 cp -n .env.example .env.local
 ```
 
-Set `GEMINI_API_KEY` to a Google AI Studio key in that ignored local file or in
-your deployment's server-side secret store. Set `SERPER_API_KEY` to your Serper
+Set `OPENAI_API_KEY` in that ignored local file or in your deployment's
+server-side secret store. The default `AI_PROVIDER=openai` uses
+`OPENAI_MODEL=gpt-6-luna`. To use Gemini instead, set `AI_PROVIDER=gemini` and
+`GEMINI_API_KEY` to a Google AI Studio key; `GEMINI_MODEL` optionally overrides
+`gemini-3.1-flash-lite`. A key for the unselected provider is not required and
+is never used as an automatic fallback. Invalid provider names return the same
+configuration error as a missing key.
+Set `SERPER_API_KEY` to your Serper
 key for search discovery and failed mapped-page lookups. Mapped pages and
 recognized downloads work without a search key if direct verification succeeds.
 `web/.env` is also supported; keep existing secrets there if already configured.
-Search now consumes Serper credits rather than Gemini grounding quota; ordinary
-Gemini generation quotas still apply to planning and answers.
-`GEMINI_MODEL` optionally overrides
-`gemini-3.1-flash-lite`. Never prefix any key with `NEXT_PUBLIC_`.
+Search consumes Serper credits; the selected AI provider's generation charges
+and quotas apply to planning, field assistance and answers. OpenAI requests set
+`store: false`; this does not change the provider's other data-retention policies.
+Never prefix any key with `NEXT_PUBLIC_`.
 Next.js loads `.env*` from `web/`, with `.env.local` taking precedence over
 `.env`; restart the server after changing configuration. Never commit actual
 credentials. The root [.env.example](.env.example) lists the same variable names
 for reference; the running app does not load environment files from the root.
 
-Chat has a 60-second deadline. Missing `GEMINI_API_KEY` returns 503; a Gemini
+Chat has a 60-second deadline. A missing selected-provider key returns 503; a provider
 startup failure before streaming returns 502, and deadline expiry before
 streaming returns 504. After a failed direct attempt, Google search quota
 exhaustion produces an explicit `grounding_quota` state with the original

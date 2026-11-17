@@ -13,6 +13,10 @@ function loadModule(path, imports, globals = {}) {
   vm.runInNewContext(outputText, {
     exports,
     require(name) {
+      if (name === "./config" || name === "@/lib/ai/config") {
+        return loadModule("../src/lib/ai/config.ts", {}, globals);
+      }
+      if (name === "./openai") return { createOpenAIClient: () => assert.fail("Unexpected OpenAI call") };
       assert.ok(Object.hasOwn(imports, name), `Unexpected import: ${name}`);
       return imports[name];
     },
@@ -36,7 +40,7 @@ const generated = {
   commonMistakes: ["Gemini warning"],
 };
 
-function setupRoute(provider, env = { GEMINI_API_KEY: "test-only" }) {
+function setupRoute(provider, env = { OPENAI_API_KEY: "test-only" }) {
   const timers = new Map();
   const logs = [];
   const route = loadModule("../src/app/api/explain/route.ts", {
@@ -151,7 +155,7 @@ test("Gemini explanation uses structured JSON, safe context, and selected langua
         };
       },
     },
-  }, { process: { env: { GEMINI_API_KEY: "test-only", GEMINI_MODEL: "test-model" } } });
+  }, { process: { env: { AI_PROVIDER: "gemini", GEMINI_API_KEY: "test-only", GEMINI_MODEL: "test-model" } } });
 
   const signal = new AbortController().signal;
   const result = await generateGeminiFieldExplanation({

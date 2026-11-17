@@ -23,7 +23,7 @@ function loadModule(path) {
   vm.runInNewContext(outputText, {
     exports,
     URL,
-    process: { env: { GEMINI_API_KEY: "test-only" } },
+    process: { env: { AI_PROVIDER: "gemini", GEMINI_API_KEY: "test-only" } },
     require(name) {
       if (name === "server-only") return {};
       if (name === "@google/genai") return {
