@@ -233,7 +233,7 @@ const en = {
   navigatorSuggestions: [
     "How do I renew a passport?",
     "I lost my job. How do I apply for Employment Insurance?",
-    "How do I get a Social Insurance Number?",
+    "Where do I download the Saskatchewan Student Aid form from?",
     "Where do I download the Canadian pension plan from?",
   ],
   overviewSuggestion: "Give me an overview of this form",
@@ -524,7 +524,7 @@ const fr: Dict = {
   navigatorSuggestions: [
     "Comment renouveler mon passeport ?",
     "J'ai perdu mon emploi. Comment demander l'assurance-emploi ?",
-    "Comment obtenir un numéro d'assurance sociale ?",
+    "Où puis-je télécharger le formulaire d'aide financière aux étudiants de la Saskatchewan ?",
     "Où puis-je télécharger le Régime de pensions du Canada ?",
   ],
   overviewSuggestion: "Donne-moi un aperçu de ce formulaire",
